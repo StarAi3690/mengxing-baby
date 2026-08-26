@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a0a52"/>
+      <stop offset="0.45" stop-color="#3a1166"/>
+      <stop offset="1" stop-color="#0d0520"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+      <stop offset="0" stop-color="#b14dff" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#7b1fa2" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd54f" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffd54f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="cone2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4dd0ff" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#4dd0ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="cone3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5edb" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#ff5edb" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a1b9a"/>
+      <stop offset="1" stop-color="#1a0633"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 夜空背景 -->
+  <rect width="1200" height="520" fill="url(#sky)"/>
+  <rect width="1200" height="520" fill="url(#glow)"/>
+
+  <!-- 顶部射灯光束 -->
+  <polygon points="120,0 60,360 200,360" fill="url(#cone)" opacity="0.8"/>
+  <polygon points="420,0 360,360 500,360" fill="url(#cone2)" opacity="0.7"/>
+  <polygon points="760,0 700,360 840,360" fill="url(#cone3)" opacity="0.7"/>
+  <polygon points="1080,0 1010,360 1160,360" fill="url(#cone)" opacity="0.8"/>
+
+  <!-- 星点 -->
+  <g fill="#ffffff" opacity="0.8">
+    <circle cx="180" cy="70" r="2"/><circle cx="320" cy="40" r="1.6"/>
+    <circle cx="540" cy="90" r="2.2"/><circle cx="690" cy="50" r="1.5"/>
+    <circle cx="900" cy="80" r="2"/><circle cx="1040" cy="44" r="1.7"/>
+    <circle cx="60" cy="120" r="1.5"/><circle cx="1150" cy="110" r="1.8"/>
+  </g>
+
+  <!-- 舞台地板（透视梯形 + 霓虹边） -->
+  <polygon points="120,360 1080,360 1180,520 20,520" fill="url(#floor)"/>
+  <polygon points="120,360 1080,360 1180,520 20,520" fill="none" stroke="#ffd54f" stroke-width="3" opacity="0.9"/>
+  <line x1="120" y1="360" x2="1080" y2="360" stroke="#ff5edb" stroke-width="4" opacity="0.9"/>
+  <!-- 地板霓虹网格 -->
+  <g stroke="#4dd0ff" stroke-width="1.5" opacity="0.35">
+    <line x1="220" y1="420" x2="980" y2="420"/>
+    <line x1="170" y1="470" x2="1030" y2="470"/>
+    <line x1="350" y1="360" x2="300" y2="520"/>
+    <line x1="600" y1="360" x2="600" y2="520"/>
+    <line x1="850" y1="360" x2="900" y2="520"/>
+  </g>
+
+  <!-- 两侧音箱剪影 -->
+  <rect x="40" y="370" width="40" height="130" rx="6" fill="#2a0a3e" stroke="#ffd54f" stroke-width="2" opacity="0.9"/>
+  <rect x="1120" y="370" width="40" height="130" rx="6" fill="#2a0a3e" stroke="#ffd54f" stroke-width="2" opacity="0.9"/>
+  <g fill="#1a0633">
+    <circle cx="60" cy="400" r="8"/><circle cx="60" cy="430" r="8"/><circle cx="60" cy="460" r="8"/>
+    <circle cx="1140" cy="400" r="8"/><circle cx="1140" cy="430" r="8"/><circle cx="1140" cy="460" r="8"/>
+  </g>
+</svg>

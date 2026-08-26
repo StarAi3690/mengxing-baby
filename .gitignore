@@ -1,0 +1,5 @@
+# B方案：彻底去 Netlify，不推 Netlify 相关文件
+netlify/
+netlify.toml
+
+temp/

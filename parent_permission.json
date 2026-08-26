@@ -1,0 +1,12 @@
+{
+  "parentLockEnabled": true,
+  "defaultPin": "0000",
+  "sessionIsolation": true,
+  "tabs": ["home", "calendar", "tasks"],
+  "tabLabels": {
+    "home": "工作台主页",
+    "calendar": "个人日历·日程",
+    "tasks": "学习任务·套组"
+  },
+  "note": "家长工作台权限配置：parentLockEnabled=进入强制密码；defaultPin=默认密码(首次即生效)；sessionIsolation=切到其他一级菜单立即失效，重返需重输；tabs/tabLabels=页签控制台结构。本文件可被同目录部署覆盖内嵌默认值。"
+}
