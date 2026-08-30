@@ -10511,6 +10511,9 @@ window.DB = {
         // [修复#248] 以「是否已设过密码」决定 设置/登录，而非 firstSetup（firstSetup 仅在全新首次为真）
         var pinSetting = !hasPin;
         return '<div class="mx-lock-sub" id="mx-lock-sub">' + (pinSetting ? '请设置字母数字密码（4–12 位，用于家长验证）' : '请输入字母数字密码进入') + '</div>' +
+          /* [修复] 补上错误提示容器：此前密码模式没有 #mx-lock-err，
+             fail() 取不到元素，"密码不正确 / 两次不一致 / 至少4位" 等提示全部静默不显示 */
+          '<div class="mx-lock-err" id="mx-lock-err"></div>' +
           '<div class="mx-lock-pinrow" style="flex-direction:column;align-items:stretch;gap:8px">' +
             '<input type="password" id="mx-lock-pin" maxlength="12" placeholder="字母数字密码" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
             (pinSetting ? '<input type="password" id="mx-lock-pin2" maxlength="12" placeholder="再次输入确认" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' : '') +
@@ -10584,6 +10587,12 @@ window.DB = {
     function rerender() {
       var old = overlay.querySelector('.mx-lock');
       old.innerHTML = tabHTML() + bodyHTML() + '<div class="mx-lock-actions" style="margin-top:10px"><button type="button" class="mx-lock-cancel" id="mx-lock-cancel">取消</button></div>';
+      /* [修复#手势不可见] 重渲染后必须重新查询 #mx-gesture。
+         初次渲染时若处于「密码」模式，DOM 里没有 #mx-gesture，g 为 null；
+         此时切到「手势密码」页签，若不重新绑定，buildDots()/drawLines() 里的
+         if (!g) return 会静默返回，手势圆点区域一片空白（表现为"手势密码看不到了"）。
+         反向亦然：从手势切走再切回，旧的 g 已是被销毁的游离节点，画到上面也看不见。 */
+      g = overlay.querySelector('#mx-gesture');
       bindDynamic();
     }
     function bindDynamic() {
