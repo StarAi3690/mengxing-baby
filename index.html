@@ -23253,14 +23253,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (!res || !res.ok) {
           msg.textContent = (res && res.msg) || '激活失败，请重试';
           if (res && res.already_bound) {
-            // 已激活：自动切到登录通道引导恢复
+            // ★ P1-L1：普通码 + 同设备 → 直接重激活恢复本机数据（清缓存也能识别本机，不提示联系客服）
+            if (res.same_device && !res.vip) {
+              lsSet(STORAGE.activated, '1');
+              lsSet(STORAGE.code, code);
+              mxWriteVipInfo({ vip: 0, vip_level: '1', expire_at: '' });
+              showLocalModePopup(function () { enterApp(false, '✅ 本机已识别，已自动恢复激活状态'); });
+              return;
+            }
+            // 其余情况（VIP / 不同设备）→ 切登录通道引导恢复
             switchTab('login');
             if (res.bound_account_masked) {
               lmsg.textContent = '此卡密已绑定账号 ' + res.bound_account_masked + '，请输入该账号登录恢复';
             } else if (res.same_device) {
-              lmsg.textContent = '检测到本机已激活过此卡密，VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
+              lmsg.textContent = '检测到本机已激活过此卡密，请登录账号恢复 VIP 数据';
             } else {
-              lmsg.textContent = '此卡密已激活。VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
+              lmsg.textContent = '此卡密已在其他设备激活。VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
             }
           }
           return;
