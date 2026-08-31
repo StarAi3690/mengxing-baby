@@ -23517,6 +23517,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       /* 登录/注册/邮箱验证成功后，由服务端回传 VIP 状态，写入鉴权时间戳（用于阶梯式复核） */
       if (j && j.vip) mxWriteVipInfo({ vip: 1, vip_level: j.vip_level || '1', expire_at: j.expire_at || '' });
     } catch (e) {}
+    try { startNormalSnapshotSync(); } catch (e) {} /* 已注册账号：启用每周轻量快照（L3-1，普通/VIP 均存，供管理员紧急恢复） */
     return j;
   }
   function mxApiAuth(action, account, isEmail, pass) {
@@ -23968,6 +23969,39 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     document.addEventListener('visibilitychange', function () { if (!document.hidden) pushCloud(); });
     pullCloud().then(function () { pushCloud(); });
     setInterval(function () { if (navigator.onLine !== false) pushCloud(); }, 60000);
+  }
+
+  /* ================= 普通用户轻量快照（L3-1：每周自动存云，供管理员紧急恢复） ================= */
+  /* 复用 buildSnapshot 抽 SYNC_STORES 全库，POST /sync?action=snapshot；不要求 VIP、失败静默。
+     仅已注册账号（有 mx_token）才启用；与 VIP 全量同步隔离，不占 VIP 配额。 */
+  function mxPushSnapshot() {
+    var token = null; try { token = localStorage.getItem('mx_token'); } catch (e) {}
+    if (!token) return Promise.resolve(null); /* 未注册账号：不存快照 */
+    return ensureUid().then(function (uid) {
+      if (!uid) return null;
+      return buildSnapshot().then(function (snap) {
+        return mxApiSync('snapshot', { snapshot: snap }).then(function (r) {
+          if (r && r.ok) { try { lsSet('mx_last_snapshot', String(Date.now())); } catch (e) {} }
+          return r;
+        });
+      });
+    }).catch(function () { return null; });
+  }
+  function startNormalSnapshotSync() {
+    var token = null; try { token = localStorage.getItem('mx_token'); } catch (e) {}
+    if (!token) return; /* 未注册账号：不启用快照调度 */
+    if (window.__mx_snap_started__) return;
+    window.__mx_snap_started__ = true;
+    var WIN = 7 * 86400000; /* 7 天窗口 */
+    var trySnap = function () {
+      if (navigator.onLine === false) return;
+      var last = 0; try { last = parseInt(lsGet('mx_last_snapshot') || '0', 10) || 0; } catch (e) {}
+      if (Date.now() - last >= WIN) mxPushSnapshot();
+    };
+    trySnap(); /* 启动即检查一次 */
+    window.addEventListener('online', trySnap);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) trySnap(); });
+    setInterval(trySnap, 6 * 3600000); /* 每 6 小时检查窗口，不在窗口内不打云 */
   }
 
   /* ================= 共享助手：清数据 / 改名 / 删孩子 / 解绑（供账号中心·家长工作台·系统设置复用） ================= */
