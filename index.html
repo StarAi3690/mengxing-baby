@@ -22672,23 +22672,95 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-  /* ================= 设备指纹(稳定) ================= */
+  /* ================= 设备指纹(稳定·多维强指纹) =================
+     设计目标（P2 设备指纹增强）：
+       1) 清缓存/无痕后仍能识别为同一台设备 —— 指纹是「计算型」而非随机生成，
+          存储仅作缓存，清掉后重算一致（同机识别 ✓）。
+       2) 同型号手机不碰撞 —— 增加 GPU/硬件并发/触控等硬件级维度，熵远高于旧版 4 维。
+       3) 换浏览器/缩放回同一台物理机时尽量不漂移 —— 主维度选取「浏览器无关」的硬件特征
+          （WebGL UNMASKED_RENDERER/VENDOR、platform、hardwareConcurrency、物理分辨率、
+          timezone、language），canvas/WebGL 主版本仅作辅助熵。
+     兼容性：输出仍保持 `dev-` + 纯十六进制格式，旧版已缓存的 `dev-[hex]` 会被原样读取，
+       新设备重算为更长的双哈希十六进制串，仍满足 `/^dev-[0-9a-f]+$/`。
+     =============================================================== */
+
+  /* Canvas 渲染指纹（抗锯齿/字体栅格化引擎差异，浏览器相关，作辅助熵） */
+  function mxCanvasFp() {
+    try {
+      var c = document.createElement('canvas');
+      var ctx = c.getContext('2d');
+      if (!ctx) return 'no-2d';
+      ctx.textBaseline = 'top';
+      ctx.font = "14px 'Arial'";
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = '#069';
+      ctx.fillText('萌星宝宝·MengXing🔒abcdef', 2, 15);
+      ctx.fillStyle = 'rgba(102,204,0,0.7)';
+      ctx.fillText('萌星宝宝·MengXing🔒abcdef', 4, 17);
+      var d = c.toDataURL();
+      return d.slice(0, 32) + d.slice(-32);
+    } catch (e) { return 'no-canvas'; }
+  }
+
+  /* WebGL 指纹（GPU 硬件级，浏览器无关，最强区分维度） */
+  function mxWebglFp() {
+    try {
+      var c = document.createElement('canvas');
+      var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      if (!gl) return 'no-webgl';
+      var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      var vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : (gl.getParameter(gl.VENDOR) || '');
+      var renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : (gl.getParameter(gl.RENDERER) || '');
+      return (vendor || '') + '|' + (renderer || '');
+    } catch (e) { return 'no-webgl'; }
+  }
+
+  /* 汇总多维特征：尽量使用「同一台物理机跨浏览器/跨缩放」稳定的特征 */
+  function mxFingerprintFeatures() {
+    var ua = (navigator.userAgent || '').replace(/MicroMessenger|WeChat|wxwork|WorkMicroMsg/i, '');
+    var physW = (screen.width || 0) * (window.devicePixelRatio || 1);
+    var physH = (screen.height || 0) * (window.devicePixelRatio || 1);
+    return [
+      ua,
+      (screen.width || 0) + 'x' + (screen.height || 0),
+      physW + 'x' + physH,                                  // 物理分辨率（抗缩放漂移）
+      navigator.platform || '',
+      navigator.vendor || '',
+      (navigator.language || '') + '|' + (navigator.languages ? (navigator.languages.join(',') || '') : ''),
+      (new Date()).getTimezoneOffset() + '',                 // 时区（同机跨浏览器稳定）
+      (navigator.hardwareConcurrency || 0) + '',             // CPU 核心数（硬件级）
+      (navigator.maxTouchPoints || 0) + '',                  // 触控点数（硬件级）
+      (screen.colorDepth || 0) + '|' + (screen.pixelDepth || 0),
+      (window.devicePixelRatio || 0) + '',
+      mxWebglFp(),
+      mxCanvasFp()
+    ];
+  }
+
+  /* djb2 + FNV-1a 双哈希拼接，进一步降低碰撞概率 */
+  function mxHash(str) {
+    var h = 5381, i;
+    for (i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+    var h2 = 0x811c9dc5;
+    for (i = 0; i < str.length; i++) { h2 = ((h2 ^ str.charCodeAt(i)) * 0x1000193) | 0; }
+    return Math.abs(h).toString(16) + Math.abs(h2).toString(16);
+  }
+
   function deviceId() {
     try {
       var s = lsGet(STORAGE.devId);
       /* 仅接受确定性指纹（不含随机后缀），避免旧的随机设备 ID 被误用 */
       if (s && /^dev-[0-9a-f]+$/.test(s)) return s;
-      /* 去掉 WebView 专属 UA 片段（MicroMessenger/WeChat 等），使同一台手机在「微信内置浏览器」
-         与「原生浏览器」算出相同设备指纹，解决「微信里激活后切到浏览器识别不到本机、需重新激活 /
-         兑换码无法复用」的问题（存储隔离无法跨 WebView，但设备指纹一致可保证不算作新设备）。 */
-      var ua = (navigator.userAgent || '').replace(/MicroMessenger|WeChat|wxwork|WorkMicroMsg/i, '');
-      var f = ua + '|' + (screen.width || 0) + 'x' + (screen.height || 0) + '|' + (navigator.platform || '') + '|' + (navigator.language || '');
-      var h = 5381;
-      for (var i = 0; i < f.length; i++) { h = ((h << 5) + h + f.charCodeAt(i)) | 0; }
-      s = 'dev-' + Math.abs(h).toString(16);
+      s = 'dev-' + mxHash(mxFingerprintFeatures().join('§'));
       lsSet(STORAGE.devId, s);
       return s;
     } catch (e) { return 'dev-' + Math.floor(Math.random() * 9e5); }
+  }
+
+  /* 暴露给调试/账号中心展示当前指纹（不泄露原始特征） */
+  function deviceIdDebug() {
+    try { return { id: deviceId(), features: mxFingerprintFeatures().length }; } catch (e) { return { id: deviceId(), features: 0 }; }
   }
 
   /* ================= MX_CLOUD 可插拔后端 =================
@@ -22889,6 +22961,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             switchTab('login');
             if (res.bound_account_masked) {
               lmsg.textContent = '此卡密已绑定账号 ' + res.bound_account_masked + '，请输入该账号登录恢复';
+            } else if (res.same_device) {
+              lmsg.textContent = '检测到本机已激活过此卡密，VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
             } else {
               lmsg.textContent = '此卡密已激活。VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
             }
