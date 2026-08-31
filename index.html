@@ -22808,18 +22808,73 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(31,88,157,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
         '<div style="font-size:52px">🔐</div>' +
         '<div style="font-size:22px;font-weight:800;color:#1f3a5f;margin:10px 0 6px">萌星宝宝 · 激活</div>' +
-        '<div style="font-size:13.5px;color:#7b8ba3;line-height:1.7;margin-bottom:22px">请输入您购物获取的 <b style="color:#1f3a5f">卡密</b> 解锁全部学习功能<br>激活一次即可在本设备长期使用</div>' +
-        '<input id="mx-gate-code" maxlength="32" placeholder="请输入卡密" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
-        '<div id="mx-gate-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
-        '<button id="mx-gate-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(63,126,245,.35)">立即激活</button>' +
-        '<div style="font-size:12px;color:#9aa9bd;margin-top:16px">激活码为付费获取 · 请支持正版</div>' +
-        '<div style="margin-top:8px"><a href="javascript:void(0)" id="mx-gate-clear" style="font-size:12px;color:#b0bccd;text-decoration:underline;cursor:pointer">遇到问题？清除本机数据并重新激活</a></div>' +
+        // Tab 切换
+        '<div style="display:flex;gap:8px;margin:14px 0 18px;background:#eef3fb;border-radius:12px;padding:5px">' +
+          '<button id="mx-tab-card" type="button" style="flex:1;padding:9px 0;border:none;border-radius:9px;font-size:14px;font-weight:700;background:#4facfe;color:#fff;cursor:pointer">卡密激活</button>' +
+          '<button id="mx-tab-login" type="button" style="flex:1;padding:9px 0;border:none;border-radius:9px;font-size:14px;font-weight:700;background:transparent;color:#5b6b82;cursor:pointer">账号登录</button>' +
+        '</div>' +
+        // 卡密面板
+        '<div id="mx-gate-card" class="mx-gate-panel">' +
+          '<div style="font-size:13.5px;color:#7b8ba3;line-height:1.7;margin-bottom:18px">请输入您购物获取的 <b style="color:#1f3a5f">卡密</b> 解锁全部学习功能<br>激活一次即可在本设备长期使用</div>' +
+          '<input id="mx-gate-code" maxlength="32" placeholder="请输入卡密" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
+          '<div id="mx-gate-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
+          '<button id="mx-gate-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(63,126,245,.35)">立即激活</button>' +
+          '<div style="font-size:12px;color:#9aa9bd;margin-top:16px">激活码为付费获取 · 请支持正版</div>' +
+          '<div style="margin-top:8px"><a href="javascript:void(0)" id="mx-gate-clear" style="font-size:12px;color:#b0bccd;text-decoration:underline;cursor:pointer">遇到问题？清除本机数据并重新激活</a></div>' +
+        '</div>' +
+        // 登录面板
+        '<div id="mx-gate-login" class="mx-gate-panel" style="display:none">' +
+          '<div style="font-size:13.5px;color:#7b8ba3;line-height:1.7;margin-bottom:18px">已注册用户：输入账号密码<br>恢复您的 VIP / 本地数据（清缓存或换设备无需重买）</div>' +
+          '<input id="mx-gate-email" maxlength="64" placeholder="邮箱或用户名" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:16px;border:2px solid #d5e3f7;border-radius:12px;outline:none;margin-bottom:10px"/>' +
+          '<input id="mx-gate-pass" type="password" maxlength="64" placeholder="密码" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:16px;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
+          '<div id="mx-gate-lmsg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
+          '<button id="mx-gate-login-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(63,126,245,.35)">登录</button>' +
+          '<div style="font-size:12px;color:#9aa9bd;margin-top:16px">新用户请使用上方「卡密激活」</div>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(g);
 
     var inp = g.querySelector('#mx-gate-code');
     var btn = g.querySelector('#mx-gate-btn');
     var msg = g.querySelector('#mx-gate-msg');
+    var tabCard = g.querySelector('#mx-tab-card');
+    var tabLogin = g.querySelector('#mx-tab-login');
+    var panelCard = g.querySelector('#mx-gate-card');
+    var panelLogin = g.querySelector('#mx-gate-login');
+    var emailEl = g.querySelector('#mx-gate-email');
+    var passEl = g.querySelector('#mx-gate-pass');
+    var loginBtn = g.querySelector('#mx-gate-login-btn');
+    var lmsg = g.querySelector('#mx-gate-lmsg');
+
+    function switchTab(name) {
+      var card = name === 'card';
+      panelCard.style.display = card ? '' : 'none';
+      panelLogin.style.display = card ? 'none' : '';
+      tabCard.style.background = card ? '#4facfe' : 'transparent';
+      tabCard.style.color = card ? '#fff' : '#5b6b82';
+      tabLogin.style.background = card ? 'transparent' : '#4facfe';
+      tabLogin.style.color = card ? '#5b6b82' : '#fff';
+    }
+    tabCard.addEventListener('click', function () { switchTab('card'); });
+    tabLogin.addEventListener('click', function () { switchTab('login'); });
+
+    /* 进入首页（卡密成功 / 登录成功共用） */
+    function enterApp(vip, welcomeMsg) {
+      g.style.opacity = '0';
+      setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 300);
+      var proceed = function () {
+        document.body.classList.remove('mx-gated');
+        checkVipExpiry();
+        if (vip) startVipSync();
+        try {
+          if (window.navigateTo) window.navigateTo('page-home', 'home-main');
+          else if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('navigation', { detail: { page: 'page-home' } }));
+        } catch (e) {}
+        try { if (window.showToast) window.showToast(welcomeMsg || '✅ 欢迎回来，萌星宝宝！'); } catch (e) {}
+      };
+      showBabyProfile(proceed);
+    }
+
     function doActivate() {
       var code = (inp.value || '').trim();
       msg.textContent = '';
@@ -22827,32 +22882,48 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       btn.disabled = true; btn.textContent = '校验中…';
       redeem(code, deviceId()).then(function (res) {
         btn.disabled = false; btn.textContent = '立即激活';
-        if (!res || !res.ok) { msg.textContent = (res && res.msg) || '激活失败，请重试'; return; }
+        if (!res || !res.ok) {
+          msg.textContent = (res && res.msg) || '激活失败，请重试';
+          if (res && res.already_bound) {
+            // 已激活：自动切到登录通道引导恢复
+            switchTab('login');
+            if (res.bound_account_masked) {
+              lmsg.textContent = '此卡密已绑定账号 ' + res.bound_account_masked + '，请输入该账号登录恢复';
+            } else {
+              lmsg.textContent = '此卡密已激活。VIP 用户请登录账号恢复；普通码请凭原始卡密联系客服。';
+            }
+          }
+          return;
+        }
         lsSet(STORAGE.activated, '1');
         lsSet(STORAGE.code, code);
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
-        msg.textContent = '';
-        g.style.opacity = '0';
-        setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 300);
-        // 双轨分流：普通码→本地模式弹窗；VIP码→强制注册/登录（邮箱+密码）后开启云同步
-        var proceed = function () {
-          showBabyProfile(function () {
-            document.body.classList.remove('mx-gated');
-            checkVipExpiry();
-            if (res.vip) startVipSync();
-            try {
-              if (window.navigateTo) window.navigateTo('page-home', 'home-main');
-              else if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('navigation', { detail: { page: 'page-home' } }));
-            } catch (e) {}
-            try { if (window.showToast) window.showToast('✅ 激活成功，欢迎使用萌星宝宝！'); } catch (e) {}
-          });
-        };
-        if (res.vip) showVipRegister(code, proceed);
-        else showLocalModePopup(proceed);
+        if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); });
+        else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); });
       });
     }
     btn.addEventListener('click', doActivate);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doActivate(); });
+
+    function doLogin() {
+      var acc = (emailEl.value || '').trim();
+      var pwd = (passEl.value || '').trim();
+      lmsg.textContent = '';
+      if (!acc || !pwd) { lmsg.textContent = '请输入账号和密码'; return; }
+      loginBtn.disabled = true; loginBtn.textContent = '登录中…';
+      var isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acc);
+      mxSignIn(acc, isEmail, pwd).then(function (j) {
+        loginBtn.disabled = false; loginBtn.textContent = '登录';
+        lsSet(STORAGE.activated, '1');
+        enterApp(!!(j && j.vip), '✅ 登录成功，欢迎回来！');
+      }).catch(function (err) {
+        loginBtn.disabled = false; loginBtn.textContent = '登录';
+        lmsg.textContent = (err && err.message) || '登录失败，请重试';
+      });
+    }
+    loginBtn.addEventListener('click', doLogin);
+    passEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
     var clr = g.querySelector('#mx-gate-clear');
     if (clr) clr.onclick = function () { if (window.__mxClearLocalData) window.__mxClearLocalData(); };
   }
@@ -23006,7 +23077,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* 直连 CloudBase HTTP 网关的 checkCard，绕开浏览器 CloudBase SDK 的安全域名白名单限制 */
     return callCheckCardApi(c, devId)
       .then(function (res) {
-        return { ok: !!res.ok, vip: res.vip ? 1 : 0, expire_at: res.expire_at || null, msg: res.msg || (res.ok ? '激活成功' : '激活失败') };
+        return {
+          ok: !!res.ok,
+          vip: res.vip ? 1 : 0,
+          expire_at: res.expire_at || null,
+          already_bound: !!res.already_bound,
+          bound_account_masked: res.bound_account_masked || '',
+          msg: res.msg || (res.ok ? '激活成功' : '激活失败')
+        };
       });
   }
 
