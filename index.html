@@ -10493,16 +10493,18 @@ window.DB = {
     var saved = ''; try { saved = localStorage.getItem('mx_parent_pattern') || ''; } catch (e) {}
     var hasPin = false; try { hasPin = localStorage.getItem('mx_parent_has_pin') === '1'; } catch (e) {}
     var pin = ''; try { pin = localStorage.getItem('mx_parent_pin') || '0000'; } catch (e) { pin = '0000'; }
-    // 配置驱动：未设任何凭据时，按权限配置直接种入默认密码，使每次进入都是「密码输入弹窗」（错误/空则拦截）
-    if (window.PARENT_AUTH && window.PARENT_AUTH.parentLockEnabled && !saved && !hasPin) {
+    // [修复#家长控制首次] 仅调试模式才自动种默认密码；正式环境首次进入应显示「设置密码」界面
+    // 旧逻辑：无条件种入 defaultPin → hasPin 被强制为 true → firstSetup 永远为 false
+    //       → 首次用户看到的是「登录」界面（需知道 0000 才能进），而非「设置」界面
+    if (window.__MX_DEBUG && window.PARENT_AUTH && window.PARENT_AUTH.parentLockEnabled && !saved && !hasPin) {
       try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); localStorage.setItem('mx_parent_has_pin', '1'); hasPin = true; } catch (e) {}
     }
     // 首次使用：手势 / 字母数字 二选一设置（不再强制只能手势）
     var firstSetup = (!saved && !hasPin);
     // [重构] 默认进入「字母数字密码」模式，确保弹窗是密码输入；已设手势才走手势
     var mode = saved ? 'gesture' : 'pin';
-    // 种入默认密码后同步 pin 变量，确保登录校验与配置一致
-    if (window.PARENT_AUTH && !saved && hasPin && !localStorage.getItem('mx_parent_pin')) { try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); } catch (e) {} }
+    // [修复#家长控制首次] 同上，仅 DEBUG 模式才兜底种入
+    if (window.__MX_DEBUG && window.PARENT_AUTH && !saved && hasPin && !localStorage.getItem('mx_parent_pin')) { try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); } catch (e) {} }
     try { pin = localStorage.getItem('mx_parent_pin') || '0000'; } catch (e) { pin = '0000'; }
     var overlay = document.createElement('div');
     overlay.className = 'mx-lock-mask';
@@ -10518,6 +10520,7 @@ window.DB = {
             '<input type="password" id="mx-lock-pin" maxlength="12" placeholder="字母数字密码" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
             (pinSetting ? '<input type="password" id="mx-lock-pin2" maxlength="12" placeholder="再次输入确认" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' : '') +
             '<button type="button" id="mx-lock-pinok" style="padding:9px 14px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">' + (pinSetting ? '设置密码' : '密码进入') + '</button>' +
+            (!pinSetting && parentHasQuestions() ? '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') +
           '</div>';
       }
       // [修复#248] 密码登录行改为「已设密码(hasPin)即显示」，不再依赖 saved；
@@ -10526,7 +10529,7 @@ window.DB = {
       return '<div class="mx-lock-sub" id="mx-lock-sub">' + gSub + '</div>' +
         '<div class="mx-gesture" id="mx-gesture"></div>' +
         '<div class="mx-lock-err" id="mx-lock-err"></div>' +
-        (hasPin ? '<div class="mx-lock-pinrow"><input type="password" id="mx-lock-pin" maxlength="12" placeholder="或使用密码"><button type="button" id="mx-lock-pinok">密码进入</button></div>' : '') +
+        (hasPin ? '<div class="mx-lock-pinrow"><input type="password" id="mx-lock-pin" maxlength="12" placeholder="或使用密码"><button type="button" id="mx-lock-pinok">密码进入</button></div>' + (parentHasQuestions() ? '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') : '') +
         '<div class="mx-lock-actions">' +
           (saved ? '<button type="button" class="mx-lock-confirm" id="mx-lock-confirm">确认手势</button>' : '<button type="button" class="mx-lock-confirm" id="mx-lock-confirm">设置手势密码</button>') +
         '</div>';
@@ -10613,6 +10616,8 @@ window.DB = {
             if (v !== v2v) { fail('两次输入不一致'); return; }
             try { localStorage.setItem('mx_parent_pin', v); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {}
             ok();
+            // 首次设密成功后自动引导设置安全问题（已有则跳过）
+            if (!parentHasQuestions()) { try { showParentSecuritySetup(); } catch (e) {} }
           } else {
             if (v === pin) { ok(); } else { fail('密码不正确'); }
           }
@@ -10633,6 +10638,8 @@ window.DB = {
             try { localStorage.setItem('mx_parent_pattern', seq.join('')); } catch (e) {}
             window.__mxLockTmp = '';
             ok();
+            // 首次设密成功后自动引导设置安全问题（已有则跳过）
+            if (!parentHasQuestions()) { try { showParentSecuritySetup(); } catch (e) {} }
             return;
           }
           if (seq.join('') !== saved) { fail('手势密码不正确'); return; }
@@ -10644,11 +10651,282 @@ window.DB = {
           if (v === pin) { ok(); } else { fail('密码不正确'); }
         };
       }
+      // [新增#家长控制] 忘记密码？→ 安全问题验证 → 重置
+      var forgotBtn = overlay.querySelector('#mx-lock-forgot');
+      if (forgotBtn) forgotBtn.onclick = function (ev) {
+        ev.preventDefault();
+        close(); // 关闭登录弹窗
+        showParentPasswordReset(function () {
+          // 验证通过：旧凭据已清除，重新打开解锁门 → 进入「设置密码」流程
+          window.mxParentUnlock(onOk);
+        });
+      };
     }
     bindDynamic();
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
   }
   window.mxParentUnlock = mxParentUnlock;
+
+  /**
+   * 修改进入密码：先验证旧密码/手势，再引导设置新密码（不触发安全问题）
+   * @param {function} onDone - 完成后回调
+   */
+  function mxParentUnlockChange(onDone) {
+    function askOld() {
+      var overlay = document.createElement('div');
+      overlay.className = 'mx-lock-mask';
+      var hasPin = localStorage.getItem('mx_parent_has_pin') === '1';
+      var savedPattern = localStorage.getItem('mx_parent_pattern') || '';
+      var oldPin = localStorage.getItem('mx_parent_pin') || '0000';
+      var mode = savedPattern ? 'gesture' : 'pin';
+      function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+      function body() {
+        if (mode === 'pin') {
+          return '<div class="mx-lock-sub" id="mx-lock-sub">请输入当前密码以修改</div>' +
+            '<div class="mx-lock-err" id="mx-lock-err"></div>' +
+            '<input type="password" id="mx-lock-pin" maxlength="12" placeholder="当前密码" style="width:100%;padding:9px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
+            '<button type="button" id="mx-lock-pinok" style="width:100%;margin-top:8px;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">验证</button>';
+        }
+        return '<div class="mx-lock-sub" id="mx-lock-sub">请画出当前手势密码以修改</div>' +
+          '<div class="mx-lock-err" id="mx-lock-err"></div>' +
+          '<div class="mx-gesture" id="mx-gesture"></div>' +
+          (hasPin ? '<div class="mx-lock-pinrow"><input type="password" id="mx-lock-pin" maxlength="12" placeholder="或用密码"><button type="button" id="mx-lock-pinok">验证</button></div>' : '') +
+          '<button type="button" class="mx-lock-confirm" id="mx-lock-confirm" style="width:100%;margin-top:8px">确认手势</button>';
+      }
+      overlay.innerHTML = '<div class="mx-lock"><div class="mx-lock-t">🔑 修改进入密码</div>' + body() +
+        '<div class="mx-lock-actions" style="margin-top:10px"><button type="button" class="mx-lock-cancel" id="mx-lock-cancel">取消</button></div></div>';
+      document.body.appendChild(overlay);
+      var seq = [];
+      var g = overlay.querySelector('#mx-gesture');
+      function fail(m) { var e = overlay.querySelector('#mx-lock-err'); if (e) e.textContent = m; }
+      function verified() {
+        close();
+        setNew();
+      }
+      if (mode === 'pin') {
+        var ok = overlay.querySelector('#mx-lock-pinok');
+        if (ok) ok.onclick = function () {
+          var v = overlay.querySelector('#mx-lock-pin').value;
+          if (v === oldPin) verified(); else fail('当前密码不正确');
+        };
+      } else {
+        if (g) {
+          for (var i = 0; i < 9; i++) {
+            (function (idx) {
+              var d = document.createElement('div'); d.className = 'mx-g-dot'; d.dataset.i = idx;
+              d.onclick = function () { if (seq.indexOf(idx) >= 0) return; seq.push(idx); d.classList.add('on'); };
+              g.appendChild(d);
+            })(i);
+          }
+        }
+        var conf = overlay.querySelector('#mx-lock-confirm');
+        if (conf) conf.onclick = function () {
+          if (seq.join('') === savedPattern) verified(); else { fail('手势密码不正确'); seq = []; g.querySelectorAll('.mx-g-dot').forEach(function (d) { d.classList.remove('on'); }); }
+        };
+        var ok2 = overlay.querySelector('#mx-lock-pinok');
+        if (ok2) ok2.onclick = function () {
+          var v = overlay.querySelector('#mx-lock-pin').value;
+          if (v === oldPin) verified(); else fail('当前密码不正确');
+        };
+      }
+      var cb = overlay.querySelector('#mx-lock-cancel');
+      if (cb) cb.onclick = function () { close(); };
+    }
+    function setNew() {
+      var overlay = document.createElement('div');
+      overlay.className = 'mx-lock-mask';
+      function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+      overlay.innerHTML = '<div class="mx-lock"><div class="mx-lock-t">🔑 设置新密码</div>' +
+        '<div class="mx-lock-sub">设置新的字母数字密码（4–12 位）</div>' +
+        '<div class="mx-lock-err" id="mx-lock-err"></div>' +
+        '<input type="password" id="np1" maxlength="12" placeholder="新密码" style="width:100%;padding:9px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px;margin-bottom:6px">' +
+        '<input type="password" id="np2" maxlength="12" placeholder="再次输入" style="width:100%;padding:9px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
+        '<button type="button" id="npok" style="width:100%;margin-top:8px;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">保存新密码</button>' +
+        '<div class="mx-lock-actions" style="margin-top:8px"><button type="button" class="mx-lock-cancel" id="mx-lock-cancel">取消</button></div></div>';
+      document.body.appendChild(overlay);
+      var ok = overlay.querySelector('#npok');
+      if (ok) ok.onclick = function () {
+        var a = overlay.querySelector('#np1').value, b = overlay.querySelector('#np2').value;
+        if (a.length < 4) { overlay.querySelector('#mx-lock-err').textContent = '密码至少 4 位'; return; }
+        if (a !== b) { overlay.querySelector('#mx-lock-err').textContent = '两次输入不一致'; return; }
+        localStorage.setItem('mx_parent_pin', a); localStorage.setItem('mx_parent_has_pin', '1'); localStorage.removeItem('mx_parent_pattern');
+        close();
+        toast('✅ 密码已修改');
+        if (onDone) try { onDone(); } catch (e) {}
+      };
+      var cb = overlay.querySelector('#mx-lock-cancel');
+      if (cb) cb.onclick = function () { close(); };
+    }
+    askOld();
+  }
+  window.mxParentUnlockChange = mxParentUnlockChange;
+
+  /* ==================== 家长控制：安全问题与密码重置 ==================== */
+  var PARENT_SEC_QA_KEY = 'mx_parent_questions';
+  var PARENT_SEC_DEFAULT_QUESTIONS = [
+    '您孩子的生日是？（格式：YYYYMMDD，如 20200101）',
+    '您配偶的生日是？（格式同上）',
+    '您第一只宠物的名字是？',
+    '您小学学校名称是？',
+    '您出生的城市是？'
+  ];
+  /** 简单哈希（不依赖外部库，答案不做高强度加密，仅防明文直读） */
+  function parentHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return Math.abs(h).toString(16);
+  }
+  /** 读取已存的安全问题 */
+  function parentGetQuestions() {
+    try { var r = localStorage.getItem(PARENT_SEC_QA_KEY); return r ? JSON.parse(r) : []; } catch (e) { return []; }
+  }
+  /** 检查是否已设置过安全问题 */
+  function parentHasQuestions() { return parentGetQuestions().length > 0; }
+
+  /**
+   * 弹出安全问题设定界面（首次设密成功后自动调用，或家长控制台内手动设置）
+   * @param {function} onComplete - 设定完成回调
+   */
+  function showParentSecuritySetup(onComplete) {
+    var existing = parentGetQuestions();
+    var overlay = document.createElement('div');
+    overlay.className = 'mx-lock-mask';
+    function render() {
+      var itemsHtml = '';
+      for (var i = 0; i < 2; i++) {
+        var eq = existing[i] || {};
+        itemsHtml += '<div style="margin-bottom:10px">' +
+          '<select id="psq-sel-' + i + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px">' +
+          '<option value=""' + (!eq.q ? ' selected' : '') + '>— 选择安全问题 ' + (i + 1) + (i === 0 ? '（必填）' : '（选填）') + ' —</option>' +
+          PARENT_SEC_DEFAULT_QUESTIONS.map(function (q, j) { return '<option value="' + j + '"' + (eq.q === q ? ' selected' : '') + '>' + q + '</option>'; }).join('') +
+          '<option value="custom"' + (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? ' selected' : '') + '>自定义问题…</option>' +
+          '</select>' +
+          (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? '<input type="text" id="psq-cust-' + i + '" placeholder="输入自定义问题" value="' + eq.q.replace(/"/g, '&quot;') + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px">' : '') +
+          (!eq.q ? '' : '<input type="text" id="psq-ans-' + i + '" placeholder="输入答案" value="" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">') +
+          '</div>';
+      }
+      overlay.innerHTML = '<div class="mx-lock" style="max-width:380px">' +
+        '<div class="mx-lock-t">🔐 设置安全问题</div>' +
+        '<div style="font-size:12px;color:#666;margin-bottom:10px">设置 1~2 个安全问题（至少 1 个）。忘记家长密码时可通过问题验证重置。</div>' +
+        '<div id="psq-err" style="color:#e74c3c;font-size:12px;margin-bottom:6px;min-height:16px"></div>' +
+        '<div id="psq-items">' + itemsHtml + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button type="button" id="psq-save" style="flex:1;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">保存安全问题</button>' +
+        (onComplete ? '<button type="button" id="psq-skip" style="padding:9px 16px;background:#eee;color:#666;border:none;border-radius:9px">稍后再说</button>' : '') +
+        '</div></div>';
+      // 绑定 select 变更 → 显示/隐藏自定义输入框 + 答案输入框
+      for (var k = 0; k < 2; k++) {
+        (function (idx) {
+          var sel = document.getElementById('psq-sel-' + idx);
+          if (sel) sel.onchange = function () {
+            render();
+            // 恢复之前的值
+            if (existing[idx]) {
+              var aEl = document.getElementById('psq-ans-' + idx);
+              if (aEl) {}
+            }
+          };
+        })(k);
+      }
+      var saveBtn = document.getElementById('psq-save');
+      if (saveBtn) saveBtn.onclick = function () {
+        var result = [];
+        var hasOne = false;
+        for (var j = 0; j < 2; j++) {
+          var sEl = document.getElementById('psq-sel-' + j);
+          var cEl = document.getElementById('psq-cust-' + j);
+          var aEl = document.getElementById('psq-ans-' + j);
+          if (!sEl) continue;
+          var qText = '';
+          if (sEl.value === 'custom') {
+            qText = cEl ? cEl.value.trim() : '';
+          } else if (sEl.value !== '') {
+            qText = PARENT_SEC_DEFAULT_QUESTIONS[parseInt(sEl.value, 10)] || '';
+          }
+          var ansText = aEl ? aEl.value.trim() : '';
+          if (qText && ansText) {
+            result.push({ q: qText, a: parentHash(ansText.toLowerCase()) });
+            hasOne = true;
+          }
+        }
+        if (!hasOne) {
+          var errEl = document.getElementById('psq-err');
+          if (errEl) errEl.textContent = '请至少设置 1 个安全问题及答案';
+          return;
+        }
+        try { localStorage.setItem(PARENT_SEC_QA_KEY, JSON.stringify(result)); } catch (e) {}
+        close();
+        if (onComplete) try { onComplete(); } catch (e) {};
+      };
+      var skipBtn = document.getElementById('psq-skip');
+      if (skipBtn) skipBtn.onclick = function () { close(); if (onComplete) try { onComplete(); } catch (e) {}; };
+    }
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    render();
+    document.body.appendChild(overlay);
+  }
+
+  /**
+   * 弹出「忘记密码 → 验证安全问题」流程
+   * @param {function} onSuccess - 验证通过回调（清除旧密码后重新设置）
+   */
+  function showParentPasswordReset(onSuccess) {
+    var qs = parentGetQuestions();
+    if (qs.length === 0) {
+      alert('未设置安全问题，无法自助重置密码。\n请联系客服或清除浏览器数据后重新进入（将重新初始化家长控制）。');
+      return;
+    }
+    var overlay = document.createElement('div');
+    overlay.className = 'mx-lock-mask';
+    var currentIdx = 0;
+    var wrongCount = 0;
+    function render() {
+      if (currentIdx >= qs.length) {
+        // 全部答对
+        overlay.innerHTML = '<div class="mx-lock" style="max-width:360px;text-align:center;padding:20px">' +
+          '<div style="font-size:36px;margin-bottom:10px">✅</div>' +
+          '<div style="font-size:15px;font-weight:700;margin-bottom:8px">验证通过</div>' +
+          '<div style="font-size:12px;color:#666;margin-bottom:14px">旧密码已清除，请设置新的家长密码。</div>' +
+          '<button type="button" id="psr-setnew" style="padding:10px 24px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">设置新密码</button></div>';
+        var btn = document.getElementById('psr-setnew');
+        if (btn) btn.onclick = function () {
+          close();
+          try { localStorage.removeItem('mx_parent_pin'); localStorage.removeItem('mx_parent_has_pin'); localStorage.removeItem('mx_parent_pattern'); } catch (e) {}
+          if (onSuccess) try { onSuccess(); } catch (e) {};
+        };
+        return;
+      }
+      var q = qs[currentIdx];
+      overlay.innerHTML = '<div class="mx-lock" style="max-width:360px">' +
+        '<div class="mx-lock-t">🔑 安全验证 (' + (currentIdx + 1) + '/' + qs.length + ')</div>' +
+        '<div id="psr-err" style="color:#e74c3c;font-size:12px;margin-bottom:6px;min-height:16px"></div>' +
+        '<div style="font-size:14px;font-weight:600;margin-bottom:8px">' + q.q + '</div>' +
+        '<input type="text" id="psr-ans" placeholder="输入答案" style="width:100%;padding:9px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
+        '<button type="button" id="psr-ok" style="width:100%;margin-top:10px;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">确认</button>' +
+        '<div style="text-align:center;margin-top:8px"><a href="#" id="psr-cancel" style="font-size:12px;color:#999">取消，返回登录</a></div></div>';
+      var okBtn = document.getElementById('psr-ok');
+      if (okBtn) okBtn.onclick = function () {
+        var input = document.getElementById('psr-ans');
+        var val = input ? input.value.trim().toLowerCase() : '';
+        if (!val) { var e = document.getElementById('psr-err'); if (e) e.textContent = '请输入答案'; return; }
+        if (parentHash(val) !== q.a) {
+          wrongCount++;
+          var e2 = document.getElementById('psr-err');
+          if (e2) e2.textContent = '答案错误（还可尝试 ' + Math.max(0, 3 - wrongCount) + ' 次）';
+          if (input) input.value = '';
+          if (wrongCount >= 3) { close(); return; }
+          return;
+        }
+        currentIdx++;
+        render();
+      };
+      var cancelBtn = document.getElementById('psr-cancel');
+      if (cancelBtn) cancelBtn.onclick = function (ev) { ev.preventDefault(); close(); };
+    }
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    render();
+    document.body.appendChild(overlay);
+  }
 
   (function () {
     var b = document.getElementById('header-parent-btn');
@@ -19949,6 +20227,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
 
+    /* ---- 🔐 家长验证设置（安全问题 / 修改密码） ---- */
+    h += '<div class="mx-card no-print"><div class="mx-card-t">🔐 家长验证设置</div>';
+    h += '<div class="mx-note" style="margin-bottom:8px">忘记密码时可通过安全问题重置。建议设置 1~2 个安全问题。</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button type="button" class="mx-btn mx-btn-main" id="pt-setsec">🛡️ ' + (parentHasQuestions() ? '修改安全问题' : '设置安全问题') + '</button>' +
+      '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
+      '</div></div>';
+
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
@@ -20030,6 +20316,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
     var pb = $('pt-print');
     if (pb) pb.onclick = function () { window.print(); };
+
+    /* 家长验证设置：设置/修改安全问题 */
+    var setSecBtn = $('pt-setsec');
+    if (setSecBtn) setSecBtn.onclick = function () { try { showParentSecuritySetup(renderParent); } catch (e) {} };
+    /* 家长验证设置：修改进入密码（先验证旧密码，再设新密码） */
+    var chgPinBtn = $('pt-chgpin');
+    if (chgPinBtn) chgPinBtn.onclick = function () {
+      if (!window.mxParentUnlockChange) { toast('功能初始化中…'); return; }
+      window.mxParentUnlockChange(renderParent);
+    };
 
     var rangeBox = $('pt-ranges');
     if (rangeBox) rangeBox.querySelectorAll('.mx-seg-btn').forEach(function (b) {
