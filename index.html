@@ -19787,7 +19787,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
 </script>
 
-<script id="mx-v21-tools">
+<script>
 /* ==========================================================
    萌星宝宝 v2.1.1 · 剩余全量模块
    家长工作台 / 错题归集+Canvas擦除 / A4打印 / 智能工具真实UI
@@ -20061,16 +20061,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return { from: from, to: to, totalMin: totalMin, totalDone: totalDone, wrong: wrong, byMod: byMod, chart: chart };
   }
 
-  /* ⛔ 开发红线护栏：家长工作台模块(主页/日历·日程/任务套组)为已验证可用核心功能，禁止用空白/占位符删除或整体覆盖。任何修改只可局部缝合，且须先备份 index_备份_日期.html。历史真身见 _test_deploy/index.html(8/25)。 */
   async function renderParent() {
     var s = sec('page-parent');
-    if (!s) return;
-    console.log('[renderParent] start, s=', !!s);
-
-    var _tabBar, h = '';
-    /* ===== 外层兜底：无论数据读取/拼接是否报错，三 Tab 栏必须渲染 ===== */
-    try {
-      var kids = [];
+    var kids = [];
     try { kids = (await db().getAll('children')) || []; } catch (e) {}
     if (!kids.length) {
       /* 不再伪造「默认两个孩子」：统一以数据库真实档案为准。
@@ -20079,22 +20072,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       try { await db().put('children', def); } catch (e) {}
       kids = [def];
     }
-    var c = 'default';
-    try { var _cc = await cid(); if (_cc) c = _cc; } catch (e) { c = 'default'; }
+    var c = await cid();
 
     /* 【多孩上限】非 VIP 最多 2 个孩子，VIP 最多 5 个（设备已激活 VIP 码也算 VIP） */
     var parVip = false;
     try { parVip = !!(window.isVip && window.isVip()) || localStorage.getItem('mengxing_activated_vip') === '1'; } catch (e) {}
     var CHILD_CAP = parVip ? 5 : 2;
-    var capNote = parVip ? 'VIP 最多 5 个孩子' : '普通用户最多 2 个孩子（升级 VIP 可至 5 个）';
+    var capNote = parVip ? 'VIP 最多 5 个孩子' : '普通用户最多 2 个孩子（升级 VIP 可至 5 个)';
 
     var pts = 0;
     try { var p = await db().get('points', c); pts = (p && p.total) || 0; } catch (e) {}
 
     // 周期学习时长（今日 / 本周 / 本月 / 本季度 / 本年）
-    var ps = { chart: [], byMod: {}, wrong: 0 };
-    try { var _ps = await calcPeriod(c, ptRange); if (_ps) ps = _ps; } catch (e) { ps = { chart: [], byMod: {}, wrong: 0 }; }
-    var week = (ps && ps.chart) || [], maxM = 1;
+    const ps = await calcPeriod(c, ptRange);
+    var week = ps.chart, maxM = 1;
     week.forEach(function (w) { if (w.m > maxM) maxM = w.m; });
 
     // 学科掌握度（扩展为需求四要求的 8 大学科，并绑定跳转页）
@@ -20127,16 +20118,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           txt = mn + '/' + po.length + ' 首';
         } catch (e) {}
       } else {
-        var rec = 0;
-        try { rec = await sget('mastery:' + sj.k + ':' + c, 0); } catch (e) { rec = 0; }
+        var rec = await sget('mastery:' + sj.k + ':' + c, 0);
         pct = Math.min(100, Number(rec) || 0);
         txt = pct + '%';
       }
       mastery.push({ k: sj.k, icon: sj.icon, pct: pct, txt: txt, page: sj.page });
     }
 
-    var errs = [];
-    try { errs = (await errList(c)) || []; } catch (e) { errs = []; }
+    var errs = await errList(c);
     var bySub = {};
     errs.forEach(function (i) { bySub[i.subject] = (bySub[i.subject] || 0) + 1; });
     var eks = Object.keys(bySub), eMax = 1;
@@ -20243,18 +20232,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div class="mx-card no-print"><div class="mx-card-t">🎵 节奏盒子音游设置</div>';
     h += '<div class="mx-setting-row"><label>音符速度</label><select class="mx-sel" id="pt-rh-speed">';
     var _rhSpeedLabels = ['veryslow','slow','normal','fast'];
-    var _curRhSpeed = 'fast';
-    try { _curRhSpeed = await sget('rhythm:speed:' + c, 'fast'); } catch (e) { _curRhSpeed = 'fast'; }
-    var _RH_LEVELS = window.RH_SPEED_LEVELS || {};
+    var _curRhSpeed = await sget('rhythm:speed:' + c, 'fast');
       _rhSpeedLabels.forEach(function(sl) {
-      var sc = _RH_LEVELS[sl] || {};
+      var sc = window.RH_SPEED_LEVELS[sl] || {};
       h += '<option value="' + sl + '"' + (sl === _curRhSpeed ? ' selected' : '') + '>' + (sc.label || sl) + '</option>';
     });
     h += '</select><span class="mx-note-inline">速度越快，音符移动越快，难度越高。推荐入门用"慢"或"正常"。</span></div>';
     h += '<div class="mx-setting-row"><label>每日游戏次数上限</label>';
-    var _rhLimit = (window.RH_DEFAULT_DAILY_LIMIT != null ? String(window.RH_DEFAULT_DAILY_LIMIT) : '10');
-    try { _rhLimit = await sget('rhythm:dailyLimit:' + c, _rhLimit); } catch (e) {}
-    h += '<input type="number" class="mx-input" id="pt-rh-limit" min="1" max="50" value="' + _rhLimit + '" style="width:70px">';
+    h += '<input type="number" class="mx-input" id="pt-rh-limit" min="1" max="50" value="' + (await sget('rhythm:dailyLimit:' + c, String(window.RH_DEFAULT_DAILY_LIMIT))) + '" style="width:70px">';
     h += '<span class="mx-note-inline">次/天。设置为0则不限制。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
@@ -20269,22 +20254,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
 
-    /* 🔐 家长验证设置（安全问题 / 修改密码） */
-    h += '<div class="mx-card no-print"><div class="mx-card-t">🔐 家长验证设置</div>';
-    h += '<div class="mx-note" style="margin-bottom:8px">忘记密码时可通过安全问题重置。建议设置 1~2 个安全问题。</div>';
-    h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button type="button" class="mx-btn mx-btn-main" id="pt-setsec">🛡️ ' + (parentHasQuestions() ? '修改安全问题' : '设置安全问题') + '</button>' +
-      '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
-      '</div></div>';
-
-    } catch (e) {
-      console.error('[renderParent] 数据准备异常（三 Tab 仍将渲染）:', e);
-      h = '<div class="mx-card" style="border:2px solid red;background:#fff0f0;padding:12px;margin-bottom:12px">' +
-        '<div class="mx-card-t" style="color:red">⚠️ 家长工作台数据加载异常</div>' +
-        '<div style="font-size:13px;color:#333;margin-top:6px">错误：' + String(e.message || e).replace(/</g,'&lt;') + '</div>' +
-        '<div style="font-size:12px;color:#666;margin-top:4px">三 Tab 栏下方应显示主页内容。若反复出现此提示，请截图反馈。</div></div>';
-    }
-
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
@@ -20293,7 +20262,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<button type="button" class="mx-tab" data-ptab="tasks">🗂️ ' + (_tabL.tasks || '学习任务·套组') + '</button>' +
       '</div>';
     s.innerHTML = _tabBar + '<div id="mx-parent-home">' + h + '</div>' + '<div id="mx-parent-tab-body" style="display:none"></div>';
-    console.log('[renderParent] innerHTML set, tabBar length=', _tabBar.length, 'h length=', h.length);
 
     /* 家长工具箱：跳转入口 + 异常任务处理（把未识别的任务手动转完成） */
     s.querySelectorAll('[data-go]').forEach(function (b) {
@@ -20367,15 +20335,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
     var pb = $('pt-print');
     if (pb) pb.onclick = function () { window.print(); };
-
-    /* 🔐 验证设置按钮绑定 */
-    var setSecBtn = $('pt-setsec');
-    if (setSecBtn) setSecBtn.onclick = function () { try { showParentSecuritySetup(renderParent); } catch (e) {} };
-    var chgPinBtn = $('pt-chgpin');
-    if (chgPinBtn) chgPinBtn.onclick = function () {
-      if (!window.mxParentUnlockChange) { toast('功能初始化中…'); return; }
-      window.mxParentUnlockChange(renderParent);
-    };
 
     var rangeBox = $('pt-ranges');
     if (rangeBox) rangeBox.querySelectorAll('.mx-seg-btn').forEach(function (b) {
@@ -20585,57 +20544,40 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ==================== 7. 学习闪卡 ==================== */
-  var flashState = { idx: 0, flip: false, src: 'words', data: [], fromDB: false };
+  var flashState = { idx: 0, flip: false, src: 'words', data: [] };
 
   async function loadFlash(src) {
     var arr = [];
-    var gotFromDB = false;
     try {
       if (src === 'words') {
         var w = (await db().getAll('words')) || [];
-        if (w.length > 0) { gotFromDB = true; arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; }); }
+        arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; });
       } else if (src === 'poems') {
         var p = (await db().getAll('poems')) || [];
-        if (p.length > 0) { gotFromDB = true; arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 80) }); }); }
+        arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 60) }; });
       }
     } catch (e) {}
     if (!arr.length) {
-      /* 不同模式显示不同的示例数据，避免"都是识字卡"的困惑 */
-      if (src === 'poems') {
-        arr = [
-          { f: '静夜思', b: '李白\n床前明月光，疑是地上霜。\n举头望明月，低头思故乡。' },
-          { f: '春晓', b: '孟浩然\n春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。' },
-          { f: '咏鹅', b: '骆宾王\n鹅鹅鹅，曲项向天歌。\n白毛浮绿水，红掌拨清波。' },
-          { f: '登鹳雀楼', b: '王之涣\n白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。' }
-        ];
-      } else {
-        arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
-          { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
-      }
+      arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
+      { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
     }
-    return { arr: arr, fromDB: gotFromDB };
+    return arr;
   }
 
   async function renderToolFlash() {
     var s = sec('page-tool-flash');
-    var result = await loadFlash(flashState.src);
-    flashState.data = result.arr;
-    flashState.fromDB = result.fromDB;
+    flashState.data = await loadFlash(flashState.src);
     if (flashState.idx >= flashState.data.length) flashState.idx = 0;
     var cur = flashState.data[flashState.idx] || { f: '—', b: '—' };
-    var srcLabel = flashState.src === 'poems' ? '古诗卡' : '识字卡';
-    var dbBadge = flashState.fromDB ? '<span style="font-size:11px;color:#7ec850;background:#e8f5e9;padding:1px 6px;border-radius:4px;margin-left:4px">已从词库加载 ' + flashState.data.length + ' 张</span>' : '<span style="font-size:11px;color:#999;padding:1px 6px;border-radius:4px;margin-left:4px">演示数据</span>';
-
     var h = '<div class="mx-tool-head no-print"><div class="mx-tool-title">🃏 学习闪卡生成</div>' +
       '<div class="mx-tool-actions">' +
-      '<select class="mx-sel" id="fc-src"><option value="words"' + (flashState.src === 'words' ? ' selected' : '') + '>识字卡</option><option value="poems"' + (flashState.src === 'poems' ? ' selected' : '') + '>古诗卡</option></select>' +
-      dbBadge +
+      '<select class="mx-sel" id="fc-src"><option value="words">识字卡</option><option value="poems">古诗卡</option></select>' +
       '<button class="mx-btn mx-btn-ghost" id="fc-shuffle">🔀 打乱</button>' +
       '<button class="mx-btn mx-btn-ghost" id="fc-print">🖨️ 打印全部</button></div></div>';
     h += '<div class="mx-flash-wrap"><div class="mx-flash' + (flashState.flip ? ' flip' : '') + '" id="fc-card">' +
       '<div class="mx-flash-f">' + cur.f + '</div>' +
       '<div class="mx-flash-b">' + String(cur.b).replace(/\n/g, '<br>') + '</div></div>' +
-      '<div class="mx-flash-tip no-print">点击卡片翻面 · ' + srcLabel + ' · 第 ' + (flashState.idx + 1) + '/' + flashState.data.length + ' 张</div>' +
+      '<div class="mx-flash-tip no-print">点击卡片翻面</div>' +
       '<div class="mx-flash-nav no-print"><button class="mx-btn mx-btn-ghost big" id="fc-prev">◀ 上一张</button>' +
       '<span class="mx-flash-idx">' + (flashState.idx + 1) + ' / ' + flashState.data.length + '</span>' +
       '<button class="mx-btn mx-btn-main big" id="fc-next">下一张 ▶</button></div></div>';
@@ -20645,6 +20587,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('') + '</div></div>';
     s.innerHTML = h;
 
+    $('fc-src').value = flashState.src;
     $('fc-src').onchange = function () { flashState.src = this.value; flashState.idx = 0; flashState.flip = false; renderToolFlash(); };
     $('fc-card').onclick = function () { flashState.flip = !flashState.flip; this.classList.toggle('flip'); };
     $('fc-prev').onclick = function () {
@@ -20783,24 +20726,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       };
       var cur = await sget('feedback:list', []);
       if (!Array.isArray(cur)) cur = [];
-      /* 云端同步：通过 CloudBase HTTP 网关写入（GitHub Pages 可直连） */
+      // 云端可插拔：已配置 LeanCloud 时尝试写入 Feedback 表
       try {
-        var gw = (window.MX_GATEWAY || 'https://my-kb-d9grepb0u2ac94dc7-1253756551.ap-shanghai.app.tcloudbase.com');
-        var resp = await fetch(gw + '/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'logSecurityEvent', data: {
-            type: 'feedback',
-            detail: { name: row.name, contact: row.contact, text: row.text },
-            ts: row.ts,
-            _from: 'app-feedback'
-          }})
-        });
-        if (resp.ok) { row.synced = true; }
-      } catch (e) { /* 网络失败不影响本地保存 */ }
+        if (window.AV && window.AV.Object) {
+          var FB = window.AV.Object.extend('Feedback');
+          var o = new FB();
+          o.set('name', row.name); o.set('contact', row.contact); o.set('text', row.text);
+          await o.save(); row.synced = true;
+        }
+      } catch (e) {}
       cur.unshift(row);
       await sset('feedback:list', cur);
-      toast('感谢你的建议！我们收到啦 💌' + (row.synced ? ' 已同步云端' : '（本地留存）'));
+      toast('感谢你的建议！我们收到啦 💌');
       renderFeedback();
     };
   }
