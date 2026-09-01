@@ -11023,6 +11023,23 @@ window.DB = {
 
     document.dispatchEvent(evt);
 
+    // 管理后台·模块点击遥测（节流：每设备每模块每天仅上报一次，避免刷屏云写入）
+    try {
+      if (typeof window.mxApiProxy === 'function') {
+        var mod = String(pageId || '').replace(/^page-/, '');
+        if (mod) {
+          var today = new Date().toISOString().slice(0, 10);
+          var lk = 'mx_evt_' + today + '_' + mod;
+          if (!lsGet(lk)) {
+            lsSet(lk, '1');
+            var dev = (typeof window.deviceId === 'function') ? window.deviceId() : '';
+            var mu = lsGet('mx_user') || '';
+            window.mxApiProxy('logSecurityEvent', { type: 'EVENT', module: mod, deviceId: dev, uid: mu }).catch(function () {});
+          }
+        }
+      }
+    } catch (e) {}
+
   }
 
 
