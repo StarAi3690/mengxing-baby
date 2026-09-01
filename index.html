@@ -20065,7 +20065,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   async function renderParent() {
     var s = sec('page-parent');
     if (!s) return;
-    var kids = [];
+    console.log('[renderParent] start, s=', !!s);
+
+    var _tabBar, h = '';
+    /* ===== 外层兜底：无论数据读取/拼接是否报错，三 Tab 栏必须渲染 ===== */
+    try {
+      var kids = [];
     try { kids = (await db().getAll('children')) || []; } catch (e) {}
     if (!kids.length) {
       /* 不再伪造「默认两个孩子」：统一以数据库真实档案为准。
@@ -20272,6 +20277,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
       '</div></div>';
 
+    } catch (e) {
+      console.error('[renderParent] 数据准备异常（三 Tab 仍将渲染）:', e);
+      h = '<div class="mx-card"><div class="mx-card-t">⚠️ 部分数据加载异常</div><div class="mx-empty">家长工作台主页数据未完全加载。可尝试刷新页面；若反复出现，可在控制台查看上方红色报错。</div></div>';
+    }
+
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
@@ -20280,6 +20290,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<button type="button" class="mx-tab" data-ptab="tasks">🗂️ ' + (_tabL.tasks || '学习任务·套组') + '</button>' +
       '</div>';
     s.innerHTML = _tabBar + '<div id="mx-parent-home">' + h + '</div>' + '<div id="mx-parent-tab-body" style="display:none"></div>';
+    console.log('[renderParent] innerHTML set, tabBar length=', _tabBar.length, 'h length=', h.length);
 
     /* 家长工具箱：跳转入口 + 异常任务处理（把未识别的任务手动转完成） */
     s.querySelectorAll('[data-go]').forEach(function (b) {
