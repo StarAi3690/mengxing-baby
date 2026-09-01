@@ -20063,7 +20063,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* ★ 容错保护：确保即使数据读取异常也不会留白页（之前某块抛异常导致整个工作台不渲染） */
     var h = '';
     try {
-    try { kids = (await db().getAll('children')) || []; } catch (e) {}
+    var kids = [];
+    try { kids = (await db().getAll('children')) || []; } catch (e) { kids = []; }
     if (!kids.length) {
       /* 不再伪造「默认两个孩子」：统一以数据库真实档案为准。
          新/老用户补齐一个真实「宝宝」档案（关联既有 default 学习数据），保证页面非空、数据可见。 */
@@ -20071,7 +20072,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       try { await db().put('children', def); } catch (e) {}
       kids = [def];
     }
-    var c = await cid();
+    var c = 'default';
+    try { c = await cid(); } catch (e) {}
+    if (!c) c = 'default';
 
     /* 【多孩上限】非 VIP 最多 2 个孩子，VIP 最多 5 个（设备已激活 VIP 码也算 VIP） */
     var parVip = false;
@@ -20083,7 +20086,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try { var p = await db().get('points', c); pts = (p && p.total) || 0; } catch (e) {}
 
     // 周期学习时长（今日 / 本周 / 本月 / 本季度 / 本年）
-    const ps = await calcPeriod(c, ptRange);
+    var ps = { chart: [], byMod: {}, wrong: 0 };
+    try { ps = await calcPeriod(c, ptRange); } catch (e) { ps = { chart: [], byMod: {}, wrong: 0 }; }
+    if (!ps || !ps.chart) ps = { chart: [], byMod: {}, wrong: 0 };
     var week = ps.chart, maxM = 1;
     week.forEach(function (w) { if (w.m > maxM) maxM = w.m; });
 
@@ -21574,26 +21579,40 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ---------- 数独（四宫格入门 · 多题库版） ---------- */
-  var SUDOKU_PUZZLES = [
-    { clue: [[1,0,0,3],[0,4,1,0],[0,0,0,2],[3,0,0,0]], sol: [[1,2,3,4],[3,4,1,2],[2,1,4,3],[4,3,2,1]] },
-    { clue: [[0,0,3,0],[4,0,0,1],[0,2,0,0],[0,0,4,0]], sol: [[2,1,3,4],[4,3,2,1],[1,2,4,3],[3,4,1,2]] },
-    { clue: [[4,0,0,0],[0,3,0,0],[0,0,2,0],[0,0,0,1]], sol: [[4,1,2,3],[2,3,1,4],[3,4,2,1],[1,2,3,4]] },
-    { clue: [[0,3,0,0],[0,0,4,0],[2,0,0,0],[0,1,0,0]], sol: [[1,3,4,2],[3,2,4,1],[2,4,1,3],[4,1,3,2]] },
-    { clue: [[0,0,0,2],[0,4,0,0],[3,0,0,0],[0,0,1,0]], sol: [[4,3,1,2],[1,4,2,3],[3,2,4,1],[2,1,3,4]] },
-    { clue: [[2,0,0,0],[0,0,3,0],[0,4,0,0],[0,0,0,1]], sol: [[2,1,4,3],[4,2,3,1],[3,4,1,2],[1,3,2,4]] },
-    { clue: [[0,4,0,0],[3,0,0,2],[0,0,0,4],[0,1,0,0]], sol: [[2,4,1,3],[3,1,4,2],[1,3,2,4],[4,1,3,2]] },
-    { clue: [[0,0,2,0],[0,3,0,4],[1,0,0,0],[0,0,0,3]], sol: [[4,1,2,3],[2,3,1,4],[1,4,3,2],[4,2,1,3]] }
-  ];
   var _sudoCurrent = null;
   var _sudoSelCell = null; /* 当前选中的格子 {r,c} */
 
+  /* 4x4 数独生成器：回溯法生成合法解，再挖空生成题目。
+     题目由完整解推导而来，因此必然有解，永不出现「死题」。 */
   function genSudoku() {
-    /* 随机取一题，浅拷贝避免修改原数据 */
-    var p = SUDOKU_PUZZLES[Math.floor(Math.random() * SUDOKU_PUZZLES.length)];
-    return {
-      sol: p.sol.map(function(row){ return row.slice(); }),
-      clue: p.clue.map(function(row){ return row.slice(); })
-    };
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function canPlace(g, r, c, v) {
+      for (var i = 0; i < 4; i++) { if (g[r][i] === v) return false; if (g[i][c] === v) return false; }
+      var br = Math.floor(r / 2) * 2, bc = Math.floor(c / 2) * 2;
+      for (var i = 0; i < 2; i++) for (var j = 0; j < 2; j++) { if (g[br + i][bc + j] === v) return false; }
+      return true;
+    }
+    function fill(g) {
+      for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) {
+        if (g[r][c] === 0) {
+          var nums = shuffle([1, 2, 3, 4]);
+          for (var k = 0; k < 4; k++) {
+            var v = nums[k];
+            if (canPlace(g, r, c, v)) { g[r][c] = v; if (fill(g)) return true; g[r][c] = 0; }
+          }
+          return false;
+        }
+      }
+      return true;
+    }
+    var sol = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+    fill(sol);
+    var clue = sol.map(function (row) { return row.slice(); });
+    /* 挖空：随机移除 9 格（保留 7 个提示，难度适中），由解反推必然可解 */
+    var pos = []; for (var i = 0; i < 16; i++) pos.push(i);
+    shuffle(pos);
+    for (var k = 0; k < 9; k++) { var p = pos[k]; clue[Math.floor(p / 4)][p % 4] = 0; }
+    return { sol: sol, clue: clue };
   }
 
   function renderSudokuMain() {
