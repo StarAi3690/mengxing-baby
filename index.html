@@ -10802,7 +10802,8 @@ window.DB = {
           '<option value="custom"' + (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? ' selected' : '') + '>自定义问题…</option>' +
           '</select>' +
           (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? '<input type="text" id="psq-cust-' + i + '" placeholder="输入自定义问题" value="' + eq.q.replace(/"/g, '&quot;') + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px">' : '') +
-          (!eq.q ? '' : '<input type="text" id="psq-ans-' + i + '" placeholder="输入答案" value="" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">') +
+          /* ★ 始终显示答案输入框（修复：之前仅 eq.q 有值时才显示，导致首次设置看不到答案输入框） */
+          '<input type="text" id="psq-ans-' + i + '" placeholder="输入答案' + (i === 0 ? '（必填）' : '（选填）') + '" value="' + (eq.a || '') + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">' +
           '</div>';
       }
       overlay.innerHTML = '<div class="mx-lock" style="max-width:380px">' +
@@ -10814,16 +10815,25 @@ window.DB = {
         '<button type="button" id="psq-save" style="flex:1;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">保存安全问题</button>' +
         (onComplete ? '<button type="button" id="psq-skip" style="padding:9px 16px;background:#eee;color:#666;border:none;border-radius:9px">稍后再说</button>' : '') +
         '</div></div>';
-      // 绑定 select 变更 → 显示/隐藏自定义输入框 + 答案输入框
+      // 绑定 select 变更 → 仅动态显示/隐藏自定义问题输入框（不再整体 render，避免清空已填答案）
       for (var k = 0; k < 2; k++) {
         (function (idx) {
           var sel = document.getElementById('psq-sel-' + idx);
-          if (sel) sel.onchange = function () {
-            render();
-            // 恢复之前的值
-            if (existing[idx]) {
-              var aEl = document.getElementById('psq-ans-' + idx);
-              if (aEl) {}
+          if (!sel) return;
+          sel.onchange = function () {
+            var isCustom = (sel.value === 'custom');
+            var custEl = document.getElementById('psq-cust-' + idx);
+            if (isCustom && !custEl) {
+              /* 动态插入自定义问题输入框到答案框前面 */
+              custEl = document.createElement('input');
+              custEl.type = 'text';
+              custEl.id = 'psq-cust-' + idx;
+              custEl.placeholder = '输入自定义问题';
+              custEl.style.cssText = 'width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px';
+              var ansEl = document.getElementById('psq-ans-' + idx);
+              if (ansEl && ansEl.parentNode) ansEl.parentNode.insertBefore(custEl, ansEl);
+            } else if (!isCustom && custEl && custEl.parentNode) {
+              custEl.parentNode.removeChild(custEl);
             }
           };
         })(k);
@@ -20053,7 +20063,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   async function renderParent() {
     var s = sec('page-parent');
-    var kids = [];
+    /* ★ 容错保护：确保即使数据读取异常也不会留白页（之前某块抛异常导致整个工作台不渲染） */
+    var h = '';
+    try {
     try { kids = (await db().getAll('children')) || []; } catch (e) {}
     if (!kids.length) {
       /* 不再伪造「默认两个孩子」：统一以数据库真实档案为准。
@@ -20376,6 +20388,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (tab === 'calendar') { window.__parentCalMount = bodyEl; if (window.renderMyCalendar) window.renderMyCalendar(); }
         else if (tab === 'tasks') { window.__parentTaskMount = bodyEl; if (window.__mxRenderTasksets) window.__mxRenderTasksets(); }
       }
+    }
+    } catch (e) {
+      console.error('[renderParent]', e);
+      /* 兜底：即使数据全部读取失败，也显示基本框架而非留白 */
+      s.innerHTML = '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div></div>' +
+        '<div class="mx-card"><div class="mx-empty" style="padding:22px;color:#e74c3c">⚠️ 工作台数据加载异常，请刷新页面重试。如持续出现请联系客服。</div></div>';
     }
   }
 
@@ -23215,7 +23233,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           '<div id="mx-gate-lmsg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
           '<button id="mx-gate-login-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(63,126,245,.35)">登录</button>' +
           '<div style="font-size:12px;color:#9aa9bd;margin-top:16px">新用户请使用上方「卡密激活」</div>' +
-          '<div style="margin-top:12px"><a href="javascript:void(0)" id="mx-gate-recover" style="font-size:12.5px;color:#3f7ef5;text-decoration:underline;cursor:pointer">📞 数据丢失？联系客服恢复（普通码）</a></div>' +
+          '<div style="margin-top:12px"><span id="mx-gate-recover" style="font-size:12.5px;color:#3f7ef5;text-decoration:underline;cursor:pointer">📞 数据丢失？联系客服恢复（普通码）</span></div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(g);
@@ -23841,8 +23859,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         return finish(j);
       }).then(function () {
         m.close();
-        try { if (window.showToast) window.showToast('✅ 普通账号已就绪（数据仍仅本机）'); } catch (e) {}
-        if (next) next();
+        try { if (window.showToast) window.showToast('✅ 普通账号登录成功'); } catch (e) {}
+        /* 普通账号重要提示（用户指定文案） */
+        setTimeout(function () {
+          try {
+            var tipM = modal(
+              '<div style="font-size:38px;margin-bottom:8px">📋</div>' +
+              '<div style="font-size:17px;font-weight:800;color:#1f3a5f;margin-bottom:10px">普通账号提示</div>' +
+              '<div style="font-size:13.5px;color:#5b6b80;line-height:1.9;text-align:left;background:#f6f9ff;border-radius:12px;padding:14px 16px;margin-bottom:16px">' +
+                '普通账号<b>不提供自动云同步服务</b>，只能靠本机存储功能使用，请定期自行导出备份；<br>' +
+                '如需多端账号自动保存同步数据，请开通VIP服务；<br>' +
+                '若不慎数据丢失（换设备 / 清理网页存储记录等），可从购买渠道或联系客服尝试恢复（非VIP可能小额收费）。' +
+              '</div>' +
+              '<button id="mx-tip-ok" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:15px;font-weight:700;cursor:pointer">我知道了</button>'
+            );
+            tipM.querySelector('#mx-tip-ok').onclick = function () { tipM.close(); };
+          } catch (e) {}
+          if (next) next();
+        }, 300);
       }).catch(function (e) {
         goBtn.disabled = false; goBtn.textContent = (tab === 'reg' ? '注册普通账号' : '登录普通账号');
         msg.textContent = '操作失败：' + safeErr(e);
@@ -23872,7 +23906,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '</div>' +
       '<div style="font-size:12.5px;color:#7b8ba3;line-height:1.7;text-align:left;margin-bottom:14px">如您在<b>闲鱼等合作平台</b>购买，也可在原购买账号处申请恢复。联系时请说明您的<b>卡密 / 注册账号</b>，便于客服核对云快照。</div>' +
       '<button id="mx-rec-vip" style="width:100%;padding:11px;border:1px solid #f0d9a0;border-radius:12px;background:#fff7e6;color:#b8860b;font-size:13.5px;font-weight:700;cursor:pointer;margin-bottom:10px">💡 升级 VIP 享无限自动云同步，免人工恢复</button>' +
-      '<button id="mx-rec-ok" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:15px;font-weight:700;cursor:pointer">我知道了</button>'
+      '<button id="mx-rec-ok" onclick="var m=this;while(m&&!m.close)m=m.parentElement;if(m&&m.close)m.close();" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:15px;font-weight:700;cursor:pointer">我知道了</button>'
     );
     function fallbackCopy(t) { try { var ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); } catch (e) {} }
     m.querySelector('#mx-rec-copy').onclick = function () {
