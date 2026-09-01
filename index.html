@@ -20060,11 +20060,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   async function renderParent() {
     var s = sec('page-parent');
-    /* ★ 容错保护：确保即使数据读取异常也不会留白页（之前某块抛异常导致整个工作台不渲染） */
-    var h = '';
-    try {
     var kids = [];
-    try { kids = (await db().getAll('children')) || []; } catch (e) { kids = []; }
+    try { kids = (await db().getAll('children')) || []; } catch (e) {}
     if (!kids.length) {
       /* 不再伪造「默认两个孩子」：统一以数据库真实档案为准。
          新/老用户补齐一个真实「宝宝」档案（关联既有 default 学习数据），保证页面非空、数据可见。 */
@@ -20072,23 +20069,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       try { await db().put('children', def); } catch (e) {}
       kids = [def];
     }
-    var c = 'default';
-    try { c = await cid(); } catch (e) {}
-    if (!c) c = 'default';
+    var c = await cid();
 
     /* 【多孩上限】非 VIP 最多 2 个孩子，VIP 最多 5 个（设备已激活 VIP 码也算 VIP） */
     var parVip = false;
     try { parVip = !!(window.isVip && window.isVip()) || localStorage.getItem('mengxing_activated_vip') === '1'; } catch (e) {}
     var CHILD_CAP = parVip ? 5 : 2;
-    var capNote = parVip ? 'VIP 最多 5 个孩子' : '普通用户最多 2 个孩子（升级 VIP 可至 5 个)';
+    var capNote = parVip ? 'VIP 最多 5 个孩子' : '普通用户最多 2 个孩子（升级 VIP 可至 5 个）';
 
     var pts = 0;
     try { var p = await db().get('points', c); pts = (p && p.total) || 0; } catch (e) {}
 
     // 周期学习时长（今日 / 本周 / 本月 / 本季度 / 本年）
-    var ps = { chart: [], byMod: {}, wrong: 0 };
-    try { ps = await calcPeriod(c, ptRange); } catch (e) { ps = { chart: [], byMod: {}, wrong: 0 }; }
-    if (!ps || !ps.chart) ps = { chart: [], byMod: {}, wrong: 0 };
+    const ps = await calcPeriod(c, ptRange);
     var week = ps.chart, maxM = 1;
     week.forEach(function (w) { if (w.m > maxM) maxM = w.m; });
 
@@ -20139,8 +20132,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var totalDone = week.reduce(function (a, b) { return a + b.done; }, 0);
 
     var h = '';
-    /* ---- 段 A：标题栏 / 周期切换 / 统计概览 / 时长图表 ---- */
-    try {
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div>' +
       '<div class="mx-tool-actions">' +
       '<select class="mx-sel" id="pt-kid">' +
@@ -20169,10 +20160,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-chart-x">' + w.l + '</span></div>';
     });
     h += '</div></div>';
-    } catch (eA) { console.error('[renderParent·段A]', eA); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 统计概览加载异常：' + (eA.message || eA) + '</div></div>'; }
 
     // 各模块学习明细（按当前周期）
-    try {
     var modKeys = Object.keys(ps.byMod);
     h += '<div class="mx-card"><div class="mx-card-t">🧩 ' + RANGE_LABEL[ptRange] + '各模块学习明细 <span style="font-size:12px;color:#9aa;font-weight:400">（时长 · 完成/总数）</span></div>';
     if (!modKeys.length) {
@@ -20190,10 +20179,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       h += '</div>';
     }
     h += '</div>';
-    } catch (eB) { console.error('[renderParent·段B]', eB); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 模块明细加载异常：' + (eB.message || eB) + '</div></div>'; }
 
-    /* 学科掌握度 */
-    try {
     h += '<div class="mx-card"><div class="mx-card-t">🎯 各学科掌握进度 <span style="font-size:12px;color:#9aa;font-weight:400">（点击进入对应模块）</span></div><div class="mx-bars">';
     mastery.forEach(function (m) {
       h += '<div class="mx-bar-row mx-click" onclick="if(window.navigateTo)window.navigateTo(\'' + m.page + '\')" title="进入 ' + m.k + '">' +
@@ -20202,10 +20188,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-bar-v">' + m.txt + '</span></div>';
     });
     h += '</div></div>';
-    } catch (eC) { console.error('[renderParent·段C]', eC); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 学科掌握度加载异常：' + (eC.message || eC) + '</div></div>'; }
 
-    /* 错题分布 */
-    try {
+    // 错题分布：竖向柱状统计图
     var SHORT_SUB = { '拼音认读': '拼音', '识字启蒙': '识字', '古诗': '古诗', '绘本': '绘本', '英文26字母': '字母', '自然拼读': '拼读', '数学思维': '数学', '认知识工': '数感', '综合': '综合', '其他': '其他' };
     h += '<div class="mx-card"><div class="mx-card-t">📊 错题分布（柱状统计图）</div>';
     if (!eks.length) {
@@ -20222,10 +20206,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       });
       h += '</div>';
     }
-    } catch (eD) { console.error('[renderParent·段D-错题]', eD); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 错题分布加载异常</div></div>'; }
+    h += '</div>';
 
-    /* ---- 段 E：多孩管理 ---- */
-    try {
     h += '<div class="mx-card no-print"><div class="mx-card-t">👶 多孩管理 <span style="font-size:12px;color:#9aa;font-weight:400">切换学习数据 · 相互隔离 · ' + kids.length + '/' + CHILD_CAP + '</span></div>';
     if (!kids.length) h += '<div class="empty-tip" style="font-size:12.5px;padding:6px 2px">暂无孩子档案，添加后可切换学习数据</div>';
     h += '<div class="mx-kids">';
@@ -20242,10 +20224,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="pt-newchild" placeholder="新孩子昵称" style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:8px;font-size:13px"' + (kids.length >= CHILD_CAP ? ' disabled' : '') + '>' +
       '<button type="button" class="mx-btn mx-btn-main" id="pt-addchild" style="font-size:13px;padding:7px 14px;border-radius:8px"' + (kids.length >= CHILD_CAP ? ' disabled' : '') + '>➕ 添加</button></div>';
     h += '<div class="mx-note">添加孩子后可点击头像切换学习数据，多孩数据相互隔离。<b>' + capNote + '</b>。</div></div>';
-    } catch (eE) { console.error('[renderParent·段E-多孩]', eE); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 多孩管理加载异常</div></div>'; }
 
-    /* ---- 段 F：节奏盒子设置 ---- */
-    try {
+    /* ---- 🎵 节奏盒子游戏设置 ---- */
     h += '<div class="mx-card no-print"><div class="mx-card-t">🎵 节奏盒子音游设置</div>';
     h += '<div class="mx-setting-row"><label>音符速度</label><select class="mx-sel" id="pt-rh-speed">';
     var _rhSpeedLabels = ['veryslow','slow','normal','fast'];
@@ -20260,10 +20240,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<span class="mx-note-inline">次/天。设置为0则不限制。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
-    } catch (eF) { console.error('[renderParent·段F-节奏]', eF); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 节奏盒子设置加载异常</div></div>'; }
 
-    /* ---- 段 G：家长工具箱 ---- */
-    try {
+    /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 ---- */
     h += '<div class="mx-card no-print"><div class="mx-card-t">🛠️ 家长工具箱</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="calendar">🗓️ 个人日历·日程</button>' +
@@ -20272,19 +20250,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div class="mx-sub-t" style="font-size:13px;font-weight:700;margin:6px 0 6px">🆘 异常任务处理（今日）</div>';
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
-    } catch (eG) { console.error('[renderParent·段G-工具箱]', eG); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 家长工具箱加载异常</div></div>'; }
 
-    /* ---- 段 H：家长验证设置 ---- */
-    try {
+    /* 🔐 家长验证设置（安全问题 / 修改密码） */
     h += '<div class="mx-card no-print"><div class="mx-card-t">🔐 家长验证设置</div>';
     h += '<div class="mx-note" style="margin-bottom:8px">忘记密码时可通过安全问题重置。建议设置 1~2 个安全问题。</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       '<button type="button" class="mx-btn mx-btn-main" id="pt-setsec">🛡️ ' + (parentHasQuestions() ? '修改安全问题' : '设置安全问题') + '</button>' +
       '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
       '</div></div>';
-    } catch (eH) { console.error('[renderParent·段H-验证]', eH); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 验证设置加载异常</div></div>'; }
 
-    /* 家长工作台页签控制台 */
+    /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
       '<button type="button" class="mx-tab on" data-ptab="home">' + (_tabL.home || '工作台主页') + '</button>' +
@@ -20366,10 +20341,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var pb = $('pt-print');
     if (pb) pb.onclick = function () { window.print(); };
 
-    /* 家长验证设置：设置/修改安全问题 */
+    /* 🔐 验证设置按钮绑定 */
     var setSecBtn = $('pt-setsec');
     if (setSecBtn) setSecBtn.onclick = function () { try { showParentSecuritySetup(renderParent); } catch (e) {} };
-    /* 家长验证设置：修改进入密码（先验证旧密码，再设新密码） */
     var chgPinBtn = $('pt-chgpin');
     if (chgPinBtn) chgPinBtn.onclick = function () {
       if (!window.mxParentUnlockChange) { toast('功能初始化中…'); return; }
@@ -20408,12 +20382,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (tab === 'calendar') { window.__parentCalMount = bodyEl; if (window.renderMyCalendar) window.renderMyCalendar(); }
         else if (tab === 'tasks') { window.__parentTaskMount = bodyEl; if (window.__mxRenderTasksets) window.__mxRenderTasksets(); }
       }
-    }
-    } catch (e) {
-      console.error('[renderParent]', e);
-      /* 兜底：即使数据全部读取失败，也显示基本框架而非留白 */
-      s.innerHTML = '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div></div>' +
-        '<div class="mx-card"><div class="mx-empty" style="padding:22px;color:#e74c3c">⚠️ 工作台数据加载异常：' + (e && e.message ? e.message : String(e)) + '<br><br>请刷新页面重试。如持续出现请联系客服。</div></div>';
     }
   }
 
