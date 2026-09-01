@@ -20061,6 +20061,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return { from: from, to: to, totalMin: totalMin, totalDone: totalDone, wrong: wrong, byMod: byMod, chart: chart };
   }
 
+  /* ⛔ 开发红线护栏：家长工作台模块(主页/日历·日程/任务套组)为已验证可用核心功能，禁止用空白/占位符删除或整体覆盖。任何修改只可局部缝合，且须先备份 index_备份_日期.html。历史真身见 _test_deploy/index.html(8/25)。 */
   async function renderParent() {
     var s = sec('page-parent');
     if (!s) return;
