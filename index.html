@@ -20279,7 +20279,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
     } catch (e) {
       console.error('[renderParent] 数据准备异常（三 Tab 仍将渲染）:', e);
-      h = '<div class="mx-card"><div class="mx-card-t">⚠️ 部分数据加载异常</div><div class="mx-empty">家长工作台主页数据未完全加载。可尝试刷新页面；若反复出现，可在控制台查看上方红色报错。</div></div>';
+      h = '<div class="mx-card" style="border:2px solid red;background:#fff0f0;padding:12px;margin-bottom:12px">' +
+        '<div class="mx-card-t" style="color:red">⚠️ 家长工作台数据加载异常</div>' +
+        '<div style="font-size:13px;color:#333;margin-top:6px">错误：' + String(e.message || e).replace(/</g,'&lt;') + '</div>' +
+        '<div style="font-size:12px;color:#666;margin-top:4px">三 Tab 栏下方应显示主页内容。若反复出现此提示，请截图反馈。</div></div>';
     }
 
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
