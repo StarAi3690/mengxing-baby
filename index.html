@@ -10031,8 +10031,7 @@ window.DB = {
     /* 家长工作台独立化：单一一级菜单，内部以页签控制台呈现（主页 / 个人日历·日程 / 学习任务·套组） */
     { id: 'parent', label: '👨‍👩‍👧 家长工作台', icon: '📊', page: 'page-parent' },
     { id: 'account', label: '账号中心', icon: '👤', page: 'page-account' },
-        { id: 'settings', label: '系统设置', icon: '⚙️', page: 'page-settings' },
-    { id: 'security-monitor', label: '安全监控', icon: '🛡️', page: 'page-security-monitor' }
+        { id: 'settings', label: '系统设置', icon: '⚙️', page: 'page-settings' }
 
   ];
 
@@ -10415,8 +10414,7 @@ window.DB = {
     'page-parent':   { title: '家长工作台', desc: '多孩切换 · 周学习时长统计 · 各学科掌握进度 · 错题分布，支持打印周报。', icon: '👨', tag: '家长后台' },
     'page-feedback': { title: '建议与反馈', desc: '提交使用建议与联系方式，本地留存并可同步云端 Feedback 表。', icon: '💌', tag: '智能工具' },
     'page-account':  { title: '账号中心', desc: '本地/云端账号、5设备限制、卡密VIP。', icon: '👤', tag: '阶段五实现' },
-        'page-settings': { title: '系统设置', desc: '多孩切换 · 主题切换（V1/V2/V3 共38套） · 模块自定义开关 · 数据导出/导入 · VIP卡密 · 顶部公告', icon: '⚙️', tag: '阶段四实现' },
-    'page-security-monitor': { title: '安全监控', desc: '违规激活行为实时监控（普通卡二设备 / VIP超额设备），最近 50 条记录倒序展示。', icon: '🛡️', tag: '运营管理' }
+        'page-settings': { title: '系统设置', desc: '多孩切换 · 主题切换（V1/V2/V3 共38套） · 模块自定义开关 · 数据导出/导入 · VIP卡密 · 顶部公告', icon: '⚙️', tag: '阶段四实现' }
 
   };
 
@@ -10795,83 +10793,78 @@ window.DB = {
       var itemsHtml = '';
       for (var i = 0; i < 2; i++) {
         var eq = existing[i] || {};
-        itemsHtml += '<div style="margin-bottom:10px">' +
+        var isCustomEq = !!(eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0);
+        var selVal = isCustomEq ? 'custom' : (eq.q ? String(PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q)) : '');
+        itemsHtml += '<div style="margin-bottom:10px" data-psi="' + i + '">' +
           '<select id="psq-sel-' + i + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px">' +
-          '<option value=""' + (!eq.q ? ' selected' : '') + '>— 选择安全问题 ' + (i + 1) + (i === 0 ? '（必填）' : '（选填）') + ' —</option>' +
-          PARENT_SEC_DEFAULT_QUESTIONS.map(function (q, j) { return '<option value="' + j + '"' + (eq.q === q ? ' selected' : '') + '>' + q + '</option>'; }).join('') +
-          '<option value="custom"' + (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? ' selected' : '') + '>自定义问题…</option>' +
+          '<option value=""' + (!selVal ? ' selected' : '') + '>— 选择安全问题 ' + (i + 1) + (i === 0 ? '（必填）' : '（选填）') + ' —</option>' +
+          PARENT_SEC_DEFAULT_QUESTIONS.map(function (q, j) { return '<option value="' + j + '"' + (selVal === String(j) ? ' selected' : '') + '>' + q + '</option>'; }).join('') +
+          '<option value="custom"' + (selVal === 'custom' ? ' selected' : '') + '>自定义问题…</option>' +
           '</select>' +
-          (eq.q && PARENT_SEC_DEFAULT_QUESTIONS.indexOf(eq.q) < 0 ? '<input type="text" id="psq-cust-' + i + '" placeholder="输入自定义问题" value="' + eq.q.replace(/"/g, '&quot;') + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px">' : '') +
-          /* ★ 始终显示答案输入框（修复：之前仅 eq.q 有值时才显示，导致首次设置看不到答案输入框） */
-          '<input type="text" id="psq-ans-' + i + '" placeholder="输入答案' + (i === 0 ? '（必填）' : '（选填）') + '" value="' + (eq.a || '') + '" style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">' +
+          /* ★ 自定义问题文本框：始终渲染，用 display 控制显隐（修复之前动态插入 DOM 不可靠的问题） */
+          '<input type="text" id="psq-cust-' + i + '" placeholder="请输入你的安全问题"' + (isCustomEq ? ' value="' + eq.q.replace(/"/g, '&quot;') + '"' : '') + ' style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px' + (isCustomEq ? '' : ' display:none') + '">' +
+          /* ★ 答案输入框：始终显示 */
+          '<input type="text" id="psq-ans-' + i + '" placeholder="输入答案' + (i === 0 ? '（必填）' : '（选填）') + '"' + (eq.a ? ' value="' + eq.a.replace(/"/g, '&quot;') + '"' : '') + ' style="width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">' +
           '</div>';
       }
-      overlay.innerHTML = '<div class="mx-lock" style="max-width:380px">' +
+      overlay.innerHTML = '<div class="mx-lock" style="max-width:400px">' +
         '<div class="mx-lock-t">🔐 设置安全问题</div>' +
         '<div style="font-size:12px;color:#666;margin-bottom:10px">设置 1~2 个安全问题（至少 1 个）。忘记家长密码时可通过问题验证重置。</div>' +
         '<div id="psq-err" style="color:#e74c3c;font-size:12px;margin-bottom:6px;min-height:16px"></div>' +
         '<div id="psq-items">' + itemsHtml + '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
-        '<button type="button" id="psq-save" style="flex:1;padding:9px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">保存安全问题</button>' +
-        (onComplete ? '<button type="button" id="psq-skip" style="padding:9px 16px;background:#eee;color:#666;border:none;border-radius:9px">稍后再说</button>' : '') +
+        '<button type="button" id="psq-save" onclick="void(0)" style="flex:1;padding:10px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer">保存安全问题</button>' +
+        (onComplete ? '<button type="button" id="psq-skip" style="padding:10px 16px;background:#eee;color:#666;border:none;border-radius:9px;cursor:pointer">稍后再说</button>' : '') +
         '</div></div>';
-      // 绑定 select 变更 → 仅动态显示/隐藏自定义问题输入框（不再整体 render，避免清空已填答案）
+
+      /* 绑定 select 变更 → 仅切换自定义问题框的 display（不再重建 DOM，不会丢失已填值） */
       for (var k = 0; k < 2; k++) {
         (function (idx) {
           var sel = document.getElementById('psq-sel-' + idx);
-          if (!sel) return;
+          var custEl = document.getElementById('psq-cust-' + idx);
+          if (!sel || !custEl) return;
           sel.onchange = function () {
-            var isCustom = (sel.value === 'custom');
-            var custEl = document.getElementById('psq-cust-' + idx);
-            if (isCustom && !custEl) {
-              /* 动态插入自定义问题输入框到答案框前面 */
-              custEl = document.createElement('input');
-              custEl.type = 'text';
-              custEl.id = 'psq-cust-' + idx;
-              custEl.placeholder = '输入自定义问题';
-              custEl.style.cssText = 'width:100%;padding:8px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;margin-bottom:4px';
-              var ansEl = document.getElementById('psq-ans-' + idx);
-              if (ansEl && ansEl.parentNode) ansEl.parentNode.insertBefore(custEl, ansEl);
-            } else if (!isCustom && custEl && custEl.parentNode) {
-              custEl.parentNode.removeChild(custEl);
-            }
+            if (sel.value === 'custom') { custEl.style.display = ''; custEl.placeholder = '请输入你的安全问题'; }
+            else { custEl.style.display = 'none'; }
           };
         })(k);
       }
+
+      /* ★ 保存按钮绑定（内联 onclick + addEventListener 双保险） */
       var saveBtn = document.getElementById('psq-save');
-      if (saveBtn) saveBtn.onclick = function () {
-        var result = [];
-        var hasOne = false;
-        for (var j = 0; j < 2; j++) {
-          var sEl = document.getElementById('psq-sel-' + j);
-          var cEl = document.getElementById('psq-cust-' + j);
-          var aEl = document.getElementById('psq-ans-' + j);
-          if (!sEl) continue;
-          var qText = '';
-          if (sEl.value === 'custom') {
-            qText = cEl ? cEl.value.trim() : '';
-          } else if (sEl.value !== '') {
-            qText = PARENT_SEC_DEFAULT_QUESTIONS[parseInt(sEl.value, 10)] || '';
-          }
-          var ansText = aEl ? aEl.value.trim() : '';
-          if (qText && ansText) {
-            result.push({ q: qText, a: parentHash(ansText.toLowerCase()) });
-            hasOne = true;
-          }
-        }
-        if (!hasOne) {
+      if (saveBtn) {
+        saveBtn.onclick = function () {
           var errEl = document.getElementById('psq-err');
-          if (errEl) errEl.textContent = '请至少设置 1 个安全问题及答案';
-          return;
-        }
-        try { localStorage.setItem(PARENT_SEC_QA_KEY, JSON.stringify(result)); } catch (e) {}
-        close();
-        if (onComplete) try { onComplete(); } catch (e) {};
-      };
+          var result = [];
+          var hasOne = false;
+          for (var j = 0; j < 2; j++) {
+            var sEl = document.getElementById('psq-sel-' + j);
+            var cEl = document.getElementById('psq-cust-' + j);
+            var aEl = document.getElementById('psq-ans-' + j);
+            if (!sEl || !aEl) continue;
+            var qText = '';
+            if (sEl.value === 'custom') {
+              qText = (cEl && cEl.value.trim()) || '';
+            } else if (sEl.value !== '') {
+              qText = PARENT_SEC_DEFAULT_QUESTIONS[parseInt(sEl.value, 10)] || '';
+            }
+            var ansText = aEl.value.trim();
+            if (qText && ansText) {
+              result.push({ q: qText, a: parentHash(ansText.toLowerCase()) });
+              hasOne = true;
+            }
+          }
+          if (!hasOne) { if (errEl) errEl.textContent = '⚠️ 请至少设置 1 个完整的安全问题及答案'; return; }
+          try { localStorage.setItem(PARENT_SEC_QA_KEY, JSON.stringify(result)); } catch (e) {}
+          if (errEl) errEl.textContent = '';
+          close();
+          if (onComplete) try { onComplete(); } catch (e) {};
+        };
+      }
       var skipBtn = document.getElementById('psq-skip');
       if (skipBtn) skipBtn.onclick = function () { close(); if (onComplete) try { onComplete(); } catch (e) {}; };
     }
-    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+    function close() { try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(e){} }
     render();
     document.body.appendChild(overlay);
   }
@@ -24265,96 +24258,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   initGate();
 })();
 </script>
-
-<!-- ===== 安全监控面板（v2.4.0 最终版）：读取 admin_security_logs 最近 50 条违规 ===== -->
-<script>
-(function () {
-  'use strict';
-  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  function fmtTs(ts){
-    if(!ts) return '';
-    try { var d=new Date(ts); if(isNaN(d.getTime())) return ts;
-      var p=function(n){return String(n).padStart(2,'0');};
-      return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
-    } catch(e){ return ts; }
-  }
-  var TYPE_LABEL = { VIP_EXCEED_DEVICES: 'VIP 超额设备', NORMAL_SECOND_DEVICE: '普通卡二设备', UNKNOWN: '未知违规' };
-
-  function injectCSS(){
-    if(document.getElementById('mx-security-monitor-css')) return;
-    var st=document.createElement('style'); st.id='mx-security-monitor-css';
-    st.textContent = [
-      '.sm-wrap{display:flex;flex-direction:column;gap:12px}',
-      '.sm-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}',
-      '.sm-sub{font-size:13px;color:#8a99ad}',
-      '.sm-refresh{border:1px solid rgba(0,0,0,.15);background:#fff;border-radius:9px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer}',
-      '.sm-refresh:hover{background:#f3f6fb}',
-      '.sm-loading,.sm-empty{padding:44px;text-align:center;color:#8a99ad;font-size:14px;background:#fafbfd;border:1px dashed #e0e6ef;border-radius:14px}',
-      '.sm-cards{display:flex;flex-direction:column;gap:10px}',
-      '.sm-card{background:#fff;border:1px solid rgba(0,0,0,.08);border-left:5px solid #bbb;border-radius:12px;padding:12px 14px}',
-      '.sm-card.vip{border-left-color:#e040fb}',
-      '.sm-card.normal{border-left-color:#ff9800}',
-      '.sm-card.other{border-left-color:#90a4ae}',
-      '.sm-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}',
-      '.sm-type{font-weight:800;font-size:14px;color:#c0392b}',
-      '.sm-time{font-size:12px;color:#9aa}',
-      '.sm-row{font-size:13px;color:#455;line-height:1.7}',
-      '.sm-row b{display:inline-block;min-width:42px;color:#7a8aa0;font-weight:700;margin-right:6px}',
-      '.sm-detail{color:#b06a00;background:#fff7e6;border-radius:8px;padding:4px 8px;margin-top:4px}'
-    ].join('');
-    document.head.appendChild(st);
-  }
-  injectCSS();
-
-  function render(){
-    var page = document.getElementById('page-security-monitor');
-    if(!page) return;
-    page.innerHTML =
-      '<div class="content-section-title">🛡️ 安全监控 · 违规激活记录</div>' +
-      '<div class="sm-wrap">' +
-        '<div class="sm-bar">' +
-          '<span class="sm-sub">实时监控违规激活（普通卡第2台 / VIP第6台）</span>' +
-          '<button type="button" class="sm-refresh" id="sm-refresh">🔄 刷新</button>' +
-        '</div>' +
-        '<div class="sm-list" id="sm-list"><div class="sm-loading">读取中…</div></div>' +
-      '</div>';
-    load(page);
-    var btn = page.querySelector('#sm-refresh');
-    if(btn) btn.onclick = function(){ load(page); };
-  }
-  function load(page){
-    var box = page.querySelector('#sm-list'); if(!box) return;
-    box.innerHTML = '<div class="sm-loading">读取中…</div>';
-    var caller = (window.MX_CLOUD && window.MX_CLOUD.callFn) ? window.MX_CLOUD.callFn : null;
-    if(!caller){ box.innerHTML = '<div class="sm-empty">当前无违规记录</div>'; return; }
-    caller('logSecurityEvent', { action: 'list' }).then(function(res){
-      var logs = (res && res.logs) || [];
-      if(!logs.length){ box.innerHTML = '<div class="sm-empty">当前无违规记录</div>'; return; }
-      box.innerHTML = '<div class="sm-cards">' + logs.map(function(r){
-        var tp = TYPE_LABEL[r.type] || r.type;
-        var badge = r.type === 'VIP_EXCEED_DEVICES' ? 'vip' : (r.type === 'NORMAL_SECOND_DEVICE' ? 'normal' : 'other');
-        return '<div class="sm-card ' + badge + '">' +
-          '<div class="sm-top"><span class="sm-type">⚠️ ' + esc(tp) + '</span><span class="sm-time">' + esc(fmtTs(r.ts)) + '</span></div>' +
-          '<div class="sm-row"><b>卡密</b>' + esc(r.code || '—') + '</div>' +
-          '<div class="sm-row"><b>设备</b>' + esc(r.deviceId || '—') + '</div>' +
-          '<div class="sm-row"><b>IP</b>' + esc(r.ip || '—') + '</div>' +
-          (r.detail ? '<div class="sm-row sm-detail">' + esc(r.detail) + '</div>' : '') +
-        '</div>';
-      }).join('') + '</div>';
-    }).catch(function(){
-      /* 全局监控面板随时可用：读不到也只显示空态，绝不让页面报错 */
-      box.innerHTML = '<div class="sm-empty">当前无违规记录</div>';
-    });
-  }
-  document.addEventListener('navigation', function(e){
-    var p = e.detail && e.detail.page;
-    if(p === 'page-security-monitor') setTimeout(render, 60);
-  });
-  if(document.getElementById('page-security-monitor') && document.getElementById('page-security-monitor').classList.contains('active')) render();
-  window.MX_SECURITY_MONITOR = { render: render };
-})();
-</script>
-
 <script>
 /* ===== 萌星宝宝 v2.4.0 增强（候选C安全增量）：飘分动画 + 解绑换设备 ===== */
 (function () {
