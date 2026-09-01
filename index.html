@@ -22625,7 +22625,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
     wrap.innerHTML =
       '<div class="content-section-title">🌟 日常表现 <span class="sub">' + todayStr() + ' · 自理就是这样棒</span></div>' +
-      '<div class="mx22-linkbar">🗂️ 学习计划已与该板块打通：<a href="javascript:void(0)" onclick="if(window.navigateTo)window.navigateTo(\'page-tasksets\')">去「学习任务套组」安排今日学习日程 →</a></div>' +
+      '<div class="mx22-linkbar">🗂️ 学习计划已与该板块打通：<a href="javascript:void(0)" onclick="if(window.mxOpenParentTab){window.mxOpenParentTab(\'tasks\');}else if(window.navigateTo){window.navigateTo(\'page-parent\');}">去「学习任务·套组」安排今日学习日程（需输入家长密码）→</a></div>' +
       '<div class="mx22-daily-progress page-module">' +
         '<div class="mx22-dp-line"><span>今日完成</span><span>' + doneCount + ' 项 / 今天共 ' + DTPL().reduce(function (a, g) { return a + g.list.length; }, 0) + ' 项</span></div>' +
         '<div class="mx22-bar"><div class="mx22-bar-fill" style="width:' + pct + '%"></div></div>' +
@@ -22903,6 +22903,23 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     splitWords: splitWords,
     pyOfChar: pyOfChar,
     DAILY_TEMPLATES: DAILY_TEMPLATES
+  };
+
+  /* [mx-goto-parenttab] 2026-09-02：从「日常表现」等模块跳到家长工作台指定 tab。
+     - 自动触发家长 PIN 锁（沿用 navigateTo 现有机制）
+     - PIN 通过、renderParent 完成挂载后，模拟点击对应 tab 按钮（学习任务·套组 / 个人日历·日程）
+     - 主页 tab 传 'home' 也可，但日常表现默认使用 'tasks'（学习任务·套组） */
+  window.mxOpenParentTab = function (tab) {
+    tab = (tab === 'calendar' || tab === 'tasks' || tab === 'home') ? tab : 'tasks';
+    window.__pendingParentTab = tab;
+    function _tryClick() {
+      var sec = document.getElementById('page-parent');
+      var btn = sec && sec.querySelector('#mx-parent-tabs [data-ptab="' + tab + '"]');
+      if (btn) { btn.click(); window.__pendingParentTab = null; return; }
+      setTimeout(_tryClick, 80);
+    }
+    if (window.navigateTo) window.navigateTo('page-parent'); else { location.hash = '#parent'; }
+    setTimeout(_tryClick, 120);
   };
 })();
 </script>
