@@ -4963,7 +4963,9 @@ html, body {
 .sudo-pad button { width: 46px; height: 46px; font-size: 20px; font-weight: 800; border-radius: 12px;
   background: #e3f2fd; color: #1565c0; border: none; cursor: pointer; }
 .sudo-pad button:hover { background: #bbdefb; }
-.sudo-hint { margin-top: 10px; font-weight: 700; }
+.sudo-cell.selected { border-color: #7ec850; box-shadow: 0 0 8px rgba(126,200,80,0.5); }
+.sudo-cell.wrong { border-color: #e74c3c; background: #fce4ec; }
+.sudo-hint { margin-top: 10px; font-weight: 700; min-height: 24px; }
 
 /* 模块占位清除（让空壳页可渲染真实内容） */
 .page-module { padding: 4px 2px; }
@@ -10813,15 +10815,18 @@ window.DB = {
         '<div id="psq-err" style="color:#e74c3c;font-size:12px;margin-bottom:6px;min-height:16px"></div>' +
         '<div id="psq-items">' + itemsHtml + '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
-        '<button type="button" id="psq-save" onclick="void(0)" style="flex:1;padding:10px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer">保存安全问题</button>' +
+        '<button type="button" id="psq-save" style="flex:1;padding:10px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer">保存安全问题</button>' +
         (onComplete ? '<button type="button" id="psq-skip" style="padding:10px 16px;background:#eee;color:#666;border:none;border-radius:9px;cursor:pointer">稍后再说</button>' : '') +
         '</div></div>';
+
+      /* ★ 关键修复：必须先将 overlay 挂入 DOM，否则 getElementById 找不到内部元素 */
+      document.body.appendChild(overlay);
 
       /* 绑定 select 变更 → 仅切换自定义问题框的 display（不再重建 DOM，不会丢失已填值） */
       for (var k = 0; k < 2; k++) {
         (function (idx) {
-          var sel = document.getElementById('psq-sel-' + idx);
-          var custEl = document.getElementById('psq-cust-' + idx);
+          var sel = overlay.querySelector('#psq-sel-' + idx);
+          var custEl = overlay.querySelector('#psq-cust-' + idx);
           if (!sel || !custEl) return;
           sel.onchange = function () {
             if (sel.value === 'custom') { custEl.style.display = ''; custEl.placeholder = '请输入你的安全问题'; }
@@ -10830,17 +10835,17 @@ window.DB = {
         })(k);
       }
 
-      /* ★ 保存按钮绑定（内联 onclick + addEventListener 双保险） */
-      var saveBtn = document.getElementById('psq-save');
+      /* ★ 保存按钮绑定 */
+      var saveBtn = overlay.querySelector('#psq-save');
       if (saveBtn) {
         saveBtn.onclick = function () {
-          var errEl = document.getElementById('psq-err');
+          var errEl = overlay.querySelector('#psq-err');
           var result = [];
           var hasOne = false;
           for (var j = 0; j < 2; j++) {
-            var sEl = document.getElementById('psq-sel-' + j);
-            var cEl = document.getElementById('psq-cust-' + j);
-            var aEl = document.getElementById('psq-ans-' + j);
+            var sEl = overlay.querySelector('#psq-sel-' + j);
+            var cEl = overlay.querySelector('#psq-cust-' + j);
+            var aEl = overlay.querySelector('#psq-ans-' + j);
             if (!sEl || !aEl) continue;
             var qText = '';
             if (sEl.value === 'custom') {
@@ -10861,12 +10866,11 @@ window.DB = {
           if (onComplete) try { onComplete(); } catch (e) {};
         };
       }
-      var skipBtn = document.getElementById('psq-skip');
+      var skipBtn = overlay.querySelector('#psq-skip');
       if (skipBtn) skipBtn.onclick = function () { close(); if (onComplete) try { onComplete(); } catch (e) {}; };
     }
     function close() { try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(e){} }
     render();
-    document.body.appendChild(overlay);
   }
 
   /**
@@ -20130,6 +20134,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var totalDone = week.reduce(function (a, b) { return a + b.done; }, 0);
 
     var h = '';
+    /* ---- 段 A：标题栏 / 周期切换 / 统计概览 / 时长图表 ---- */
+    try {
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div>' +
       '<div class="mx-tool-actions">' +
       '<select class="mx-sel" id="pt-kid">' +
@@ -20158,8 +20164,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-chart-x">' + w.l + '</span></div>';
     });
     h += '</div></div>';
+    } catch (eA) { console.error('[renderParent·段A]', eA); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 统计概览加载异常：' + (eA.message || eA) + '</div></div>'; }
 
     // 各模块学习明细（按当前周期）
+    try {
     var modKeys = Object.keys(ps.byMod);
     h += '<div class="mx-card"><div class="mx-card-t">🧩 ' + RANGE_LABEL[ptRange] + '各模块学习明细 <span style="font-size:12px;color:#9aa;font-weight:400">（时长 · 完成/总数）</span></div>';
     if (!modKeys.length) {
@@ -20177,7 +20185,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       h += '</div>';
     }
     h += '</div>';
+    } catch (eB) { console.error('[renderParent·段B]', eB); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 模块明细加载异常：' + (eB.message || eB) + '</div></div>'; }
 
+    /* 学科掌握度 */
+    try {
     h += '<div class="mx-card"><div class="mx-card-t">🎯 各学科掌握进度 <span style="font-size:12px;color:#9aa;font-weight:400">（点击进入对应模块）</span></div><div class="mx-bars">';
     mastery.forEach(function (m) {
       h += '<div class="mx-bar-row mx-click" onclick="if(window.navigateTo)window.navigateTo(\'' + m.page + '\')" title="进入 ' + m.k + '">' +
@@ -20186,8 +20197,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-bar-v">' + m.txt + '</span></div>';
     });
     h += '</div></div>';
+    } catch (eC) { console.error('[renderParent·段C]', eC); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 学科掌握度加载异常：' + (eC.message || eC) + '</div></div>'; }
 
-    // 错题分布：竖向柱状统计图
+    /* 错题分布 */
+    try {
     var SHORT_SUB = { '拼音认读': '拼音', '识字启蒙': '识字', '古诗': '古诗', '绘本': '绘本', '英文26字母': '字母', '自然拼读': '拼读', '数学思维': '数学', '认知识工': '数感', '综合': '综合', '其他': '其他' };
     h += '<div class="mx-card"><div class="mx-card-t">📊 错题分布（柱状统计图）</div>';
     if (!eks.length) {
@@ -20204,8 +20217,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       });
       h += '</div>';
     }
-    h += '</div>';
+    } catch (eD) { console.error('[renderParent·段D-错题]', eD); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 错题分布加载异常</div></div>'; }
 
+    /* ---- 段 E：多孩管理 ---- */
+    try {
     h += '<div class="mx-card no-print"><div class="mx-card-t">👶 多孩管理 <span style="font-size:12px;color:#9aa;font-weight:400">切换学习数据 · 相互隔离 · ' + kids.length + '/' + CHILD_CAP + '</span></div>';
     if (!kids.length) h += '<div class="empty-tip" style="font-size:12.5px;padding:6px 2px">暂无孩子档案，添加后可切换学习数据</div>';
     h += '<div class="mx-kids">';
@@ -20222,8 +20237,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="pt-newchild" placeholder="新孩子昵称" style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:8px;font-size:13px"' + (kids.length >= CHILD_CAP ? ' disabled' : '') + '>' +
       '<button type="button" class="mx-btn mx-btn-main" id="pt-addchild" style="font-size:13px;padding:7px 14px;border-radius:8px"' + (kids.length >= CHILD_CAP ? ' disabled' : '') + '>➕ 添加</button></div>';
     h += '<div class="mx-note">添加孩子后可点击头像切换学习数据，多孩数据相互隔离。<b>' + capNote + '</b>。</div></div>';
+    } catch (eE) { console.error('[renderParent·段E-多孩]', eE); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 多孩管理加载异常</div></div>'; }
 
-    /* ---- 🎵 节奏盒子游戏设置 ---- */
+    /* ---- 段 F：节奏盒子设置 ---- */
+    try {
     h += '<div class="mx-card no-print"><div class="mx-card-t">🎵 节奏盒子音游设置</div>';
     h += '<div class="mx-setting-row"><label>音符速度</label><select class="mx-sel" id="pt-rh-speed">';
     var _rhSpeedLabels = ['veryslow','slow','normal','fast'];
@@ -20238,8 +20255,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<span class="mx-note-inline">次/天。设置为0则不限制。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
+    } catch (eF) { console.error('[renderParent·段F-节奏]', eF); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 节奏盒子设置加载异常</div></div>'; }
 
-    /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 ---- */
+    /* ---- 段 G：家长工具箱 ---- */
+    try {
     h += '<div class="mx-card no-print"><div class="mx-card-t">🛠️ 家长工具箱</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="calendar">🗓️ 个人日历·日程</button>' +
@@ -20248,16 +20267,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div class="mx-sub-t" style="font-size:13px;font-weight:700;margin:6px 0 6px">🆘 异常任务处理（今日）</div>';
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
+    } catch (eG) { console.error('[renderParent·段G-工具箱]', eG); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 家长工具箱加载异常</div></div>'; }
 
-    /* ---- 🔐 家长验证设置（安全问题 / 修改密码） ---- */
+    /* ---- 段 H：家长验证设置 ---- */
+    try {
     h += '<div class="mx-card no-print"><div class="mx-card-t">🔐 家长验证设置</div>';
     h += '<div class="mx-note" style="margin-bottom:8px">忘记密码时可通过安全问题重置。建议设置 1~2 个安全问题。</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       '<button type="button" class="mx-btn mx-btn-main" id="pt-setsec">🛡️ ' + (parentHasQuestions() ? '修改安全问题' : '设置安全问题') + '</button>' +
       '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
       '</div></div>';
+    } catch (eH) { console.error('[renderParent·段H-验证]', eH); h += '<div class="mx-card"><div class="mx-empty" style="color:#e74c3c">⚠️ 验证设置加载异常</div></div>'; }
 
-    /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
+    /* 家长工作台页签控制台 */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
       '<button type="button" class="mx-tab on" data-ptab="home">' + (_tabL.home || '工作台主页') + '</button>' +
@@ -20386,7 +20408,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       console.error('[renderParent]', e);
       /* 兜底：即使数据全部读取失败，也显示基本框架而非留白 */
       s.innerHTML = '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div></div>' +
-        '<div class="mx-card"><div class="mx-empty" style="padding:22px;color:#e74c3c">⚠️ 工作台数据加载异常，请刷新页面重试。如持续出现请联系客服。</div></div>';
+        '<div class="mx-card"><div class="mx-empty" style="padding:22px;color:#e74c3c">⚠️ 工作台数据加载异常：' + (e && e.message ? e.message : String(e)) + '<br><br>请刷新页面重试。如持续出现请联系客服。</div></div>';
     }
   }
 
@@ -20563,40 +20585,57 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ==================== 7. 学习闪卡 ==================== */
-  var flashState = { idx: 0, flip: false, src: 'words', data: [] };
+  var flashState = { idx: 0, flip: false, src: 'words', data: [], fromDB: false };
 
   async function loadFlash(src) {
     var arr = [];
+    var gotFromDB = false;
     try {
       if (src === 'words') {
         var w = (await db().getAll('words')) || [];
-        arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; });
+        if (w.length > 0) { gotFromDB = true; arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; }); }
       } else if (src === 'poems') {
         var p = (await db().getAll('poems')) || [];
-        arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 60) }; });
+        if (p.length > 0) { gotFromDB = true; arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 80) }); }); }
       }
     } catch (e) {}
     if (!arr.length) {
-      arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
-      { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
+      /* 不同模式显示不同的示例数据，避免"都是识字卡"的困惑 */
+      if (src === 'poems') {
+        arr = [
+          { f: '静夜思', b: '李白\n床前明月光，疑是地上霜。\n举头望明月，低头思故乡。' },
+          { f: '春晓', b: '孟浩然\n春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。' },
+          { f: '咏鹅', b: '骆宾王\n鹅鹅鹅，曲项向天歌。\n白毛浮绿水，红掌拨清波。' },
+          { f: '登鹳雀楼', b: '王之涣\n白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。' }
+        ];
+      } else {
+        arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
+          { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
+      }
     }
-    return arr;
+    return { arr: arr, fromDB: gotFromDB };
   }
 
   async function renderToolFlash() {
     var s = sec('page-tool-flash');
-    flashState.data = await loadFlash(flashState.src);
+    var result = await loadFlash(flashState.src);
+    flashState.data = result.arr;
+    flashState.fromDB = result.fromDB;
     if (flashState.idx >= flashState.data.length) flashState.idx = 0;
     var cur = flashState.data[flashState.idx] || { f: '—', b: '—' };
+    var srcLabel = flashState.src === 'poems' ? '古诗卡' : '识字卡';
+    var dbBadge = flashState.fromDB ? '<span style="font-size:11px;color:#7ec850;background:#e8f5e9;padding:1px 6px;border-radius:4px;margin-left:4px">已从词库加载 ' + flashState.data.length + ' 张</span>' : '<span style="font-size:11px;color:#999;padding:1px 6px;border-radius:4px;margin-left:4px">演示数据</span>';
+
     var h = '<div class="mx-tool-head no-print"><div class="mx-tool-title">🃏 学习闪卡生成</div>' +
       '<div class="mx-tool-actions">' +
-      '<select class="mx-sel" id="fc-src"><option value="words">识字卡</option><option value="poems">古诗卡</option></select>' +
+      '<select class="mx-sel" id="fc-src"><option value="words"' + (flashState.src === 'words' ? ' selected' : '') + '>识字卡</option><option value="poems"' + (flashState.src === 'poems' ? ' selected' : '') + '>古诗卡</option></select>' +
+      dbBadge +
       '<button class="mx-btn mx-btn-ghost" id="fc-shuffle">🔀 打乱</button>' +
       '<button class="mx-btn mx-btn-ghost" id="fc-print">🖨️ 打印全部</button></div></div>';
     h += '<div class="mx-flash-wrap"><div class="mx-flash' + (flashState.flip ? ' flip' : '') + '" id="fc-card">' +
       '<div class="mx-flash-f">' + cur.f + '</div>' +
       '<div class="mx-flash-b">' + String(cur.b).replace(/\n/g, '<br>') + '</div></div>' +
-      '<div class="mx-flash-tip no-print">点击卡片翻面</div>' +
+      '<div class="mx-flash-tip no-print">点击卡片翻面 · ' + srcLabel + ' · 第 ' + (flashState.idx + 1) + '/' + flashState.data.length + ' 张</div>' +
       '<div class="mx-flash-nav no-print"><button class="mx-btn mx-btn-ghost big" id="fc-prev">◀ 上一张</button>' +
       '<span class="mx-flash-idx">' + (flashState.idx + 1) + ' / ' + flashState.data.length + '</span>' +
       '<button class="mx-btn mx-btn-main big" id="fc-next">下一张 ▶</button></div></div>';
@@ -20606,7 +20645,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('') + '</div></div>';
     s.innerHTML = h;
 
-    $('fc-src').value = flashState.src;
     $('fc-src').onchange = function () { flashState.src = this.value; flashState.idx = 0; flashState.flip = false; renderToolFlash(); };
     $('fc-card').onclick = function () { flashState.flip = !flashState.flip; this.classList.toggle('flip'); };
     $('fc-prev').onclick = function () {
@@ -20745,18 +20783,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       };
       var cur = await sget('feedback:list', []);
       if (!Array.isArray(cur)) cur = [];
-      // 云端可插拔：已配置 LeanCloud 时尝试写入 Feedback 表
+      /* 云端同步：通过 CloudBase HTTP 网关写入（GitHub Pages 可直连） */
       try {
-        if (window.AV && window.AV.Object) {
-          var FB = window.AV.Object.extend('Feedback');
-          var o = new FB();
-          o.set('name', row.name); o.set('contact', row.contact); o.set('text', row.text);
-          await o.save(); row.synced = true;
-        }
-      } catch (e) {}
+        var gw = (window.MX_GATEWAY || 'https://my-kb-d9grepb0u2ac94dc7-1253756551.ap-shanghai.app.tcloudbase.com');
+        var resp = await fetch(gw + '/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'logSecurityEvent', data: {
+            type: 'feedback',
+            detail: { name: row.name, contact: row.contact, text: row.text },
+            ts: row.ts,
+            _from: 'app-feedback'
+          }})
+        });
+        if (resp.ok) { row.synced = true; }
+      } catch (e) { /* 网络失败不影响本地保存 */ }
       cur.unshift(row);
       await sset('feedback:list', cur);
-      toast('感谢你的建议！我们收到啦 💌');
+      toast('感谢你的建议！我们收到啦 💌' + (row.synced ? ' 已同步云端' : '（本地留存）'));
       renderFeedback();
     };
   }
@@ -21529,62 +21573,158 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
   }
 
-  /* ---------- 数独（四宫格入门） ---------- */
-  function genSudoku() {
-    // 一个固定的可解四宫格谜面（解多次打乱）
-    var base = [[1, 2, 3, 4], [3, 4, 1, 2], [2, 1, 4, 3], [4, 3, 2, 1]];
-    var sol = base;
-    var clue = [[1, 0, 0, 3], [0, 4, 1, 0], [0, 0, 0, 2], [3, 0, 0, 0]];
-    return { sol: sol, clue: clue };
-  }
+  /* ---------- 数独（四宫格入门 · 多题库版） ---------- */
+  var SUDOKU_PUZZLES = [
+    { clue: [[1,0,0,3],[0,4,1,0],[0,0,0,2],[3,0,0,0]], sol: [[1,2,3,4],[3,4,1,2],[2,1,4,3],[4,3,2,1]] },
+    { clue: [[0,0,3,0],[4,0,0,1],[0,2,0,0],[0,0,4,0]], sol: [[2,1,3,4],[4,3,2,1],[1,2,4,3],[3,4,1,2]] },
+    { clue: [[4,0,0,0],[0,3,0,0],[0,0,2,0],[0,0,0,1]], sol: [[4,1,2,3],[2,3,1,4],[3,4,2,1],[1,2,3,4]] },
+    { clue: [[0,3,0,0],[0,0,4,0],[2,0,0,0],[0,1,0,0]], sol: [[1,3,4,2],[3,2,4,1],[2,4,1,3],[4,1,3,2]] },
+    { clue: [[0,0,0,2],[0,4,0,0],[3,0,0,0],[0,0,1,0]], sol: [[4,3,1,2],[1,4,2,3],[3,2,4,1],[2,1,3,4]] },
+    { clue: [[2,0,0,0],[0,0,3,0],[0,4,0,0],[0,0,0,1]], sol: [[2,1,4,3],[4,2,3,1],[3,4,1,2],[1,3,2,4]] },
+    { clue: [[0,4,0,0],[3,0,0,2],[0,0,0,4],[0,1,0,0]], sol: [[2,4,1,3],[3,1,4,2],[1,3,2,4],[4,1,3,2]] },
+    { clue: [[0,0,2,0],[0,3,0,4],[1,0,0,0],[0,0,0,3]], sol: [[4,1,2,3],[2,3,1,4],[1,4,3,2],[4,2,1,3]] }
+  ];
   var _sudoCurrent = null;
+  var _sudoSelCell = null; /* 当前选中的格子 {r,c} */
+
+  function genSudoku() {
+    /* 随机取一题，浅拷贝避免修改原数据 */
+    var p = SUDOKU_PUZZLES[Math.floor(Math.random() * SUDOKU_PUZZLES.length)];
+    return {
+      sol: p.sol.map(function(row){ return row.slice(); }),
+      clue: p.clue.map(function(row){ return row.slice(); })
+    };
+  }
+
   function renderSudokuMain() {
     var wrap = el('page-sudoku');
     if (!wrap) return;
     _sudoCurrent = genSudoku();
+    _sudoSelCell = null;
     var board = '';
     for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) {
       var g = _sudoCurrent.clue[r][c];
-      board += '<div class="sudo-cell' + (g ? ' given' : '') + '" data-r="' + r + '" data-c="' + c + '">' + (g ? g : '<input class="sudo-in" inputmode="numeric">') + '</div>';
+      board += '<div class="sudo-cell' + (g ? ' given' : '') + '" data-r="' + r + '" data-c="' + c + '">' +
+        (g ? '<span>' + g + '</span>' : '<input class="sudo-in" inputmode="numeric" maxlength="1">') +
+        '</div>';
     }
     wrap.innerHTML =
       '<div class="content-section-title">🧩 数独游戏 <span class="sub">四宫格入门 · 每行每列1-4不重复</span></div>' +
       '<div class="page-module" style="text-align:center">' +
-        '<div class="sudoku-board">' + board + '</div>' +
-        '<div class="sudo-pad">' + [1, 2, 3, 4, 0].map(function (n) { return '<button type="button" data-n="' + n + '">' + (n === 0 ? '⌫' : n) + '</button>'; }).join('') + '</div>' +
-        '<div class="sudo-hint" id="sudo-hint">在空格里填入 1-4，让每行每列都不重复；点数字再点格子即可填入。</div>' +
-        '<div style="margin-top:12px"><button type="button" class="btn" id="sudo-check" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;">✅ 检查 / 新一局</button></div>' +
+        '<div class="sudoku-board" id="sudo-board">' + board + '</div>' +
+        '<div class="sudo-pad" id="sudo-pad">' + [1, 2, 3, 4].map(function (n) {
+          return '<button type="button" data-n="' + n + '">' + n + '</button>';
+        }).join('') + '<button type="button" data-n="0">⌫</button></div>' +
+        '<div class="sudo-hint" id="sudo-hint">点击空格选中，再点数字填入。让每行每列的 1~4 都不重复。</div>' +
+        '<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">' +
+        '<button type="button" class="btn" id="sudo-check" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;padding:10px 22px;">✅ 检查答案</button>' +
+        '<button type="button" class="btn" id="sudo-new" style="background:#42a5f5;color:#fff;border:none;padding:10px 22px;">🔄 新一局</button>' +
+        '</div>' +
       '</div>';
     bindSudoku(wrap);
   }
+
   function bindSudoku(wrap) {
-    var pad = wrap.querySelector('.sudo-pad');
-    var active = null;
+    var board = wrap.querySelector('#sudo-board');
+    var pad = wrap.querySelector('#sudo-pad');
+
+    /* 点击格子：选中/取消选中 */
+    board.addEventListener('click', function (e) {
+      var cell = e.target.closest('.sudo-cell');
+      if (!cell || cell.classList.contains('given')) return;
+      /* 取消之前选中的 */
+      board.querySelectorAll('.sudo-cell.selected').forEach(function (c) { c.classList.remove('selected'); });
+      cell.classList.add('selected');
+      _sudoSelCell = { r: +cell.dataset.r, c: +cell.dataset.c };
+      /* 自动聚焦输入框 */
+      var inp = cell.querySelector('.sudo-in');
+      if (inp) inp.focus();
+    });
+
+    /* 数字键盘：填入选中格 */
     if (pad) pad.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-n]'); if (!b) return;
-      var cells = wrap.querySelectorAll('.sudo-cell');
-      cells.forEach(function (c) { c.classList.remove('chosen'); });
-      if (b.dataset.n === '0') { var inp = wrap.querySelector('.sudo-cell.chosen .sudo-in'); if (inp) inp.value = ''; return; }
-      var target = active || wrap.querySelector('.sudo-cell input:not([readonly])');
-      if (target && target.querySelector) { var inp = target.querySelector('.sudo-in'); if (inp) { inp.value = b.dataset.n; } active = null; }
-      // 若用户先点空格子
+      var b = e.target.closest('[data-n]');
+      if (!b) return;
+      var n = b.dataset.n;
+      if (!_sudoSelCell) {
+        var hint = wrap.querySelector('#sudo-hint');
+        if (hint) hint.textContent = '请先点击一个空格，再选择数字～';
+        return;
+      }
+      var targetCell = board.querySelector('.sudo-cell[data-r="' + _sudoSelCell.r + '"][data-c="' + _sudoSelCell.c + '"]');
+      if (!targetCell) return;
+      var inp = targetCell.querySelector('.sudo-in');
+      if (!inp) return;
+      if (n === '0') { inp.value = ''; }
+      else { inp.value = n; }
+      /* 清除错误标色 */
+      inp.style.color = '';
+      targetCell.classList.remove('wrong');
     });
-    var inputs = wrap.querySelectorAll('.sudo-in');
-    inputs.forEach(function (inp) {
-      inp.addEventListener('focus', function () { var cell = inp.closest('.sudo-cell'); wrap.querySelectorAll('.sudo-cell').forEach(function (c) { c.classList.remove('chosen'); }); if (cell) cell.classList.add('chosen'); });
+
+    /* 输入框直接输入也支持 */
+    wrap.querySelectorAll('.sudo-in').forEach(function (inp) {
+      inp.addEventListener('focus', function () {
+        var cell = inp.closest('.sudo-cell');
+        board.querySelectorAll('.sudo-cell.selected').forEach(function (c) { c.classList.remove('selected'); });
+        if (cell) { cell.classList.add('selected'); _sudoSelCell = { r: +cell.dataset.r, c: +cell.dataset.c }; }
+      });
+      inp.addEventListener('input', function () {
+        /* 只允许 1-4 */
+        this.value = this.value.replace(/[^1-4]/g, '').slice(0, 1);
+        this.style.color = '';
+        this.closest('.sudo-cell').classList.remove('wrong');
+      });
     });
-    var check = wrap.querySelector('#sudo-check');
-    if (check) check.onclick = function () {
+
+    /* 检查按钮 */
+    var checkBtn = wrap.querySelector('#sudo-check');
+    if (checkBtn) checkBtn.onclick = function () {
+      var allFilled = true;
       var okAll = true;
-      wrap.querySelectorAll('.sudo-cell:not(.given) .sudo-in').forEach(function (inp) {
-        var r = +inp.closest('.sudo-cell').dataset.r, c = +inp.closest('.sudo-cell').dataset.c;
-        if ((+inp.value) !== _sudoCurrent.sol[r][c]) { okAll = false; inp.style.color = '#c62828'; }
+      var emptyCount = 0;
+      wrap.querySelectorAll('.sudo-cell:not(.given)').forEach(function (cell) {
+        var inp = cell.querySelector('.sudo-in');
+        if (!inp) return;
+        var r = +cell.dataset.r, c = +cell.dataset.c;
+        var val = inp.value.trim();
+        if (!val) { allFilled = false; emptyCount++; cell.classList.remove('wrong'); return; }
+        if ((+val) !== _sudoCurrent.sol[r][c]) {
+          okAll = false;
+          cell.classList.add('wrong');
+          inp.style.color = '#c62828';
+        } else {
+          cell.classList.remove('wrong');
+          inp.style.color = '#2e7d32';
+        }
       });
       var hint = wrap.querySelector('#sudo-hint');
-      if (hint) hint.innerHTML = okAll ? '🎉 完全正确！太厉害了！' : '有些格子还不正确哦，再检查一下 1-4 不重复～';
-      if (okAll) { try { DB.getActiveChildId().then(function (cid) { return DB.addPoints(cid || 'default', 5, '数独答对'); }).then(function () { if (window.__refreshCoinBanner) window.__refreshCoinBanner(); toast('🧩 数独全对 +5 积分！'); }); if(window.linkTask) window.linkTask('数独'); } catch (e) {} }
-      if (okAll) { setTimeout(renderSudokuMain, 1400); }
+      if (!hint) return;
+      if (emptyCount > 0 && !allFilled) {
+        hint.innerHTML = '⏳ 还有 <b>' + emptyCount + '</b> 个空格没填完哦，继续加油！';
+      } else if (okAll) {
+        hint.innerHTML = '🎉 <b>完全正确！</b>太厉害了！+5 积分';
+        hint.style.color = '#2e7d32';
+        try {
+          DB.getActiveChildId().then(function (cid) {
+            return DB.addPoints(cid || 'default', 5, '数独答对');
+          }).then(function () {
+            if (window.__refreshCoinBanner) window.__refreshCoinBanner();
+            toast('🧩 数独全对 +5 积分！');
+          });
+          if (window.linkTask) window.linkTask('数独');
+        } catch (e) {}
+        /* 1.5秒后自动新一局 */
+        setTimeout(renderSudokuMain, 1500);
+      } else {
+        hint.innerHTML = '❌ 有些格子还不正确哦，<span style="color:#c62828">红色</span>标出的是错误的，再检查一下～';
+        hint.style.color = '#e74c3c';
+      }
     };
+
+    /* 新一局按钮 */
+    var newBtn = wrap.querySelector('#sudo-new');
+    if (newBtn) newBtn.onclick = function () { renderSudokuMain(); };
   }
 
   /* ---------- 导航接入 ---------- */
@@ -22768,7 +22908,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     sp.onclick = function () {
       var val = document.getElementById('mx22-py-input').value.trim();
       if (!val) { if (window.showToast) window.showToast('先输入文字再朗读哦'); return; }
-      if (window.speakTTS) window.speakTTS(val, 'zh-CN');
+      /* 优先 speakTTS（含 MP3 兜底），降级直接调 Web Speech API */
+      if (window.speakTTS) {
+        window.speakTTS(val, 'zh-CN');
+      } else if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+          var u = new SpeechSynthesisUtterance(val);
+          u.lang = 'zh-CN'; u.rate = 0.8; u.pitch = 1.1;
+          window.speechSynthesis.speak(u);
+        } catch (e) {
+          if (window.showToast) window.showToast('朗读失败：' + (e.message || e));
+        }
+      } else {
+        if (window.showToast) window.showToast('当前设备不支持语音朗读');
+      }
+      /* 视觉反馈：按钮动效提示用户已触发 */
+      sp.style.transform = 'scale(0.95)';
+      setTimeout(function () { sp.style.transform = ''; }, 150);
     };
   }
 

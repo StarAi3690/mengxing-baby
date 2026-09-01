@@ -53,6 +53,7 @@
   <div class="tabs">
     <div class="tab on" id="tab-ann" onclick="switchTab('ann')">📢 全站公告</div>
     <div class="tab" id="tab-mon" onclick="switchTab('mon')">📊 运营监控</div>
+    <div class="tab" id="tab-fb" onclick="switchTab('fb')">💌 用户反馈</div>
   </div>
 
   <!-- 公告编辑 -->
@@ -95,6 +96,18 @@
       <div id="secInfo" class="sub"></div>
     </div>
   </div>
+
+  <!-- 用户反馈 -->
+  <div id="pane-fb" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:0">用户反馈列表</h3>
+        <button class="btn ghost" onclick="loadFeedback()">↺ 刷新</button>
+      </div>
+      <div class="sub">用户在「建议与反馈」模块提交的内容会同步到这里。数据来源：CloudBase <code>mx_events</code>（type=feedback）。</div>
+      <table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>反馈内容</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -127,8 +140,9 @@ function unlock(){
 }
 function logout(){ ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload(); }
 function switchTab(t){
-  $('tab-ann').classList.toggle('on', t==='ann'); $('tab-mon').classList.toggle('on', t==='mon');
-  $('pane-ann').hidden = t!=='ann'; $('pane-mon').hidden = t!=='mon';
+  $('tab-ann').classList.toggle('on', t==='ann'); $('tab-mon').classList.toggle('on', t==='mon'); $('tab-fb').classList.toggle('on', t==='fb');
+  $('pane-ann').hidden = t!=='ann'; $('pane-mon').hidden = t!=='mon'; $('pane-fb').hidden = t!=='fb';
+  if (t === 'fb') loadFeedback();
 }
 
 async function loadAnnounce(){
@@ -176,6 +190,33 @@ async function loadStats(){
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
   $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+r.securityLogs+' 条。';
 }
+
+async function loadFeedback(){
+  const tbody = $('fbTable').querySelector('tbody');
+  tbody.innerHTML = '<tr><td colspan="4" class="sub">加载中…</td></tr>';
+  try {
+    /* 通过 adminStats 获取反馈数据（服务端聚合）或直接查 mx_events */
+    const r = await proxy('adminStats', { adminKey: ADMIN_KEY, includeFeedback: true });
+    const list = (r && r.feedbackList) || [];
+    if (!list.length) {
+      /* 降级：尝试直接从 logSecurityEvent 查 feedback 类型 */
+      tbody.innerHTML = '<tr><td colspan="4" class="sub">暂无用户反馈数据。用户提交后会自动出现在这里。</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(function(item){
+      var d = new Date(item.ts || item.date || 0);
+      var time = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')
+        + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      var name = (item.detail && item.detail.name) || item.name || '匿名';
+      var contact = (item.detail && item.detail.contact) || item.contact || '—';
+      var text = (item.detail && item.detail.text) || item.text || '';
+      return '<tr><td style="white-space:nowrap">'+time+'</td><td>'+esc(name)+'</td><td>'+esc(contact)+'</td><td style="max-width:300px;word-break:break-all">'+esc(text)+'</td></tr>';
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="4" class="sub" style="color:var(--bad)">加载失败：'+String(e.message||e)+'</td></tr>';
+  }
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
