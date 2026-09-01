@@ -20060,6 +20060,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   async function renderParent() {
     var s = sec('page-parent');
+    if (!s) return;
     var kids = [];
     try { kids = (await db().getAll('children')) || []; } catch (e) {}
     if (!kids.length) {
@@ -20069,7 +20070,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       try { await db().put('children', def); } catch (e) {}
       kids = [def];
     }
-    var c = await cid();
+    var c = 'default';
+    try { var _cc = await cid(); if (_cc) c = _cc; } catch (e) { c = 'default'; }
 
     /* 【多孩上限】非 VIP 最多 2 个孩子，VIP 最多 5 个（设备已激活 VIP 码也算 VIP） */
     var parVip = false;
@@ -20081,8 +20083,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try { var p = await db().get('points', c); pts = (p && p.total) || 0; } catch (e) {}
 
     // 周期学习时长（今日 / 本周 / 本月 / 本季度 / 本年）
-    const ps = await calcPeriod(c, ptRange);
-    var week = ps.chart, maxM = 1;
+    var ps = { chart: [], byMod: {}, wrong: 0 };
+    try { var _ps = await calcPeriod(c, ptRange); if (_ps) ps = _ps; } catch (e) { ps = { chart: [], byMod: {}, wrong: 0 }; }
+    var week = (ps && ps.chart) || [], maxM = 1;
     week.forEach(function (w) { if (w.m > maxM) maxM = w.m; });
 
     // 学科掌握度（扩展为需求四要求的 8 大学科，并绑定跳转页）
@@ -20115,14 +20118,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           txt = mn + '/' + po.length + ' 首';
         } catch (e) {}
       } else {
-        var rec = await sget('mastery:' + sj.k + ':' + c, 0);
+        var rec = 0;
+        try { rec = await sget('mastery:' + sj.k + ':' + c, 0); } catch (e) { rec = 0; }
         pct = Math.min(100, Number(rec) || 0);
         txt = pct + '%';
       }
       mastery.push({ k: sj.k, icon: sj.icon, pct: pct, txt: txt, page: sj.page });
     }
 
-    var errs = await errList(c);
+    var errs = [];
+    try { errs = (await errList(c)) || []; } catch (e) { errs = []; }
     var bySub = {};
     errs.forEach(function (i) { bySub[i.subject] = (bySub[i.subject] || 0) + 1; });
     var eks = Object.keys(bySub), eMax = 1;
@@ -20229,14 +20234,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div class="mx-card no-print"><div class="mx-card-t">🎵 节奏盒子音游设置</div>';
     h += '<div class="mx-setting-row"><label>音符速度</label><select class="mx-sel" id="pt-rh-speed">';
     var _rhSpeedLabels = ['veryslow','slow','normal','fast'];
-    var _curRhSpeed = await sget('rhythm:speed:' + c, 'fast');
+    var _curRhSpeed = 'fast';
+    try { _curRhSpeed = await sget('rhythm:speed:' + c, 'fast'); } catch (e) { _curRhSpeed = 'fast'; }
+    var _RH_LEVELS = window.RH_SPEED_LEVELS || {};
       _rhSpeedLabels.forEach(function(sl) {
-      var sc = window.RH_SPEED_LEVELS[sl] || {};
+      var sc = _RH_LEVELS[sl] || {};
       h += '<option value="' + sl + '"' + (sl === _curRhSpeed ? ' selected' : '') + '>' + (sc.label || sl) + '</option>';
     });
     h += '</select><span class="mx-note-inline">速度越快，音符移动越快，难度越高。推荐入门用"慢"或"正常"。</span></div>';
     h += '<div class="mx-setting-row"><label>每日游戏次数上限</label>';
-    h += '<input type="number" class="mx-input" id="pt-rh-limit" min="1" max="50" value="' + (await sget('rhythm:dailyLimit:' + c, String(window.RH_DEFAULT_DAILY_LIMIT))) + '" style="width:70px">';
+    var _rhLimit = (window.RH_DEFAULT_DAILY_LIMIT != null ? String(window.RH_DEFAULT_DAILY_LIMIT) : '10');
+    try { _rhLimit = await sget('rhythm:dailyLimit:' + c, _rhLimit); } catch (e) {}
+    h += '<input type="number" class="mx-input" id="pt-rh-limit" min="1" max="50" value="' + _rhLimit + '" style="width:70px">';
     h += '<span class="mx-note-inline">次/天。设置为0则不限制。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
