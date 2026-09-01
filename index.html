@@ -14697,7 +14697,8 @@ window.MX_SEED = data;
     if (!_selDate) _selDate = dateKey(now);
     var todayKey = dateKey(now);
 
-    var stats = await monthStats(_viewY, _viewM);
+    var stats = {};
+    try { stats = (await monthStats(_viewY, _viewM)) || {}; } catch (e) { stats = {}; }
     var daysInMonth = new Date(_viewY, _viewM + 1, 0).getDate();
     var lead = (new Date(_viewY, _viewM, 1).getDay() + 6) % 7;
 
@@ -14765,7 +14766,8 @@ window.MX_SEED = data;
   async function fillDayPanel(page, date) {
     var body = page.querySelector('#cal-daybody');
     if (!body) return;
-    var row = await dayRow(date);
+    var row = { items: [] };
+    try { row = (await dayRow(date)) || { items: [] }; } catch (e) { row = { items: [] }; }
     var items = (row && row.items) || [];
     var done = items.filter(function (it) { return it.done; }).length;
 
@@ -14827,7 +14829,8 @@ window.MX_SEED = data;
   async function fillListenZone(page, date) {
     var body = page.querySelector('#cal-listenbody');
     if (!body) return;
-    var row = await dayRow(date);
+    var row = { items: [] };
+    try { row = (await dayRow(date)) || { items: [] }; } catch (e) { row = { items: [] }; }
     var items = (row && row.items) || [];
     var list = items.filter(function (it) { return (it.category || 'base') === 'listen'; })
       .sort(function (a, b) { return (a.time || '').localeCompare(b.time || ''); });
@@ -25034,6 +25037,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '</div>';
       bind(page, cid);
       renderTodaySchedule(cid, page);
+    }).catch(function (e) {
+      try { page.innerHTML = '<div class="ts-tip">学习任务套组加载失败：' + esc((e && e.message) || e) + '。请确认浏览器本地存储可用，或使用线上版 https://StarAi3690.github.io/mengxing-baby/</div>'; } catch (_) {}
     });
   }
   window.__mxRenderTasksets = render;   // 供家长工作台页签控制台内嵌调用
