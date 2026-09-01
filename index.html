@@ -11169,6 +11169,13 @@ window.DB = {
 
   }
 
+
+  /* ---- 跨块导出：家长工作台（Block 16 / renderParent）需调用本块的安全问题能力 ----
+     本块是独立 IIFE，块外无法直接访问内部函数；沿用 window.mxParentUnlockChange 的既有
+     导出模式统一暴露，避免 Block 16 出现 ReferenceError（2026-09-02 setSecBtn 缝合事故）。*/
+  window.parentHasQuestions = parentHasQuestions;
+  window.showParentSecuritySetup = showParentSecuritySetup;
+
 })();
 
 
@@ -19540,7 +19547,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   function cidOf() {
     try { if (window.DB && DB.getActiveChildId) return DB.getActiveChildId(); } catch (e) {}
-    return Promise.resolve('child1');
+    /* 2026-09-02 修复：回退值必须与全项目一致为 'default'（其余 6 处均为 default）。
+       原 'child1' 会导致从未切换过孩子的用户读写到不存在的 childId，排期/积分全部落空。 */
+    return Promise.resolve('default');
   }
   function toast(m) { if (window.showToast) window.showToast(m); }
   function esc(s) {
@@ -19811,13 +19820,51 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (window.showToast) { window.showToast(msg); return; }
     try { console.log(msg); } catch (e) {}
   }
+  /* 2026-09-02 修复：本 IIFE 内原本没有 esc（同名函数定义在另一个 script 块，跨 IIFE 不可见）。
+     家长工作台「各模块学习明细」一旦有数据就会调用 esc(k) -> ReferenceError，
+     导致 renderParent 整个中断 -> 家长工作台整页空白（表现为三 Tab 一起消失）。
+     此处补一个等价的本地实现。 */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  /* 2026-09-02：家长工作台主页看板「脏标记」。
+     在「🗓️个人日历·日程」/「🗂️学习任务·套组」tab 里勾选任务后切回「工作台主页」，
+     原先只做 display 切换、不重算，看板数字仍是旧的。
+     这里监听所有排期写入入口置脏，切回主页时若脏则整体重算 renderParent()。 */
+  window.__parentDashDirty = false;
+  function markDashDirty() { window.__parentDashDirty = true; }
+  (function initDashDirtyWatch() {
+    if (!window.DB) { setTimeout(initDashDirtyWatch, 300); return; }
+    try {
+      ['markTaskDone', 'saveDailySchedule', 'putDailySchedule'].forEach(function (fn) {
+        var orig = window.DB[fn];
+        if (typeof orig === 'function' && !orig.__mxDashWrapped) {
+          var w = function () { markDashDirty(); return orig.apply(this, arguments); };
+          w.__mxDashWrapped = true;
+          window.DB[fn] = w;
+        }
+      });
+    } catch (e) {}
+    try {
+      ['mx-task-done', 'mx-points-changed'].forEach(function (evn) {
+        document.addEventListener(evn, markDashDirty);
+      });
+    } catch (e) {}
+  })();
+
   function dateKey(d) {
     d = d || new Date();
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
   async function cid() {
-    try { return (await db().getActiveChildId()) || 'child1'; } catch (e) { return 'child1'; }
+    /* 2026-09-02 修复：回退值 'child1' -> 'default'，与全项目其余 6 处一致。
+       根因：settings.activeChildId 未设置时返回 null -> cid() 得到 'child1'，
+       而排期(dailySchedule)/积分(points)/错题 均以 'default' 为 childId 写入，
+       过滤 r.id.indexOf(c + ':') === 0 永远不命中 -> 看板恒为 0 / 空态。 */
+    try { return (await db().getActiveChildId()) || 'default'; } catch (e) { return 'default'; }
   }
   async function sget(k, fb) {
     try { return await db().getSetting(k, fb); } catch (e) { return fb; }
@@ -20025,14 +20072,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     const byMod = {}; const dayMin = {};
     const rows = (await db().getAll('dailySchedule').catch(function () { return []; })) || [];
     rows.filter(function (r) { return r && ('' + r.id).indexOf(c + ':') === 0; }).forEach(function (r) {
+      /* 2026-09-02 兼容：早期版本勾选任务时未写 doneAt（done=true 但 doneAt=null），
+         周期过滤把这些老数据全部丢弃 -> 看板恒为 0。此处回退用排期当天 12:00 的时间戳。 */
+      var dayTs = r.date ? (new Date(r.date + 'T12:00:00').getTime()) : 0;
       (r.items || []).forEach(function (it) {
-        if (it.done && it.doneAt >= from && it.doneAt <= to) {
+        var _ts = it.doneAt || (it.done ? dayTs : 0);
+        if (it.done && _ts >= from && _ts <= to) {
           const mins = Number(it.duration) || 0;
           const sub = it.subject || '其他';
           totalMin += mins; totalDone++;
           const mm = byMod[sub] || (byMod[sub] = { min: 0, done: 0, tot: 0 });
           mm.min += mins; mm.done++; mm.tot++;
-          const dk = dateKey(new Date(it.doneAt)); dayMin[dk] = (dayMin[dk] || 0) + mins;
+          const dk = dateKey(new Date(_ts)); dayMin[dk] = (dayMin[dk] || 0) + mins;
         }
       });
     });
@@ -20073,6 +20124,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       kids = [def];
     }
     var c = await cid();
+    /* 2026-09-02 兜底：若当前 childId 不在真实孩子档案列表内
+       （activeChildId 从未设置 / 指向已删除的孩子），自动落到第一个档案并持久化，
+       避免看板、积分、错题全部读空。 */
+    if (kids.length) {
+      var inKids = false;
+      for (var ki = 0; ki < kids.length; ki++) { if (kids[ki].id === c) { inKids = true; break; } }
+      if (!inKids) { c = kids[0].id; try { await db().setActiveChildId(c); } catch (e) {} }
+    }
 
     /* 【多孩上限】非 VIP 最多 2 个孩子，VIP 最多 5 个（设备已激活 VIP 码也算 VIP） */
     var parVip = false;
@@ -20132,7 +20191,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     eks.forEach(function (k) { if (bySub[k] > eMax) eMax = bySub[k]; });
 
     var totalMin = week.reduce(function (a, b) { return a + b.m; }, 0);
-    var totalDone = week.reduce(function (a, b) { return a + b.done; }, 0);
+    /* 2026-09-02 修复：原 totalDone = week.reduce(a + b.done)，但 week 是 ps.chart，
+       元素只有 {l, m} 两个字段、没有 done -> undefined 累加得 NaN，页面显示「NaN 完成任务」。
+       改从 calcPeriod 的真实统计 ps.totalDone 取。 */
+    var totalDone = ps.totalDone || 0;
 
     var h = '';
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div>' +
@@ -20254,6 +20316,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
 
+    /* ---- 🔐 家长验证设置（安全问题 / 修改密码） ---- */
+    h += '<div class="mx-card no-print"><div class="mx-card-t">🔐 家长验证设置</div>';
+    h += '<div class="mx-note" style="margin-bottom:8px">忘记密码时可通过安全问题重置。建议设置 1~2 个安全问题。</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button type="button" class="mx-btn mx-btn-main" id="pt-setsec">🛡️ ' + (typeof window.parentHasQuestions === 'function' && window.parentHasQuestions() ? '修改安全问题' : '设置安全问题') + '</button>' +
+      '<button type="button" class="mx-btn mx-btn-ghost" id="pt-chgpin">🔑 修改进入密码</button>' +
+    '</div></div>';
+
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
@@ -20336,6 +20406,21 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var pb = $('pt-print');
     if (pb) pb.onclick = function () { window.print(); };
 
+    /* 家长验证设置：设置/修改安全问题 */
+    var setSecBtn = $('pt-setsec');
+    if (setSecBtn) setSecBtn.onclick = function () {
+      try {
+        if (typeof window.showParentSecuritySetup === 'function') window.showParentSecuritySetup(renderParent);
+        else toast('功能初始化中…');
+      } catch (e) {}
+    };
+    /* 家长验证设置：修改进入密码（先验证旧密码，再设新密码） */
+    var chgPinBtn = $('pt-chgpin');
+    if (chgPinBtn) chgPinBtn.onclick = function () {
+      if (!window.mxParentUnlockChange) { toast('功能初始化中…'); return; }
+      window.mxParentUnlockChange(renderParent);
+    };
+
     var rangeBox = $('pt-ranges');
     if (rangeBox) rangeBox.querySelectorAll('.mx-seg-btn').forEach(function (b) {
       b.onclick = function () { ptRange = b.dataset.r; renderParent(); };
@@ -20361,6 +20446,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         t.classList.toggle('on', t.getAttribute('data-ptab') === tab);
       });
       if (tab === 'home') {
+        /* 2026-09-02：若在日历/套组 tab 里勾选过任务（脏标记），切回主页时整体重算看板 */
+        if (window.__parentDashDirty) {
+          window.__parentDashDirty = false;
+          try { renderParent(); } catch (e) {}
+          return;
+        }
         homeEl.style.display = ''; bodyEl.style.display = 'none'; bodyEl.innerHTML = '';
       } else {
         homeEl.style.display = 'none'; bodyEl.style.display = '';
@@ -20544,40 +20635,57 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ==================== 7. 学习闪卡 ==================== */
-  var flashState = { idx: 0, flip: false, src: 'words', data: [] };
+  var flashState = { idx: 0, flip: false, src: 'words', data: [], fromDB: false };
 
   async function loadFlash(src) {
     var arr = [];
+    var gotFromDB = false;
     try {
       if (src === 'words') {
         var w = (await db().getAll('words')) || [];
-        arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; });
+        if (w.length > 0) { gotFromDB = true; arr = w.slice(0, 60).map(function (x) { return { f: x.word, b: (x.pinyin || '') + (x.def ? '\n' + x.def : '') }; }); }
       } else if (src === 'poems') {
         var p = (await db().getAll('poems')) || [];
-        arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 60) }; });
+        if (p.length > 0) { gotFromDB = true; arr = p.slice(0, 40).map(function (x) { return { f: x.title, b: (x.author || '') + '\n' + (x.content || '').slice(0, 80) }; }); }
       }
     } catch (e) {}
     if (!arr.length) {
-      arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
-      { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
+      /* 不同模式显示不同的示例数据，避免"都是识字卡"的困惑 */
+      if (src === 'poems') {
+        arr = [
+          { f: '静夜思', b: '李白\n床前明月光，疑是地上霜。\n举头望明月，低头思故乡。' },
+          { f: '春晓', b: '孟浩然\n春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。' },
+          { f: '咏鹅', b: '骆宾王\n鹅鹅鹅，曲项向天歌。\n白毛浮绿水，红掌拨清波。' },
+          { f: '登鹳雀楼', b: '王之涣\n白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。' }
+        ];
+      } else {
+        arr = [{ f: '天', b: 'tiān　天空' }, { f: '地', b: 'dì　土地' }, { f: '人', b: 'rén　人类' },
+          { f: '你', b: 'nǐ　你好' }, { f: '我', b: 'wǒ　我们' }, { f: '他', b: 'tā　他们' }];
+      }
     }
-    return arr;
+    return { arr: arr, fromDB: gotFromDB };
   }
 
   async function renderToolFlash() {
     var s = sec('page-tool-flash');
-    flashState.data = await loadFlash(flashState.src);
+    var result = await loadFlash(flashState.src);
+    flashState.data = result.arr;
+    flashState.fromDB = result.fromDB;
     if (flashState.idx >= flashState.data.length) flashState.idx = 0;
     var cur = flashState.data[flashState.idx] || { f: '—', b: '—' };
+    var srcLabel = flashState.src === 'poems' ? '古诗卡' : '识字卡';
+    var dbBadge = flashState.fromDB ? '<span style="font-size:11px;color:#7ec850;background:#e8f5e9;padding:1px 6px;border-radius:4px;margin-left:4px">已从词库加载 ' + flashState.data.length + ' 张</span>' : '<span style="font-size:11px;color:#999;padding:1px 6px;border-radius:4px;margin-left:4px">演示数据</span>';
+
     var h = '<div class="mx-tool-head no-print"><div class="mx-tool-title">🃏 学习闪卡生成</div>' +
       '<div class="mx-tool-actions">' +
-      '<select class="mx-sel" id="fc-src"><option value="words">识字卡</option><option value="poems">古诗卡</option></select>' +
+      '<select class="mx-sel" id="fc-src"><option value="words"' + (flashState.src === 'words' ? ' selected' : '') + '>识字卡</option><option value="poems"' + (flashState.src === 'poems' ? ' selected' : '') + '>古诗卡</option></select>' +
+      dbBadge +
       '<button class="mx-btn mx-btn-ghost" id="fc-shuffle">🔀 打乱</button>' +
       '<button class="mx-btn mx-btn-ghost" id="fc-print">🖨️ 打印全部</button></div></div>';
     h += '<div class="mx-flash-wrap"><div class="mx-flash' + (flashState.flip ? ' flip' : '') + '" id="fc-card">' +
       '<div class="mx-flash-f">' + cur.f + '</div>' +
       '<div class="mx-flash-b">' + String(cur.b).replace(/\n/g, '<br>') + '</div></div>' +
-      '<div class="mx-flash-tip no-print">点击卡片翻面</div>' +
+      '<div class="mx-flash-tip no-print">点击卡片翻面 · ' + srcLabel + ' · 第 ' + (flashState.idx + 1) + '/' + flashState.data.length + ' 张</div>' +
       '<div class="mx-flash-nav no-print"><button class="mx-btn mx-btn-ghost big" id="fc-prev">◀ 上一张</button>' +
       '<span class="mx-flash-idx">' + (flashState.idx + 1) + ' / ' + flashState.data.length + '</span>' +
       '<button class="mx-btn mx-btn-main big" id="fc-next">下一张 ▶</button></div></div>';
@@ -20587,7 +20695,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('') + '</div></div>';
     s.innerHTML = h;
 
-    $('fc-src').value = flashState.src;
     $('fc-src').onchange = function () { flashState.src = this.value; flashState.idx = 0; flashState.flip = false; renderToolFlash(); };
     $('fc-card').onclick = function () { flashState.flip = !flashState.flip; this.classList.toggle('flip'); };
     $('fc-prev').onclick = function () {
