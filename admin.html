@@ -50,7 +50,6 @@
   <label style="margin:6px 0 0;display:flex;align-items:center;gap:6px;color:var(--txt)"><input type="checkbox" id="remember"> 记住本次登录（2 小时内免重复输入）</label>
   <button onclick="unlock()" style="margin-top:14px">进入后台</button>
   <span id="loginMsg" class="msg"></span>
-  <div class="hint">默认账号 <code>admin</code> / 密码 <code>MxAdmin@2026</code>（首次登录自动创建；可在云函数环境变量 <code>ADMIN_ACCOUNT</code>/<code>ADMIN_PASS</code> 覆盖）。</div>
 </div>
 
 <div id="appBox" class="app" hidden>
@@ -61,6 +60,7 @@
     <div class="tab" id="tab-mon" onclick="switchTab('mon')">📊 运营监控</div>
     <div class="tab" id="tab-fb" onclick="switchTab('fb')">💌 用户反馈</div>
     <div class="tab" id="tab-data" onclick="switchTab('data')">📋 数据明细</div>
+    <div class="tab" id="tab-sec" onclick="switchTab('sec')">⚙️ 账号安全</div>
   </div>
 
   <!-- 公告编辑 -->
@@ -149,6 +149,38 @@
       <div class="scroll"><table id="usageTable"><thead><tr><th>用户(UID/设备)</th><th>调用次数</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
+
+  <!-- 账号安全 -->
+  <div id="pane-sec" hidden>
+    <div class="card">
+      <h3 style="margin:0 0 10px">🔑 修改密码</h3>
+      <div class="sub">修改后需重新登录。所有设备的登录会话将自动注销。</div>
+      <label>当前密码</label>
+      <input id="oldPass" type="password" placeholder="输入当前密码" autocomplete="off">
+      <label>新密码（至少 6 位）</label>
+      <input id="newPass" type="password" placeholder="输入新密码" autocomplete="off">
+      <label>确认新密码</label>
+      <input id="newPass2" type="password" placeholder="再次输入新密码" autocomplete="off">
+      <div class="row" style="margin-top:12px">
+        <button class="btn" onclick="doChangePass()">✅ 修改密码</button>
+        <span id="cpMsg" class="msg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px">🛡️ 安全问题</h3>
+      <div class="sub">设置安全问题后，若忘记密码可通过问题验证重置（未来功能）。答案经哈希存储，不可逆。</div>
+      <div id="secQStatus" class="sub"></div>
+      <label>安全问题</label>
+      <input id="secQ" type="text" placeholder="例如：你小学的学校名是什么？" autocomplete="off">
+      <label>答案</label>
+      <input id="secA" type="password" placeholder="输入答案（请牢记）" autocomplete="off">
+      <div class="row" style="margin-top:12px">
+        <button class="btn" onclick="doSetSecQ()">💾 保存安全问题</button>
+        <span id="sqMsg" class="msg"></span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -200,12 +232,13 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','mon','fb','data'].forEach(function(x){
+  ['ann','mon','fb','data','sec'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
   if (t==='fb') loadFeedback();
   if (t==='data') loadData();
+  if (t==='sec') loadSecQ();
 }
 
 async function loadAnnounce(){
@@ -313,6 +346,46 @@ function renderUsage(list){
     const w = Math.max(6, Math.min(120, Math.round(x.calls/top*120)));
     return '<tr><td>'+esc(x.who)+'</td><td>'+esc(x.calls)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('');
+}
+
+/* ---- 账号安全 ---- */
+async function loadSecQ(){
+  setMsg('secQStatus','加载中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'getSecurityQ', adminKey: ADMIN_KEY });
+    if (r && r.ok) {
+      if (r.hasQuestion) { setMsg('secQStatus','当前安全问题：'+esc(r.question),'ok'); $('secQ').value=r.question; }
+      else { setMsg('secQStatus','尚未设置安全问题，建议设置一项以备找回密码。','warn'); }
+    } else { setMsg('secQStatus',(r&&r.msg)||'读取失败','bad'); }
+  } catch(e){ setMsg('secQStatus','网络错误','bad'); }
+}
+async function doChangePass(){
+  const oldP=$('oldPass').value;
+  const newP=$('newPass').value;
+  const newP2=$('newPass2').value;
+  if(!oldP||!newP){setMsg('cpMsg','请填写当前密码和新密码','bad');return;}
+  if(newP.length<6){setMsg('cpMsg','新密码至少 6 位','bad');return;}
+  if(newP!==newP2){setMsg('cpMsg','两次输入的新密码不一致','bad');return;}
+  setMsg('cpMsg','修改中…','sub');
+  try{
+    const r=await proxy('mxAdmin',{action:'changePass',adminKey:ADMIN_KEY,oldPass:oldP,newPass:newP});
+    if(r&&r.ok){
+      setMsg('cpMsg','✅ '+r.msg,'ok');
+      ADMIN_KEY='';localStorage.removeItem('mx_admin_key');
+      setTimeout(function(){location.reload();},1500);
+    }else{setMsg('cpMsg','❌ '+((r&&r.msg)||'修改失败'),'bad');}
+  }catch(e){setMsg('cpMsg','❌ 网络错误','bad');}
+}
+async function doSetSecQ(){
+  const q=$('secQ').value.trim();
+  const a=$('secA').value.trim();
+  if(!q||!a){setMsg('sqMsg','问题和答案不能为空','bad');return;}
+  setMsg('sqMsg','保存中…','sub');
+  try{
+    const r=await proxy('mxAdmin',{action:'setSecurityQ',adminKey:ADMIN_KEY,question:q,answer:a});
+    if(r&&r.ok){setMsg('sqMsg','✅ '+r.msg,'ok');loadSecQ();}
+    else{setMsg('sqMsg','❌ '+((r&&r.msg)||'保存失败'),'bad');}
+  }catch(e){setMsg('sqMsg','❌ 网络错误','bad');}
 }
 </script>
 </body>
