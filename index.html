@@ -89,7 +89,7 @@ const ENVIRONMENTS = {
 
   DEVELOPMENT: {
 
-    APP_VERSION: '2.4.1',
+    APP_VERSION: '2.4.2',
 
     ENV_NAME: '开发环境',
 
@@ -122,7 +122,7 @@ const ENVIRONMENTS = {
 
   BETA: {
 
-    APP_VERSION: '2.4.1',
+    APP_VERSION: '2.4.2',
 
     ENV_NAME: '内测环境',
 
@@ -151,7 +151,7 @@ const ENVIRONMENTS = {
 
   PRODUCTION: {
 
-    APP_VERSION: '2.4.1',
+    APP_VERSION: '2.4.2',
 
     ENV_NAME: '正式环境',
 
@@ -10651,24 +10651,40 @@ window.DB = {
           if (v === pin) { ok(); } else { fail('密码不正确'); }
         };
       }
-      // [修复#忘记密码可见性] 忘记密码？→ 始终显示；设过安全问题走验证重置，未设则提供安全兜底（仅清空家长锁，数据保留）
+      // [修复#忘记密码·v2.4.2] 三线路，全程只动家长锁凭据，绝不触碰孩子/学习/任务/积分数据
       var forgotBtn = overlay.querySelector('#mx-lock-forgot');
       if (forgotBtn) forgotBtn.onclick = function (ev) {
         ev.preventDefault();
         close(); // 关闭登录弹窗
-        if (parentHasQuestions()) {
-          showParentPasswordReset(function () {
-            window.mxParentUnlock(onOk); // 验证通过：旧凭据已清除，重新进入「设置密码」
-          });
-        } else if (window.confirm('您尚未设置「安全问题」，无法据此找回密码。\n\n点击「确定」将清空本地家长密码（孩子、学习、任务、积分等数据全部保留），之后可重新设置密码并建议补设安全问题。')) {
+        function t(m) { try { if (window.toast) window.toast(m); else alert(m); } catch (e) {} }
+        function clearLockOnly() {
+          /* 仅清空家长锁凭据（PIN/手势/是否已设），不涉及任何业务数据 */
           try {
             localStorage.removeItem('mx_parent_pin');
             localStorage.removeItem('mx_parent_has_pin');
             localStorage.removeItem('mx_parent_pattern');
-            localStorage.removeItem('mx_parent_questions');
           } catch (e) {}
           window.__parentUnlocked = false;
-          window.mxParentUnlock(onOk); // 重新打开 → 进入「设置密码」流程
+          window.mxParentUnlock(onOk); // 重新打开 → 进入「设置密码」流程（孩子/数据全部保留）
+        }
+        if (parentHasQuestions()) {
+          // 线路A：安全问题验证 → 验证通过后进入「重置密码」流程
+          showParentPasswordReset(function () { window.mxParentUnlock(onOk); });
+          return;
+        }
+        // 线路B/C：未设安全问题
+        var isVip = false; try { isVip = localStorage.getItem('mx_vip') === '1'; } catch (e) {}
+        if (isVip && window.mxRecoverParentPin) {
+          // VIP：尝试把云端加密家长密码填回（离线缓存优先，否则重新拉取），再进入重置流程
+          window.mxRecoverParentPin().then(function (p) {
+            if (p) { try { localStorage.setItem('mx_parent_pin', p); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {} }
+            t(p ? '已从云端验证身份，请设置新的家长密码（孩子与学习数据已全部保留）' : '云端暂无可恢复密码，请直接设置新密码（数据已全部保留）');
+            clearLockOnly(); // 进入重置流程（设置新密码）；云端/本地业务数据均不删除
+          }).catch(function () { t('已为您重置家长锁入口（数据已全部保留）'); clearLockOnly(); });
+        } else {
+          // 普通/游客：无云端 PIN，仅清空家长锁，数据保留，进入设置
+          t('已重置家长锁，请设置新密码（孩子与学习数据全部保留）');
+          clearLockOnly();
         }
       };
     }
@@ -23764,6 +23780,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try { localStorage.removeItem('mx_token'); localStorage.removeItem('mx_user'); } catch (e) {}
     return Promise.resolve(null);
   }
+  window.ensureUid = ensureUid;
   /* —— 真实账号注册/登录（邮箱+密码，CloudBase 原生）—— */
   /* 注册/登录前先登出可能存在的匿名会话，避免 CloudBase 报“已登录”冲突。
      匿名登录仅作 SDK 通话凭证，邮箱账号才是真实 VIP 身份。 */
@@ -24245,6 +24262,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       return decodeURIComponent(escape(o));
     } catch (e) { return ''; }
   }
+  window.decPin = decPin;
   function buildSnapshot() {
     var out = {};
     return Promise.all(SYNC_STORES.map(function (s) {
@@ -24275,6 +24293,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
     var pinTask = Promise.resolve();
     if (snap.__parentPinEnc && lsGet(STORAGE.vip) === '1') {
+      try { window.__mxParentPinEnc = snap.__parentPinEnc; } catch (e) {} /* 缓存供「忘记密码」离线填回 */
       pinTask = ensureUid().then(function (uid) {
         var p = decPin(snap.__parentPinEnc, uid);
         if (p) { try { localStorage.setItem('mx_parent_pin', p); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {} }
@@ -24282,6 +24301,25 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     return Promise.all(dbTasks.concat([pinTask])).then(function () {});
   }
+  /* [v2.4.2 忘记密码·VIP云端填回] 恢复云端加密家长密码：优先离线缓存，否则重新拉取云端快照。
+     仅返回密码字符串（或空），绝不触碰孩子/学习/任务/积分等数据。 */
+  function mxRecoverParentPin() {
+    if (lsGet(STORAGE.vip) !== '1') return Promise.resolve('');
+    var enc = ''; try { enc = window.__mxParentPinEnc || ''; } catch (e) {}
+    if (enc) {
+      return ensureUid().then(function (uid) {
+        if (!uid) return '';
+        var p = ''; try { p = decPin(enc, uid); } catch (e) {}
+        return p || '';
+      });
+    }
+    /* 离线无缓存 → 重新从云端拉取（applySnapshot 会自动写回 localStorage 与缓存） */
+    return pullCloud().then(function () {
+      var p = ''; try { p = localStorage.getItem('mx_parent_pin') || ''; } catch (e) {}
+      return p || '';
+    }).catch(function () { return ''; });
+  }
+  window.mxRecoverParentPin = mxRecoverParentPin;
   /* 把 VIP 卡密归属到已登录的真实账号（防他人二次绑定） */
   function bindCardToUser(code, uid) {
     if (!code || !uid) return Promise.resolve(null);
