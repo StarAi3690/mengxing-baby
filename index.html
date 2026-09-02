@@ -24231,7 +24231,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (lsGet(STORAGE.vip) !== '1') return;
     var code = lsGet(STORAGE.code);
     if (!code) return;
-    window.mxApiProxy('getVipStatus', { code: code }).then(function (res) {
+    window.mxApiProxy('getVipStatus', { code: code, uid: window.__mx_uid__ }).then(function (res) {
       if (!res || !res.ok || !res.expire_at) return;
       /* 以云端为准刷新本地过期时间，避免本地值被篡改/滞后 */
       lsSet('mengxing_expire_at', res.expire_at);

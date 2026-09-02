@@ -130,7 +130,7 @@
 
     <div class="card">
       <h3 style="margin:0 0 8px">🔑 卡密绑定设备表 <code>card_activation</code></h3>
-      <div class="scroll"><table id="cardsTable"><thead><tr><th>卡号(脱敏)</th><th>类型</th><th>等级</th><th>状态</th><th>绑定UID</th><th>使用设备</th><th>首绑设备</th><th>激活时间</th><th>有效期</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="cardsTable"><thead><tr><th>卡号(脱敏)</th><th>类型</th><th>等级</th><th>状态</th><th>绑定UID</th><th>使用设备</th><th>首绑设备</th><th>激活时间</th><th>有效期</th><th>有效期(天)</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
@@ -325,10 +325,10 @@ async function loadData(){
 }
 function renderCards(list){
   const tb = $('cardsTable').querySelector('tbody');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="9" class="sub">暂无已绑定卡密</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已绑定卡密</td></tr>'; return; }
   tb.innerHTML = list.map(function(c){
     const vip = (c.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通';
-    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td></tr>';
+    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days)+'</td></tr>';
   }).join('');
 }
 function renderUsers(list){
