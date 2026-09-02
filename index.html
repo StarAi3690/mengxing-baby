@@ -28,7 +28,7 @@
 <head>
 
   <meta charset="UTF-8">
-<meta name="app-version" content="2.4.0">
+<meta name="app-version" content="2.4.4">
 
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
@@ -89,7 +89,7 @@ const ENVIRONMENTS = {
 
   DEVELOPMENT: {
 
-    APP_VERSION: '2.4.3',
+    APP_VERSION: '2.4.4',
 
     ENV_NAME: '开发环境',
 
@@ -122,7 +122,7 @@ const ENVIRONMENTS = {
 
   BETA: {
 
-    APP_VERSION: '2.4.3',
+    APP_VERSION: '2.4.4',
 
     ENV_NAME: '内测环境',
 
@@ -151,7 +151,7 @@ const ENVIRONMENTS = {
 
   PRODUCTION: {
 
-    APP_VERSION: '2.4.3',
+    APP_VERSION: '2.4.4',
 
     ENV_NAME: '正式环境',
 
@@ -11073,6 +11073,20 @@ window.DB = {
       }
     } catch (e) {}
 
+    // PV 埋点（每日每设备每页仅上报一次，供管理员后台统计 PV/UV）
+    try {
+      if (typeof window.mxApiProxy === 'function') {
+        var pvMod = String(pageId || '').replace(/^page-/, '');
+        if (pvMod) {
+          var pvKey = 'mx_pv_' + new Date().toISOString().slice(0, 10) + '_' + pvMod;
+          if (!lsGet(pvKey)) {
+            lsSet(pvKey, '1');
+            window.mxApiProxy('mxAdmin', { action: 'track', data: { cat: 'pv', page: pvMod, uid: window.__mx_uid__ || '', deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : '', ua: navigator.userAgent } }).catch(function () {});
+          }
+        }
+      }
+    } catch (e) {}
+
   }
 
 
@@ -19223,7 +19237,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.__petCooldown = function(cid){return isPetLocked(cid);};
 
   /* ==================================================
-   * 5) 本地账号体系（角色/5设备/卡密）—— LeanCloud 可插拔
+   * 5) 本地账号体系（角色/5设备/卡密）—— CloudBase 云端同步
    * ================================================== */
   /* 本地存储助手 + 键名：本 IIFE 内使用。
      修复：此前 renderAccount / renderAccountExtras / doRedeem 引用了 lsGet/lsSet/STORAGE，
@@ -20837,7 +20851,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<label>联系方式（选填）<input class="mx-inp" id="fb-contact" placeholder="手机号 / 微信 / 邮箱"></label>' +
       '<label>建议内容<textarea class="mx-inp" id="fb-text" rows="5" placeholder="希望增加什么功能？哪里用着不顺手？"></textarea></label>' +
       '<button class="mx-btn mx-btn-main big" id="fb-send">📨 提交建议</button>' +
-      '</div><div class="mx-note">提交后先写入本地 IndexedDB 留存；已登录云端账号时会同步到 Feedback 表。</div></div>';
+      '</div><div class="mx-note">提交后同时写入本地留存并同步到云端 Feedback 表，管理员后台可直接查看与导出。</div></div>';
     h += '<div class="mx-card"><div class="mx-card-t">我的历史反馈（' + list.length + '）</div>';
     if (!list.length) h += '<div class="mx-empty">还没有提交过建议</div>';
     else {
@@ -20856,22 +20870,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         id: 'fb' + Date.now(),
         name: $('fb-name').value.trim(),
         contact: $('fb-contact').value.trim(),
-        text: t, date: dateKey(), ts: Date.now(), synced: false
+        text: t, date: dateKey(), ts: Date.now(), synced: false,
+        uid: window.__mx_uid__ || '',
+        deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : ''
       };
-      var cur = await sget('feedback:list', []);
-      if (!Array.isArray(cur)) cur = [];
-      // 云端可插拔：已配置 LeanCloud 时尝试写入 Feedback 表
+      // 先同步到云端 Feedback 集合（mxAdmin 云函数，公开写入，管理员后台可直接查看）
       try {
-        if (window.AV && window.AV.Object) {
-          var FB = window.AV.Object.extend('Feedback');
-          var o = new FB();
-          o.set('name', row.name); o.set('contact', row.contact); o.set('text', row.text);
-          await o.save(); row.synced = true;
+        if (typeof window.mxApiProxy === 'function') {
+          var fr = await window.mxApiProxy('mxAdmin', { action: 'feedback', data: row });
+          if (fr && fr.ok) row.synced = true;
         }
       } catch (e) {}
+      var cur = await sget('feedback:list', []);
+      if (!Array.isArray(cur)) cur = [];
       cur.unshift(row);
       await sset('feedback:list', cur);
-      toast('感谢你的建议！我们收到啦 💌');
+      toast(row.synced ? '感谢你的建议！已同步到云端 💌' : '感谢你的建议！已本地留存 💌');
       renderFeedback();
     };
   }
@@ -20976,7 +20990,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   产品定位 : 集"游戏化激励 + 多学科启蒙 + 商业变现预留"的跨端 H5 学习工作台
   目标用户 : 3-8岁幼小衔接儿童
   视觉风格 : 暖黄色调、圆角卡片、卡通贴纸画风、无广告、大字号儿童友好
-  技术路线 : H5 SPA (HTML5 + CSS3 + 原生 JS) + IndexedDB 本地存储 + LeanCloud 云端同步
+  技术路线 : H5 SPA (HTML5 + CSS3 + 原生 JS) + IndexedDB 本地存储 + CloudBase 云端同步
 
 
 【对话历史】
@@ -23583,6 +23597,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       mxSignIn(acc, isEmail, pwd).then(function (j) {
         loginBtn.disabled = false; loginBtn.textContent = '登录';
         lsSet(STORAGE.activated, '1');
+        try { if (typeof window.mxApiProxy === 'function' && j && j.uid) { window.mxApiProxy('mxAdmin', { action: 'track', data: { cat: 'login', uid: j.uid, deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : '' } }).catch(function () {}); } } catch (e) {}
         enterApp(!!(j && j.vip), '✅ 登录成功，欢迎回来！');
       }).catch(function (err) {
         loginBtn.disabled = false; loginBtn.textContent = '登录';

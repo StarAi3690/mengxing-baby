@@ -9,51 +9,58 @@
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);padding:18px}
   h1{font-size:20px;margin:0 0 4px}
+  h3{font-size:16px}
   .sub{color:var(--sub);font-size:13px;margin-bottom:16px}
-  .login{max-width:420px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;box-shadow:0 6px 24px rgba(40,70,140,.08)}
-  .login input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;margin:10px 0}
+  .login{max-width:440px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;box-shadow:0 6px 24px rgba(40,70,140,.08)}
+  .login input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;margin:8px 0}
   .login button{width:100%;padding:11px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;font-size:15px;cursor:pointer}
   .msg{font-size:13px;min-height:18px;display:block;margin-top:8px}
-  .app{max-width:880px;margin:0 auto}
-  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .app{max-width:980px;margin:0 auto}
+  .tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .tab{padding:9px 16px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer;font-size:14px;color:var(--sub)}
   .tab.on{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-color:transparent}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 4px 16px rgba(40,70,140,.06)}
   label{display:block;font-size:13px;color:var(--sub);margin:12px 0 6px}
   textarea,input[type=text]{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;resize:vertical}
-  .row{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
   .btn{padding:10px 18px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;font-size:14px;cursor:pointer}
   .btn.ghost{background:#eef2fb;color:var(--pri)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
   .metric{background:#f8fafd;border:1px solid var(--line);border-radius:12px;padding:14px}
   .metric b{display:block;font-size:24px;margin-bottom:4px}
   .metric span{font-size:12px;color:var(--sub)}
-  .metric.bad b{color:var(--bad)} .metric.warn b{color:var(--warn)} .metric.ok b{color:var(--ok)}
+  .metric.bad b{color:var(--bad)} .metric.warn b{color:var(--warn)} .metric.ok b{color:var(--ok)} .metric.pri b{color:var(--pri)}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--sub);font-weight:600}
   .bar{height:7px;background:var(--pri);border-radius:4px;display:inline-block;vertical-align:middle}
   .pill{font-size:12px;padding:2px 9px;border-radius:20px;background:#eef2fb;color:var(--pri)}
   code{background:#eef2fb;padding:1px 6px;border-radius:5px;font-size:12px}
+  .scroll{overflow-x:auto}
+  .hint{font-size:12px;color:var(--sub);margin-top:6px}
 </style>
 </head>
 <body>
 
 <div id="loginBox" class="login">
   <h1>🔐 管理后台登录</h1>
-  <div class="sub">仅产品管理者可进入。输入管理员密钥后，可编辑全站公告与查看运营数据。</div>
-  <input id="keyInput" type="password" placeholder="管理员密钥" autocomplete="off">
-  <button onclick="unlock()">进入后台</button>
+  <div class="sub">仅产品管理者可进入。使用云端账号密码登录（账号密码存于 CloudBase <code>admin_users</code>，每次需校验）。</div>
+  <input id="accInput" type="text" placeholder="管理员账号" autocomplete="off">
+  <input id="pwdInput" type="password" placeholder="管理员密码" autocomplete="off">
+  <label style="margin:6px 0 0;display:flex;align-items:center;gap:6px;color:var(--txt)"><input type="checkbox" id="remember"> 记住本次登录（2 小时内免重复输入）</label>
+  <button onclick="unlock()" style="margin-top:14px">进入后台</button>
   <span id="loginMsg" class="msg"></span>
+  <div class="hint">默认账号 <code>admin</code> / 密码 <code>MxAdmin@2026</code>（首次登录自动创建；可在云函数环境变量 <code>ADMIN_ACCOUNT</code>/<code>ADMIN_PASS</code> 覆盖）。</div>
 </div>
 
 <div id="appBox" class="app" hidden>
   <h1>萌星宝宝 · 管理后台</h1>
-  <div class="sub">公网端运营控制台 · <a href="https://StarAi3690.github.io/mengxing-baby/" target="_blank" style="color:var(--pri)">打开公网端 ↗</a> · <a href="javascript:logout()" style="color:var(--sub)">退出</a></div>
+  <div class="sub">公网端运营控制台 · <a href="https://StarAi3690.github.io/mengxing-baby/" target="_blank" style="color:var(--pri)">打开公网端 ↗</a> · <a href="javascript:logout()" style="color:var(--sub)">退出登录</a></div>
   <div class="tabs">
     <div class="tab on" id="tab-ann" onclick="switchTab('ann')">📢 全站公告</div>
     <div class="tab" id="tab-mon" onclick="switchTab('mon')">📊 运营监控</div>
     <div class="tab" id="tab-fb" onclick="switchTab('fb')">💌 用户反馈</div>
+    <div class="tab" id="tab-data" onclick="switchTab('data')">📋 数据明细</div>
   </div>
 
   <!-- 公告编辑 -->
@@ -87,8 +94,9 @@
       <div class="grid" id="metrics" style="margin-top:12px"></div>
     </div>
     <div class="card">
-      <h3 style="margin:0 0 10px">模块热度（点击次数）</h3>
-      <table id="heatTable"><thead><tr><th>模块</th><th>点击量</th><th></th></tr></thead><tbody></tbody></table>
+      <h3 style="margin:0 0 10px">模块热度（点击次数 · 最喜爱功能）</h3>
+      <div class="sub">来自云端 <code>mx_events</code> 的模块点击上报，反映各功能点受欢迎程度。</div>
+      <div class="scroll"><table id="heatTable"><thead><tr><th>模块</th><th>点击量</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="card">
       <h3 style="margin:0 0 6px">安全与违规</h3>
@@ -104,8 +112,41 @@
         <h3 style="margin:0">用户反馈列表</h3>
         <button class="btn ghost" onclick="loadFeedback()">↺ 刷新</button>
       </div>
-      <div class="sub">用户在「建议与反馈」模块提交的内容会同步到这里。数据来源：CloudBase <code>mx_events</code>（type=feedback）。</div>
-      <table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>反馈内容</th></tr></thead><tbody></tbody></table>
+      <div class="sub">用户在「建议与反馈」模块提交的内容会同步到云端 <code>Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
+      <div class="scroll"><table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- 数据明细 -->
+  <div id="pane-data" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:0">📋 云端数据表可视化</h3>
+        <button class="btn ghost" onclick="loadData()">↺ 刷新</button>
+      </div>
+      <div class="sub">直接读取云端各集合内容：卡密绑定设备表、账号表、反馈表、各用户云调用次数（流量近似）。</div>
+      <span id="dataMsg" class="msg"></span>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px">🔑 卡密绑定设备表 <code>card_activation</code></h3>
+      <div class="scroll"><table id="cardsTable"><thead><tr><th>卡号(脱敏)</th><th>类型</th><th>等级</th><th>状态</th><th>绑定UID</th><th>使用设备</th><th>首绑设备</th><th>激活时间</th><th>有效期</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px">👤 账号密码表 <code>mx_users</code></h3>
+      <div class="scroll"><table id="usersTable"><thead><tr><th>账号</th><th>UID</th><th>类型</th><th>验证状态</th><th>注册日期</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px">💌 反馈表 <code>Feedback</code></h3>
+      <div class="scroll"><table id="dataFbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px">📡 各用户云调用次数 <code>mx_track</code>（上下行流量近似）</h3>
+      <div class="hint">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
+      <div class="scroll"><table id="usageTable"><thead><tr><th>用户(UID/设备)</th><th>调用次数</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
 </div>
@@ -120,53 +161,75 @@ function proxy(fn, data){
     body: JSON.stringify({ fn: fn, data: data || {} }) }).then(r=>r.json());
 }
 function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setMsg(id, t, c){ const e=$(id); if(e){ e.textContent=t; e.style.color='var(--'+(c||'sub')+')'; } }
 
-if (ADMIN_KEY) { /* 已记住密钥，直接进 */ }
+/* 页面加载：若本地存有有效会话令牌则自动进入，否则清空并显示登录框 */
+(async function init(){
+  if (ADMIN_KEY) {
+    try {
+      const r = await proxy('mxAdmin', { action:'stats', adminKey: ADMIN_KEY });
+      if (r && r.ok) { enterApp(); return; }
+    } catch(e){}
+    ADMIN_KEY=''; localStorage.removeItem('mx_admin_key');
+  }
+})();
 
 function unlock(){
-  const k = $('keyInput').value.trim();
-  if (!k) { $('loginMsg').textContent='请输入密钥'; $('loginMsg').style.color='var(--bad)'; return; }
-  // 用 adminStats 探测密钥是否正确（需密钥）
-  $('loginMsg').textContent='校验中…'; $('loginMsg').style.color='var(--sub)';
-  proxy('adminStats', { adminKey: k }).then(function(r){
+  const account = $('accInput').value.trim();
+  const pass = $('pwdInput').value;
+  if (!account || !pass) { setMsg('loginMsg','请输入账号和密码','bad'); return; }
+  setMsg('loginMsg','校验中…','sub');
+  proxy('mxAdmin', { action:'login', account: account, pass: pass }).then(function(r){
     if (r && r.ok) {
-      ADMIN_KEY = k; localStorage.setItem('mx_admin_key', k);
-      $('loginBox').hidden = true; $('appBox').hidden = false;
-      loadAnnounce(); loadStats();
+      ADMIN_KEY = r.adminKey;
+      if ($('remember').checked) localStorage.setItem('mx_admin_key', ADMIN_KEY);
+      else localStorage.removeItem('mx_admin_key');
+      enterApp();
     } else {
-      $('loginMsg').textContent='密钥错误'; $('loginMsg').style.color='var(--bad)';
+      setMsg('loginMsg', (r && r.msg) ? r.msg : '账号或密码错误', 'bad');
     }
-  }).catch(function(){ $('loginMsg').textContent='网络错误'; $('loginMsg').style.color='var(--bad)'; });
+  }).catch(function(){ setMsg('loginMsg','网络错误，请重试','bad'); });
 }
-function logout(){ ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload(); }
+function enterApp(){
+  $('loginBox').hidden = true; $('appBox').hidden = false;
+  loadAnnounce(); loadStats();
+}
+function logout(){
+  proxy('mxAdmin', { action:'logout', adminKey: ADMIN_KEY }).catch(function(){});
+  ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
+}
 function switchTab(t){
-  $('tab-ann').classList.toggle('on', t==='ann'); $('tab-mon').classList.toggle('on', t==='mon'); $('tab-fb').classList.toggle('on', t==='fb');
-  $('pane-ann').hidden = t!=='ann'; $('pane-mon').hidden = t!=='mon'; $('pane-fb').hidden = t!=='fb';
-  if (t === 'fb') loadFeedback();
+  ['ann','mon','fb','data'].forEach(function(x){
+    $('tab-'+x).classList.toggle('on', x===t);
+    $('pane-'+x).hidden = (x!==t);
+  });
+  if (t==='fb') loadFeedback();
+  if (t==='data') loadData();
 }
 
 async function loadAnnounce(){
-  const r = await proxy('getConfig', { key:'linkage_config' });
-  const a = (r && r.linkage && r.linkage.announcement) || {};
-  $('annText').value = a.text || ''; $('annUrl').value = a.url || '';
-  $('annEnabled').checked = !!a.enabled;
-  $('annMsg').textContent = (r&&r.ok)?'已读取当前公告':'读取失败'; $('annMsg').style.color='var(--sub)';
+  try {
+    const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY });
+    const a = (r && r.announcement) || {};
+    $('annText').value = a.text || ''; $('annUrl').value = a.url || '';
+    $('annEnabled').checked = !!a.enabled;
+    setMsg('annMsg', (r&&r.ok)?'已读取当前公告':'读取失败', 'sub');
+  } catch(e){ setMsg('annMsg','读取失败：'+String(e.message||e),'bad'); }
 }
 async function saveAnnounce(){
-  const cur = await proxy('getConfig', { key:'linkage_config' });
-  const linkage = (cur && cur.linkage) ? JSON.parse(JSON.stringify(cur.linkage)) : {};
   const text = $('annText').value.trim();
-  if (!text) { $('annMsg').textContent='公告文字不能为空'; $('annMsg').style.color='var(--bad)'; return; }
-  linkage.announcement = { text: text, url: $('annUrl').value.trim(), enabled: $('annEnabled').checked };
-  $('annMsg').textContent='发布中…'; $('annMsg').style.color='var(--sub)';
-  const r = await proxy('adminSetConfig', { adminKey: ADMIN_KEY, key:'linkage_config', linkage: linkage });
-  if (r && r.ok) { $('annMsg').textContent='✅ 已发布，全站用户即将看到'; $('annMsg').style.color='var(--ok)'; }
-  else { $('annMsg').textContent='❌ ' + ((r&&r.msg)||'发布失败'); $('annMsg').style.color='var(--bad)'; }
+  if (!text) { setMsg('annMsg','公告文字不能为空','bad'); return; }
+  setMsg('annMsg','发布中…','sub');
+  const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY, action2:'set',
+    announcement: { text: text, url: $('annUrl').value.trim(), enabled: $('annEnabled').checked } });
+  if (r && r.ok) setMsg('annMsg','✅ 已发布，全站用户即将看到','ok');
+  else setMsg('annMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
 }
 
 async function loadStats(){
-  const r = await proxy('adminStats', { adminKey: ADMIN_KEY });
-  if (!r || !r.ok) { $('metrics').innerHTML='<div class="metric"><b>—</b><span>读取失败</span></div>'; return; }
+  const r = await proxy('mxAdmin', { action:'stats', adminKey: ADMIN_KEY });
+  if (!r || !r.ok) { $('metrics').innerHTML='<div class="metric"><b>—</b><span>'+(r&&r.msg||'读取失败')+'</span></div>'; return; }
   const M = [
     {b:r.activations, s:'累计激活用户', c:''},
     {b:r.vip, s:'VIP 激活', c:'ok'},
@@ -177,46 +240,80 @@ async function loadStats(){
     {b:r.recent30, s:'近30天激活', c:''},
     {b:r.active7, s:'近7天活跃设备', c:''},
     {b:r.active30, s:'近30天活跃设备', c:''},
+    {b:r.pv, s:'累计页面访问 PV', c:'pri'},
+    {b:r.pvToday, s:'今日 PV', c:'pri'},
+    {b:r.uv, s:'累计独立访客 UV', c:'pri'},
+    {b:r.loginCount, s:'累计登录次数', c:''},
+    {b:r.loginUsers, s:'登录用户数', c:''},
+    {b:r.feedbackCount, s:'用户反馈条数', c:'ok'},
     {b:r.securityLogs, s:'安全日志条数', c:'warn'}
   ];
   $('metrics').innerHTML = M.map(function(m){
-    return '<div class="metric '+(m.c||'')+'"><b>'+m.b+'</b><span>'+m.s+'</span></div>';
+    return '<div class="metric '+(m.c||'')+'"><b>'+esc(m.b)+'</b><span>'+m.s+'</span></div>';
   }).join('');
   const heat = r.moduleHeat || [];
-  const max = heat.length? heat[0].count : 1;
-  $('heatTable').querySelector('tbody').innerHTML = heat.length? heat.map(function(h){
+  const max = heat.length ? heat[0].count : 1;
+  $('heatTable').querySelector('tbody').innerHTML = heat.length ? heat.map(function(h){
     const w = Math.max(6, Math.round(h.count/max*100));
-    return '<tr><td>'+h.module+'</td><td>'+h.count+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
+    return '<tr><td>'+esc(h.module)+'</td><td>'+esc(h.count)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
-  $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+r.securityLogs+' 条。';
+  $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+esc(r.securityLogs)+' 条。';
 }
 
 async function loadFeedback(){
   const tbody = $('fbTable').querySelector('tbody');
-  tbody.innerHTML = '<tr><td colspan="4" class="sub">加载中…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="sub">加载中…</td></tr>';
   try {
-    /* 通过 adminStats 获取反馈数据（服务端聚合）或直接查 mx_events */
-    const r = await proxy('adminStats', { adminKey: ADMIN_KEY, includeFeedback: true });
-    const list = (r && r.feedbackList) || [];
-    if (!list.length) {
-      /* 降级：尝试直接从 logSecurityEvent 查 feedback 类型 */
-      tbody.innerHTML = '<tr><td colspan="4" class="sub">暂无用户反馈数据。用户提交后会自动出现在这里。</td></tr>';
-      return;
-    }
-    tbody.innerHTML = list.map(function(item){
-      var d = new Date(item.ts || item.date || 0);
-      var time = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')
-        + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-      var name = (item.detail && item.detail.name) || item.name || '匿名';
-      var contact = (item.detail && item.detail.contact) || item.contact || '—';
-      var text = (item.detail && item.detail.text) || item.text || '';
-      return '<tr><td style="white-space:nowrap">'+time+'</td><td>'+esc(name)+'</td><td>'+esc(contact)+'</td><td style="max-width:300px;word-break:break-all">'+esc(text)+'</td></tr>';
-    }).join('');
+    const r = await proxy('mxAdmin', { action:'tables', adminKey: ADMIN_KEY });
+    if (!r || !r.ok) { tbody.innerHTML = '<tr><td colspan="5" class="sub" style="color:var(--bad)">'+(r&&r.msg||'加载失败')+'</td></tr>'; return; }
+    fillFb(tbody, r.feedback || []);
   } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="4" class="sub" style="color:var(--bad)">加载失败：'+String(e.message||e)+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="sub" style="color:var(--bad)">加载失败：'+esc(String(e.message||e))+'</td></tr>';
   }
 }
-function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fillFb(tbody, list){
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="sub">暂无用户反馈。用户提交后会自动出现在这里。</td></tr>'; return; }
+  tbody.innerHTML = list.map(function(f){
+    return '<tr><td style="white-space:nowrap">'+esc(f.date||'—')+'</td><td>'+esc(f.name)+'</td><td>'+esc(f.contact)+'</td><td>'+esc(f.page)+'</td><td style="max-width:320px;word-break:break-all">'+esc(f.text)+'</td></tr>';
+  }).join('');
+}
+
+async function loadData(){
+  setMsg('dataMsg','加载中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'tables', adminKey: ADMIN_KEY });
+    if (!r || !r.ok) { setMsg('dataMsg', (r&&r.msg)||'加载失败','bad'); return; }
+    renderCards(r.cards || []);
+    renderUsers(r.users || []);
+    fillFb($('dataFbTable').querySelector('tbody'), r.feedback || []);
+    renderUsage(r.usage || []);
+    setMsg('dataMsg','已加载（数据每 2 小时刷新一次，可点刷新实时拉取）','sub');
+  } catch(e) { setMsg('dataMsg','加载失败：'+esc(String(e.message||e)),'bad'); }
+}
+function renderCards(list){
+  const tb = $('cardsTable').querySelector('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="9" class="sub">暂无已绑定卡密</td></tr>'; return; }
+  tb.innerHTML = list.map(function(c){
+    const vip = (c.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通';
+    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td></tr>';
+  }).join('');
+}
+function renderUsers(list){
+  const tb = $('usersTable').querySelector('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="sub">暂无账号</td></tr>'; return; }
+  tb.innerHTML = list.map(function(u){
+    return '<tr><td>'+esc(u.account)+'</td><td>'+esc(u.uid)+'</td><td>'+esc(u.isEmail)+'</td><td>'+esc(u.verified)+'</td><td>'+esc(u.createdAt)+'</td></tr>';
+  }).join('');
+}
+function renderUsage(list){
+  const tb = $('usageTable').querySelector('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="3" class="sub">暂无云调用记录</td></tr>'; return; }
+  const top = list[0].calls || 1;
+  tb.innerHTML = list.map(function(x){
+    const w = Math.max(6, Math.min(120, Math.round(x.calls/top*120)));
+    return '<tr><td>'+esc(x.who)+'</td><td>'+esc(x.calls)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
+  }).join('');
+}
 </script>
 </body>
 </html>
