@@ -89,7 +89,7 @@ const ENVIRONMENTS = {
 
   DEVELOPMENT: {
 
-    APP_VERSION: '2.4.2',
+    APP_VERSION: '2.4.3',
 
     ENV_NAME: '开发环境',
 
@@ -122,7 +122,7 @@ const ENVIRONMENTS = {
 
   BETA: {
 
-    APP_VERSION: '2.4.2',
+    APP_VERSION: '2.4.3',
 
     ENV_NAME: '内测环境',
 
@@ -151,7 +151,7 @@ const ENVIRONMENTS = {
 
   PRODUCTION: {
 
-    APP_VERSION: '2.4.2',
+    APP_VERSION: '2.4.3',
 
     ENV_NAME: '正式环境',
 
@@ -10957,8 +10957,8 @@ window.DB = {
       if (cancelBtn) cancelBtn.onclick = function (ev) { ev.preventDefault(); close(); };
     }
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
-    render();
     document.body.appendChild(overlay);
+    render(); // [修复v2.4.3] 必须在 appendChild 之后 render，否则 getElementById 取不到按钮导致确认/取消无反应
   }
 
   (function () {
@@ -18270,9 +18270,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       msg += ' 这次没抽到卡牌（补偿 +3🌈）';
     }
     shInit();
+    var doneRound = shanhai.group; // group 已在上方自增，刚完成的是第 doneRound 轮
     after.then(function () {
-      modal(container, '🀄 抽卡时间', msg, function () {
-        updPts(container, shanhai.cid, shanhai).then(function () { buildShanhai(container); });
+      modal(container, '🎉 第 ' + doneRound + ' 轮通关！', msg + '<div style="margin-top:10px;font-size:12.5px;color:#00796b">点击「好的」立即开始第 ' + (doneRound + 1) + ' 轮（免费续局，无需消耗积分）。</div>', function () {
+        updPts(container, shanhai.cid, shanhai).then(function () { buildShanhai(container); }).catch(function () { try { buildShanhai(container); } catch (e2) {} });
       });
     });
   }
