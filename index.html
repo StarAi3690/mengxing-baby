@@ -89,7 +89,7 @@ const ENVIRONMENTS = {
 
   DEVELOPMENT: {
 
-    APP_VERSION: '2.4.0',
+    APP_VERSION: '2.4.1',
 
     ENV_NAME: '开发环境',
 
@@ -122,7 +122,7 @@ const ENVIRONMENTS = {
 
   BETA: {
 
-    APP_VERSION: '2.4.0',
+    APP_VERSION: '2.4.1',
 
     ENV_NAME: '内测环境',
 
@@ -151,7 +151,7 @@ const ENVIRONMENTS = {
 
   PRODUCTION: {
 
-    APP_VERSION: '2.4.0',
+    APP_VERSION: '2.4.1',
 
     ENV_NAME: '正式环境',
 
@@ -10520,7 +10520,7 @@ window.DB = {
             '<input type="password" id="mx-lock-pin" maxlength="12" placeholder="字母数字密码" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' +
             (pinSetting ? '<input type="password" id="mx-lock-pin2" maxlength="12" placeholder="再次输入确认" style="flex:1;padding:9px 11px;border:1px solid #d5e3f7;border-radius:9px;font-size:14px">' : '') +
             '<button type="button" id="mx-lock-pinok" style="padding:9px 14px;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:9px;font-weight:700">' + (pinSetting ? '设置密码' : '密码进入') + '</button>' +
-            (!pinSetting && parentHasQuestions() ? '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') +
+            (!pinSetting ? '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') +
           '</div>';
       }
       // [修复#248] 密码登录行改为「已设密码(hasPin)即显示」，不再依赖 saved；
@@ -10529,7 +10529,7 @@ window.DB = {
       return '<div class="mx-lock-sub" id="mx-lock-sub">' + gSub + '</div>' +
         '<div class="mx-gesture" id="mx-gesture"></div>' +
         '<div class="mx-lock-err" id="mx-lock-err"></div>' +
-        (hasPin ? '<div class="mx-lock-pinrow"><input type="password" id="mx-lock-pin" maxlength="12" placeholder="或使用密码"><button type="button" id="mx-lock-pinok">密码进入</button></div>' + (parentHasQuestions() ? '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') : '') +
+        (hasPin ? '<div class="mx-lock-pinrow"><input type="password" id="mx-lock-pin" maxlength="12" placeholder="或使用密码"><button type="button" id="mx-lock-pinok">密码进入</button></div>' + '<div style="text-align:center;margin-top:4px"><a href="#" id="mx-lock-forgot" style="font-size:11px;color:#999;text-decoration:none">忘记密码？</a></div>' : '') +
         '<div class="mx-lock-actions">' +
           (saved ? '<button type="button" class="mx-lock-confirm" id="mx-lock-confirm">确认手势</button>' : '<button type="button" class="mx-lock-confirm" id="mx-lock-confirm">设置手势密码</button>') +
         '</div>';
@@ -10651,15 +10651,25 @@ window.DB = {
           if (v === pin) { ok(); } else { fail('密码不正确'); }
         };
       }
-      // [新增#家长控制] 忘记密码？→ 安全问题验证 → 重置
+      // [修复#忘记密码可见性] 忘记密码？→ 始终显示；设过安全问题走验证重置，未设则提供安全兜底（仅清空家长锁，数据保留）
       var forgotBtn = overlay.querySelector('#mx-lock-forgot');
       if (forgotBtn) forgotBtn.onclick = function (ev) {
         ev.preventDefault();
         close(); // 关闭登录弹窗
-        showParentPasswordReset(function () {
-          // 验证通过：旧凭据已清除，重新打开解锁门 → 进入「设置密码」流程
-          window.mxParentUnlock(onOk);
-        });
+        if (parentHasQuestions()) {
+          showParentPasswordReset(function () {
+            window.mxParentUnlock(onOk); // 验证通过：旧凭据已清除，重新进入「设置密码」
+          });
+        } else if (window.confirm('您尚未设置「安全问题」，无法据此找回密码。\n\n点击「确定」将清空本地家长密码（孩子、学习、任务、积分等数据全部保留），之后可重新设置密码并建议补设安全问题。')) {
+          try {
+            localStorage.removeItem('mx_parent_pin');
+            localStorage.removeItem('mx_parent_has_pin');
+            localStorage.removeItem('mx_parent_pattern');
+            localStorage.removeItem('mx_parent_questions');
+          } catch (e) {}
+          window.__parentUnlocked = false;
+          window.mxParentUnlock(onOk); // 重新打开 → 进入「设置密码」流程
+        }
       };
     }
     bindDynamic();
@@ -16636,9 +16646,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* 测试模式：仅由 window.__MX_DEBUG 控制是否显示「前进一天」等测试按钮与调试面板。
      测试部署版(index.html / CloudStudio 沙箱)默认 __MX_DEBUG=true → 测试控件 + 调试面板默认可见；
      用户版(_public_deploy / Netlify)由构建脚本改为 false 并堵万能码，正式上线彻底关闭（?debug=1 入口已移除）。
-     注意：仅显示测试控件，不自动激活 VIP，VIP 仍需真实注册或手动输 __MX_TEST_CODE_DISABLED__。 */
+     注意：仅显示测试控件，不自动激活 VIP，VIP 仍需真实注册或手动输 MENGXINGTEST0001。 */
   function isDebug() { try { return window.__MX_DEBUG === true; } catch (e) { return false; } }
-  window.__MX_DEBUG = false; /* 测试部署版默认开启测试态；用户版构建脚本会改为 false */
+  window.__MX_DEBUG = true; /* 测试部署版默认开启测试态；用户版构建脚本会改为 false */
 
   /* ============================================================
      #205 非VIP限开3模块（6选3）：VIP 全开；非VIP 仅可在本地自选 3 个免费玩。
@@ -23355,7 +23365,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* —— 永久测试码（开发者反复测试用，云端模式也可本地放行）——
      不绑定设备上限、可反复激活，专供测试。正式发布请走云端核销。 */
   var TEST_CODES = {
-    '__MX_TEST_CODE_DISABLED__': { vip: 1 }     // 永久测试码（VIP全功能）
+    'MENGXINGTEST0001': { vip: 1 }     // 永久测试码（VIP全功能）
   };
   function localRedeem(code, devId) {
     var c = (code || '').trim();
@@ -24214,24 +24224,63 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* ================= VIP 多端同步(服务端云函数，断网降级) ================= */
   var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log'];
+  /* VIP 家长密码轻量加密上云：以 uid 派生密钥做 XOR 混淆（非强加密，仅避免明文落云） */
+  function pinEncKey(uid) {
+    var s = String(uid || '') + '::mx_parent_pin_v1';
+    var h = 0;
+    for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+    return h;
+  }
+  function encPin(p, uid) {
+    try {
+      var k = pinEncKey(uid), b = unescape(encodeURIComponent(String(p || ''))), o = '';
+      for (var i = 0; i < b.length; i++) { o += String.fromCharCode(b.charCodeAt(i) ^ ((k >> ((i % 4) * 8)) & 0xff)); }
+      return btoa(o);
+    } catch (e) { return ''; }
+  }
+  function decPin(c, uid) {
+    try {
+      var k = pinEncKey(uid), b = atob(String(c || '')), o = '';
+      for (var i = 0; i < b.length; i++) { o += String.fromCharCode(b.charCodeAt(i) ^ ((k >> ((i % 4) * 8)) & 0xff)); }
+      return decodeURIComponent(escape(o));
+    } catch (e) { return ''; }
+  }
   function buildSnapshot() {
     var out = {};
     return Promise.all(SYNC_STORES.map(function (s) {
       return Promise.resolve().then(function () {
         return (window.DB && window.DB.getAll) ? window.DB.getAll(s) : [];
       }).then(function (rows) { out[s] = rows || []; })
-        .catch(function () { out[s] = []; });
-    })).then(function () { return out; });
+      .catch(function () { out[s] = []; });
+    })).then(function () {
+      /* VIP 才把家长密码加密进快照；普通/游客不上云 PIN */
+      if (lsGet(STORAGE.vip) === '1') {
+        return ensureUid().then(function (uid) {
+          var p = ''; try { p = localStorage.getItem('mx_parent_pin') || ''; } catch (e) {}
+          if (p) { try { out.__parentPinEnc = encPin(p, uid); } catch (e) {} }
+          return out;
+        }).catch(function () { return out; });
+      }
+      return out;
+    });
   }
   function applySnapshot(snap) {
     if (!snap) return Promise.resolve();
-    var tasks = Object.keys(snap).map(function (s) {
+    /* 以 __ 开头的字段为元数据（如加密 PIN），不走 DB 存储循环 */
+    var dbTasks = Object.keys(snap).filter(function (s) { return s.indexOf('__') !== 0; }).map(function (s) {
       var rows = snap[s] || [];
       return Promise.all(rows.map(function (r) {
         return (window.DB && window.DB.put) ? window.DB.put(s, r) : Promise.resolve();
       }));
     });
-    return Promise.all(tasks).then(function () {});
+    var pinTask = Promise.resolve();
+    if (snap.__parentPinEnc && lsGet(STORAGE.vip) === '1') {
+      pinTask = ensureUid().then(function (uid) {
+        var p = decPin(snap.__parentPinEnc, uid);
+        if (p) { try { localStorage.setItem('mx_parent_pin', p); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {} }
+      }).catch(function () {});
+    }
+    return Promise.all(dbTasks.concat([pinTask])).then(function () {});
   }
   /* 把 VIP 卡密归属到已登录的真实账号（防他人二次绑定） */
   function bindCardToUser(code, uid) {
@@ -24304,7 +24353,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (!token) return; /* 未注册账号：不启用快照调度 */
     if (window.__mx_snap_started__) return;
     window.__mx_snap_started__ = true;
-    var WIN = 7 * 86400000; /* 7 天窗口 */
+    var WIN = 15 * 86400000; /* 15 天窗口（游客/普通账号轻量快照）*/
     var trySnap = function () {
       if (navigator.onLine === false) return;
       var last = 0; try { last = parseInt(lsGet('mx_last_snapshot') || '0', 10) || 0; } catch (e) {}
@@ -24623,7 +24672,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 /* ===== 萌星宝宝 v2.4.0 增强（测试码登录记录面板） ===== */
 (function () {
   'use strict';
-  var TEST_CODE = '__MX_TEST_CODE_DISABLED__';  /* 测试码激活时显示测试面板 */
+  var TEST_CODE = 'MENGXINGTEST0001';  /* 测试码激活时显示测试面板 */
   var KEY_ALLOWED = 'mx_test_allowed';
   var KEY_LOG = 'mx_test_log';
   var KEY_CODE = 'mengxing_activated_code';
