@@ -18201,8 +18201,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
            + '<div class="sh-bk-nm">' + (got ? ch.name : '???') + '</div>'
            + '<div class="sh-bk-rr">' + (got ? (ch.rarity || '普通') : '未解锁') + '</div></div>';
     }).join('');
+    var pairedNow = Math.floor(Object.keys(shanhai.matched).length / 2);
     var inner =
-      '<div class="mxg-chip" style="margin-bottom:10px">🌈 图鉴 ' + gotCnt + '/' + SH_ALL.length + ' · 已消光 ' + shanhai.group + ' 组</div>'
+      '<div class="mxg-chip" style="margin-bottom:10px" id="mxg-sh-progress">🌈 图鉴 ' + gotCnt + '/' + SH_ALL.length + ' · 本轮 ' + pairedNow + '/8 组 · 已消光 ' + shanhai.group + ' 轮</div>'
       + '<div class="mxg-sh-board" id="mxg-sh-board">' + board + '</div>'
       + '<div class="mxg-sh-cardslots">' + slots + '</div>'
       + '<div class="mxg-tip">🌈 翻牌连连看：开局全是牌背，点开两张，<b>图案相同</b>就消除；消光整盘可得抽卡机会，收集全部 ' + SH_ALL.length + ' 位 AI山海经角色！</div>'
@@ -18235,6 +18236,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           shanhai.matched[k1] = true; shanhai.matched[k2] = true;
           mxStatAdd('shanhai', 1); /* [v2.4.1] 成就墙·累计配对神兽 */
           publishHome('shanhai', Math.floor(Object.keys(shanhai.matched).length / 2));
+          /* 实时更新进度文字（本轮 X/8） */
+          var progEl = container.querySelector('#mxg-sh-progress');
+          if (progEl) {
+            var pc = Math.floor(Object.keys(shanhai.matched).length / 2);
+            var gc = Object.keys(shanhai.owned).length;
+            progEl.innerHTML = '🌈 图鉴 ' + gc + '/' + SH_ALL.length + ' · 本轮 ' + pc + '/8 组 · 已消光 ' + shanhai.group + ' 轮';
+          }
           if (Math.floor(Object.keys(shanhai.matched).length / 2) >= 8) completeRound('shanhai');
           shanhai.board[r1][c1] = null; shanhai.board[r2][c2] = null;
           beep(820);
@@ -18268,6 +18276,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var left = 0; for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) if (shanhai.board[r][c] != null) left++;
     if (left > 0) return;
     shanhai.group++;
+    /* 消光后立即更新进度文字（group 已自增） */
+    var progEl2 = container.querySelector('#mxg-sh-progress');
+    if (progEl2) {
+      var gc2 = Object.keys(shanhai.owned).length;
+      progEl2.innerHTML = '🌈 图鉴 ' + gc2 + '/' + SH_ALL.length + ' · 本轮 8/8 组 · 已消光 ' + shanhai.group + ' 轮';
+    }
     var g = shanhai.group % 3;
     var chance = (g === 0) ? 1 : 0.5;
     var win = Math.random() < chance;
