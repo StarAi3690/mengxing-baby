@@ -10618,13 +10618,29 @@ window.DB = {
             if (v.length < 4) { fail('密码至少 4 位'); return; }
             if (v !== v2v) { fail('两次输入不一致'); return; }
             try { localStorage.setItem('mx_parent_pin', v); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {}
-            // [修复#346] forceSetup 模式（忘记密码重置）：设完数字密码后自动跳转到手势密码设置
+            // [修复#348] forceSetup 模式（忘记密码重置）：设完数字密码后，先弹「新密码设置成功」确认框，确认后再进入手势密码设置
             if (forceSetup) {
               hasPin = true; // 已有 PIN，手势模式显示"或使用密码进入"
-              toast('✅ 数字密码已设置，请继续设置手势密码');
-              mode = 'gesture'; saved = ''; // 仍无手势 → 进入手势设置模式
-              rerender();
-              buildDots();
+              /* 内联弹窗：复用全局 .mxg-overlay/.mxg-modal 样式（与 AI山海经/节奏盒子等弹窗同款），
+                 不依赖其他 IIFE 块的 modal 函数（避免跨块未定义）。确认后跳转到「手势密码」页签重设手势。 */
+              var sucOv = document.createElement('div');
+              sucOv.className = 'mxg-overlay';
+              sucOv.innerHTML = '<div class="mxg-modal">'
+                + '<div class="mxg-modal-big">✅</div>'
+                + '<h3>新密码设置成功</h3>'
+                + '<p>数字密码已重新设置。为方便孩子快速进入，接下来请设置手势密码。</p>'
+                + '<button class="mxg-btn primary" id="mx-pwdok-go-gesture">去设置手势密码</button>'
+                + '</div>';
+              document.body.appendChild(sucOv);
+              sucOv.addEventListener('click', function (e) {
+                if (e.target === sucOv || (e.target.id && e.target.id === 'mx-pwdok-go-gesture')) {
+                  e.stopPropagation();
+                  sucOv.remove();
+                  mode = 'gesture'; saved = ''; // 仍无手势 → 进入手势设置模式
+                  rerender();
+                  buildDots();
+                }
+              });
               return;
             }
             ok();
@@ -16627,11 +16643,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var m = GAME_META[gid];
     if (!m) return;
     _roundAwarded[gid] = true;
-    finish({ id: gid, name: m.name, pts: GAME_PTS[gid] || 5 }, true);
-    /* [v2.4.1] 成就墙·通关累计 + 即时发放已达阶梯积分 */
-    mxStatAdd('clear:' + gid, 1); mxStatAdd('clearAll', 1);
-    try { var _cid = (m && m.cid) || 'default'; Promise.resolve(window.DB && DB.getActiveChildId ? DB.getActiveChildId() : Promise.resolve('default')).then(function(c){ mxCheckAchievements(c || 'default'); }); } catch (e) {}
+    /* [修复·本需求] finish/markTaskDone/record 定义在另一个 IIFE 块内，未随本块导出；
+       直接裸调用会抛「finish is not defined」，导致第 8 组配对时整个点击回调在置空棋盘 & shCheckClear 之前
+       中断 → AI山海经通关弹窗不出现、且「已消光」恒为 0。统一改走 window.MX_GAME_LINK（官方导出集合）。 */
+    var L = window.MX_GAME_LINK || {};
+    if (L.finish) try { L.finish({ id: gid, name: m.name, pts: GAME_PTS[gid] || 5 }, true); } catch (e) {}
+    if (window.mxStatAdd) { try { window.mxStatAdd('clear:' + gid, 1); } catch (e) {} try { window.mxStatAdd('clearAll', 1); } catch (e) {} }
+    try { var _cid = (m && m.cid) || 'default'; Promise.resolve(window.DB && DB.getActiveChildId ? DB.getActiveChildId() : Promise.resolve('default')).then(function (c) { if (window.mxCheckAchievements) try { window.mxCheckAchievements(c || 'default'); } catch (e2) {} }); } catch (e) {}
   }
+  /* [修复·本需求] 把本块内的 completeRound 挂到 window，供「window.MX_COMPLETE_ROUND = completeRound」所在块
+     引用（否则该块抛「completeRound is not defined」并中断后续导出）。 */
+  window.completeRound = completeRound;
 
   /* ---------- 通用外壳 ---------- */
   function topbar(m, pts) {
