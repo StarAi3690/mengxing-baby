@@ -10486,17 +10486,20 @@ window.DB = {
     } catch (e) {}
   })();
 
-  function mxParentUnlock(onOk) {
+  function mxParentUnlock(onOk, forceSetup) {
     if (window.__parentUnlocked) { try { onOk(); } catch (e) {} return; }
     // 配置关闭验证 → 直接放行（调试/特殊场景）
     if (window.PARENT_AUTH && window.PARENT_AUTH.parentLockEnabled === false) { try { onOk(); } catch (e) {} return; }
     var saved = ''; try { saved = localStorage.getItem('mx_parent_pattern') || ''; } catch (e) {}
     var hasPin = false; try { hasPin = localStorage.getItem('mx_parent_has_pin') === '1'; } catch (e) {}
     var pin = ''; try { pin = localStorage.getItem('mx_parent_pin') || '0000'; } catch (e) { pin = '0000'; }
+    // [修复#339] forceSetup 来自「忘记密码→验证通过」等重置流程，必须强制显示「设置」界面
+    //         此时即使 DEBUG 模式也不得自动种入默认密码，否则用户又看到「登录」而非「设置」
+    if (forceSetup) { hasPin = false; saved = ''; }
     // [修复#家长控制首次] 仅调试模式才自动种默认密码；正式环境首次进入应显示「设置密码」界面
     // 旧逻辑：无条件种入 defaultPin → hasPin 被强制为 true → firstSetup 永远为 false
     //       → 首次用户看到的是「登录」界面（需知道 0000 才能进），而非「设置」界面
-    if (window.__MX_DEBUG && window.PARENT_AUTH && window.PARENT_AUTH.parentLockEnabled && !saved && !hasPin) {
+    if (!forceSetup && window.__MX_DEBUG && window.PARENT_AUTH && window.PARENT_AUTH.parentLockEnabled && !saved && !hasPin) {
       try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); localStorage.setItem('mx_parent_has_pin', '1'); hasPin = true; } catch (e) {}
     }
     // 首次使用：手势 / 字母数字 二选一设置（不再强制只能手势）
@@ -10504,7 +10507,7 @@ window.DB = {
     // [重构] 默认进入「字母数字密码」模式，确保弹窗是密码输入；已设手势才走手势
     var mode = saved ? 'gesture' : 'pin';
     // [修复#家长控制首次] 同上，仅 DEBUG 模式才兜底种入
-    if (window.__MX_DEBUG && window.PARENT_AUTH && !saved && hasPin && !localStorage.getItem('mx_parent_pin')) { try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); } catch (e) {} }
+    if (!forceSetup && window.__MX_DEBUG && window.PARENT_AUTH && !saved && hasPin && !localStorage.getItem('mx_parent_pin')) { try { localStorage.setItem('mx_parent_pin', String(window.PARENT_AUTH.defaultPin || '0000')); } catch (e) {} }
     try { pin = localStorage.getItem('mx_parent_pin') || '0000'; } catch (e) { pin = '0000'; }
     var overlay = document.createElement('div');
     overlay.className = 'mx-lock-mask';
@@ -10665,11 +10668,11 @@ window.DB = {
             localStorage.removeItem('mx_parent_pattern');
           } catch (e) {}
           window.__parentUnlocked = false;
-          window.mxParentUnlock(onOk); // 重新打开 → 进入「设置密码」流程（孩子/数据全部保留）
+          window.mxParentUnlock(onOk, true); // 重新打开 → 强制进入「设置密码」流程（孩子/数据全部保留）
         }
         if (parentHasQuestions()) {
           // 线路A：安全问题验证 → 验证通过后进入「重置密码」流程
-          showParentPasswordReset(function () { window.mxParentUnlock(onOk); });
+          showParentPasswordReset(function () { window.mxParentUnlock(onOk, true); });
           return;
         }
         // 线路B/C：未设安全问题
