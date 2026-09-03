@@ -10618,6 +10618,15 @@ window.DB = {
             if (v.length < 4) { fail('密码至少 4 位'); return; }
             if (v !== v2v) { fail('两次输入不一致'); return; }
             try { localStorage.setItem('mx_parent_pin', v); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {}
+            // [修复#346] forceSetup 模式（忘记密码重置）：设完数字密码后自动跳转到手势密码设置
+            if (forceSetup) {
+              hasPin = true; // 已有 PIN，手势模式显示"或使用密码进入"
+              toast('✅ 数字密码已设置，请继续设置手势密码');
+              mode = 'gesture'; saved = ''; // 仍无手势 → 进入手势设置模式
+              rerender();
+              buildDots();
+              return;
+            }
             ok();
             // 首次设密成功后自动引导设置安全问题（已有则跳过）
             if (!parentHasQuestions()) { try { showParentSecuritySetup(); } catch (e) {} }
@@ -12105,8 +12114,9 @@ window.DB = {
       return true;
     } catch (e) { return false; }
   }
-  function renderImportPanel() {
-    var host = document.getElementById('import-panel-body');
+  function renderImportPanel(hostOverride) {
+    var host = hostOverride || document.getElementById('import-panel-body');
+    if (!host) { host = document.getElementById('pt-import-panel'); }
     if (!host) return;
     var vip = !!(window.isVip && window.isVip());
     var badge = document.getElementById('import-vip-badge');
@@ -20380,12 +20390,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
 
-    /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 ---- */
+    /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 / 自主导入 ---- */
     h += '<div class="mx-card no-print"><div class="mx-card-t">🛠️ 家长工具箱</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="calendar">🗓️ 个人日历·日程</button>' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="tasks">🗂️ 学习任务·套组</button>' +
+      '<button type="button" class="mx-btn mx-btn-main" id="pt-import-btn">📥 自主导入</button>' +
     '</div>';
+    h += '<div id="pt-import-panel" style="display:none;margin-top:10px"></div>';
     h += '<div class="mx-sub-t" style="font-size:13px;font-weight:700;margin:6px 0 6px">🆘 异常任务处理（今日）</div>';
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
@@ -20414,6 +20426,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     s.querySelectorAll('[data-ptab]').forEach(function (b) {
       b.onclick = function () { switchParentTab(b.getAttribute('data-ptab')); };
     });
+    /* [修复#345] 工具箱「自主导入」按钮：展开/收起导入面板 */
+    (function () {
+      var impBtn = s.querySelector('#pt-import-btn');
+      var impPanel = s.querySelector('#pt-import-panel');
+      if (!impBtn || !impPanel) return;
+      var impOpen = false;
+      impBtn.onclick = function () {
+        impOpen = !impOpen;
+        if (impOpen) { impPanel.style.display = 'block'; impBtn.classList.add('mx-btn-active'); try { renderImportPanel(); } catch (e) {} }
+        else { impPanel.style.display = 'none'; impBtn.classList.remove('mx-btn-active'); }
+      };
+    })();
     (function () {
       var exBox = s.querySelector('#pt-exception-tasks'); if (!exBox) return;
       function esc2(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
