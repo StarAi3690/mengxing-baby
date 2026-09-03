@@ -9673,9 +9673,8 @@ function isVip() {
 
 function setVip(v) {
 
-  if (v) localStorage.setItem('mengxing_vip', '1');
-
-  else { localStorage.removeItem('mengxing_vip'); localStorage.removeItem('mengxing_vip_level'); localStorage.removeItem('mengxing_auth_ts'); }
+  if (v) { localStorage.setItem('mengxing_vip', '1'); try { localStorage.setItem('mengxing_activated_vip', '1'); } catch(e){} }
+  else { localStorage.removeItem('mengxing_vip'); localStorage.removeItem('mengxing_vip_level'); localStorage.removeItem('mengxing_auth_ts'); try { localStorage.removeItem('mengxing_activated_vip'); } catch(e){} }
 
 }
 
@@ -9685,6 +9684,7 @@ function mxWriteVipInfo(res) {
   try {
     if (res && res.vip) {
       localStorage.setItem('mengxing_vip', '1');
+      localStorage.setItem('mengxing_activated_vip', '1');   // 同步写入 STORAGE.vip（pushCloud/pullCloud 闸门依赖此键）
       localStorage.setItem('mengxing_vip_level', String(res.vip_level || '1'));
       localStorage.setItem('mengxing_expire_at', res.expire_at || '');
       localStorage.setItem('mengxing_auth_ts', String(Date.now()));
@@ -16684,7 +16684,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
      用户版(_public_deploy / Netlify)由构建脚本改为 false 并堵万能码，正式上线彻底关闭（?debug=1 入口已移除）。
      注意：仅显示测试控件，不自动激活 VIP，VIP 仍需真实注册或手动输 MENGXINGTEST0001。 */
   function isDebug() { try { return window.__MX_DEBUG === true; } catch (e) { return false; } }
-  window.__MX_DEBUG = true; /* 测试部署版默认开启测试态；用户版构建脚本会改为 false */
+  window.__MX_DEBUG = false; /* 正式版关闭测试态（GitHub Pages / 生产环境） */
 
   /* ============================================================
      #205 非VIP限开3模块（6选3）：VIP 全开；非VIP 仅可在本地自选 3 个免费玩。
@@ -18291,10 +18291,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     shInit();
     var doneRound = shanhai.group; // group 已在上方自增，刚完成的是第 doneRound 轮
+    var SH_CONTINUE_COST = 10; /* 新开一轮消耗积分（未抽中时） */
     after.then(function () {
-      modal(container, '🎉 第 ' + doneRound + ' 轮通关！', msg + '<div style="margin-top:10px;font-size:12.5px;color:#00796b">点击「好的」立即开始第 ' + (doneRound + 1) + ' 轮（免费续局，无需消耗积分）。</div>', function () {
-        updPts(container, shanhai.cid, shanhai).then(function () { buildShanhai(container); }).catch(function () { try { buildShanhai(container); } catch (e2) {} });
-      });
+      if (win) {
+        /* 抽中卡牌 → 免费续局（原有逻辑不变） */
+        modal(container, '🎉 第 ' + doneRound + ' 轮通关！', msg + '<div style="margin-top:10px;font-size:12.5px;color:#00796b">点击「好的」立即开始第 ' + (doneRound + 1) + ' 轮（免费续局，无需消耗积分）。</div>', function () {
+          updPts(container, shanhai.cid, shanhai).then(function () { buildShanhai(container); }).catch(function () { try { buildShanhai(container); } catch (e2) {} });
+        });
+      } else {
+        /* 未抽中 → 弹窗询问是否消耗积分续局 */
+        var pts = 0; try { pts = parseInt(localStorage.getItem('mx_pts_' + shanhai.cid) || '0', 10) || 0; } catch(e) {}
+        var bodyHtml = msg + '<div style="margin-top:12px;padding:12px;background:#fff8e1;border-radius:12px;font-size:13.5px;color:#f57f17">🎮 开启第 ' + (doneRound + 1) + ' 轮需要 <b>' + SH_CONTINUE_COST + ' 🌈积分</b>（当前积分：' + pts + '）</div>';
+        bodyHtml += '<div style="display:flex;gap:10px;justify-content:center;margin-top:14px">';
+        bodyHtml += '<button data-close style="padding:10px 22px;border:none;border-radius:12px;background:#3f7ef5;color:#fff;font-weight:700;cursor:pointer;font-size:14px">✨ 消耗 ' + SH_CONTINUE_COST + ' 积分继续</button>';
+        bodyHtml += '<button data-close style="padding:10px 22px;border:none;border-radius:12px;background:#eee;color:#666;font-weight:700;cursor:pointer;font-size:14px" id="sh-end-btn">结束游戏</button>';
+        bodyHtml += '</div>';
+        modal(container, '🎉 第 ' + doneRound + ' 轮通关！', bodyHtml, function (btn) {
+          if (btn && btn.id === 'sh-end-btn') return; /* 点"结束"不续局 */
+          spend(shanhai.cid, SH_CONTINUE_COST, '山海经续局-第'+(doneRound+1)+'轮').then(function(ok) {
+            if (!ok) { toast('💰 积分不足，无法续局'); return; }
+            updPts(container, shanhai.cid, shanhai).then(function () { buildShanhai(container); }).catch(function () { try { buildShanhai(container); } catch (e2) {} });
+          });
+        });
+      }
     });
   }
 
@@ -18864,11 +18883,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
      ============================================================ */
   function modal(container, title, body, onShow) {
     var ov = document.createElement('div'); ov.className = 'mxg-overlay';
+    var hasOwnBtn = (body || '').indexOf('data-close') >= 1;
     ov.innerHTML = '<div class="mxg-modal"><div class="mxg-modal-big">' + (title.indexOf('成') >= 0 || title.indexOf('🎉') >= 0 ? '🎉' : '💡') + '</div>'
       + '<h3>' + esc(title) + '</h3><p>' + body + '</p>'
-      + '<button class="mxg-btn primary" data-close>好的</button></div>';
+      + (!hasOwnBtn ? '<button class="mxg-btn primary" data-close>好的</button>' : '') + '</div>';
     document.body.appendChild(ov);
-    ov.querySelector('[data-close]').onclick = function () { ov.remove(); if (onShow) onShow(ov.querySelector('.mxg-modal')); };
+    /* 事件委托：所有 [data-close] 按钮都能触发关闭+回调，并把被点击的按钮传给 onShow */
+    ov.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('[data-close]');
+      if (!btn) return;
+      e.stopPropagation();
+      ov.remove();
+      if (onShow) try { onShow(btn); } catch (ex) {}
+    });
   }
 
   /* ============================================================
@@ -24750,6 +24777,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function build(){
     if (document.getElementById('mx-testrec-btn')) return;       // 防重复
     // #207·debug 门面：仅测试码激活或测试构建(__MX_DEBUG)才显示测试面板，普通 VIP 用户无任何调试入口（不挂后台观察器）
+    // 仅本地/沙箱测试环境显示；GitHub Pages 正式域名为生产环境，不展示调试入口
+    var isProd = /starai3690\.github\.io|mengxing-baby\.netlify\.app/i.test(location.host || '');
+    if (isProd) return;
     if (!(window.__MX_DEBUG === true || lsGet(KEY_CODE) === TEST_CODE)) return;
     var btn = document.createElement('div');
     btn.id = 'mx-testrec-btn';
