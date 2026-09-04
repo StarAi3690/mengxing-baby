@@ -87,12 +87,14 @@
 
   <!-- 运营监控 -->
   <div id="pane-mon" hidden>
+    <div id="abuseBox" hidden></div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h3 style="margin:0">核心指标</h3>
         <button class="btn ghost" onclick="loadStats()">↺ 刷新</button>
       </div>
       <div class="grid" id="metrics" style="margin-top:12px"></div>
+      <div id="statsMsg" class="msg"></div>
     </div>
     <div class="card">
       <h3 style="margin:0 0 10px">模块热度（点击次数 · 最喜爱功能）</h3>
@@ -117,7 +119,7 @@
         </span>
       </div>
       <div class="sub">用户在「建议与反馈」模块提交的内容会同步到云端 <code>Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
-      <div class="scroll"><table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>账号</th><th>原激活卡密</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
 
@@ -129,6 +131,7 @@
         <button class="btn ghost" onclick="loadData()">↺ 刷新</button>
       </div>
       <div class="sub">直接读取云端各集合内容：卡密绑定设备表、账号表、反馈表、各用户云调用次数（流量近似）。</div>
+      <div class="grid" id="dataCounts" style="margin-top:10px"></div>
       <span id="dataMsg" class="msg"></span>
     </div>
 
@@ -145,7 +148,7 @@
         <h3 style="margin:0">👤 账号密码表 <code>mx_users</code></h3>
         <button class="btn ghost sm" onclick="exportCSV('usersTable','账号密码表')">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll"><table id="usersTable"><thead><tr><th>账号</th><th>UID</th><th>类型</th><th>验证状态</th><th>注册日期</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="usersTable"><thead><tr><th>账号</th><th>UID</th><th>类型</th><th>验证状态</th><th>注册日期</th><th>操作</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
@@ -153,7 +156,7 @@
         <h3 style="margin:0">💌 反馈表 <code>Feedback</code></h3>
         <button class="btn ghost sm" onclick="exportCSV('dataFbTable','用户反馈表')">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll"><table id="dataFbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="dataFbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>账号</th><th>原激活卡密</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
@@ -277,8 +280,10 @@ async function saveAnnounce(){
 }
 
 async function loadStats(){
+  setMsg('statsMsg','加载中…','sub');
   const r = await proxy('mxAdmin', { action:'stats', adminKey: ADMIN_KEY });
-  if (!r || !r.ok) { $('metrics').innerHTML='<div class="metric"><b>—</b><span>'+(r&&r.msg||'读取失败')+'</span></div>'; return; }
+  if (!r || !r.ok) { $('metrics').innerHTML='<div class="metric"><b>—</b><span>'+(r&&r.msg||'读取失败')+'</span></div>'; setMsg('statsMsg','❌ '+((r&&r.msg)||'读取失败')+'（若提示未授权，请退出后重新登录）','bad'); $('abuseBox').hidden=true; return; }
+  setMsg('statsMsg','✅ 已刷新（'+((r.updatedAt||'').replace('T',' ').slice(0,16)||'刚从云端实时聚合')+'）','ok');
   const M = [
     {b:r.activations, s:'累计激活用户', c:''},
     {b:r.vip, s:'VIP 激活', c:'ok'},
@@ -307,23 +312,71 @@ async function loadStats(){
     return '<tr><td>'+esc(h.module)+'</td><td>'+esc(h.count)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
   $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+esc(r.securityLogs)+' 条。';
+
+  /* #E 同设备多卡白嫖风险警告 + 封锁按钮 + 黑名单管理 */
+  const abuse = r.deviceAbuse || [], blocked = r.blockedDevices || [];
+  const box = $('abuseBox');
+  let h = '';
+  if (abuse.length) {
+    h += '<div class="card" style="border-color:var(--bad);background:#fff5f6">'
+      + '<h3 style="margin:0 0 8px;color:var(--bad)">🚨 白嫖风险警告（同一设备绑定多张卡）</h3>';
+    abuse.forEach(function (a) {
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap">'
+        + '<b style="min-width:130px">设备 ' + esc(a.deviceId) + '…</b>'
+        + '<span class="pill" style="background:#fdecee;color:var(--bad)">绑定 ' + esc(a.count) + ' 张卡</span>'
+        + '<span class="sub" style="flex:1;min-width:200px">' + esc(a.cards.map(function (c) { return c.code.slice(0, 4) + '****' + (c.vip ? '(VIP)' : ''); }).join('，')) + '</span>'
+        + '<button class="btn sm" style="background:var(--bad)" onclick="blockDevicePrompt(\'' + esc(a.deviceId) + '\')">⛔ 关闭激活通道</button>'
+        + '</div>';
+    });
+    h += '<div class="hint" style="margin-top:8px">封锁后该设备将无法激活任何新卡密（checkCard 直接拒绝），已激活内容不受影响。设备号为前 12 位，封锁按前缀匹配。</div></div>';
+  }
+  if (blocked.length) {
+    h += '<div class="card"><h3 style="margin:0 0 8px">⛔ 已封锁设备（激活通道已关闭）</h3>';
+    blocked.forEach(function (b) {
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap">'
+        + '<b style="min-width:130px">设备 ' + esc(b.deviceId) + '…</b>'
+        + '<span class="sub" style="flex:1;min-width:200px">' + esc(b.reason || '—') + '</span>'
+        + '<button class="btn ghost sm" onclick="unblockDevice(\'' + esc(b.deviceId) + '\')">🔓 解除封锁</button>'
+        + '</div>';
+    });
+    h += '</div>';
+  }
+  if (!h) box.innerHTML = ''; else { box.innerHTML = h; box.hidden = false; }
+}
+
+/* #E 封锁/解封设备（device_blacklist，checkCard 激活时校验） */
+async function blockDevicePrompt(devPrefix){
+  if (!confirm('确认关闭设备 ' + devPrefix + '… 的激活通道？\n\n效果：该设备将无法激活任何新卡密（含正常购买），已激活内容不受影响。\n如误封可随时在本页「已封锁设备」中解除。')) return;
+  const reason = prompt('封锁原因（会记录在案，可留空）：', '同设备绑定多张卡，涉嫌白嫖风险');
+  if (reason === null) return;
+  const r = await proxy('mxAdmin', { action:'blockDevice', adminKey: ADMIN_KEY, deviceId: devPrefix, reason: reason });
+  setMsg('statsMsg', (r && r.ok) ? '✅ ' + r.msg : '❌ ' + ((r && r.msg) || '操作失败'), (r && r.ok) ? 'ok' : 'bad');
+  loadStats();
+}
+async function unblockDevice(devPrefix){
+  if (!confirm('确认解除设备 ' + devPrefix + '… 的封锁？')) return;
+  const r = await proxy('mxAdmin', { action:'unblockDevice', adminKey: ADMIN_KEY, deviceId: devPrefix });
+  setMsg('statsMsg', (r && r.ok) ? '✅ ' + r.msg : '❌ ' + ((r && r.msg) || '操作失败'), (r && r.ok) ? 'ok' : 'bad');
+  loadStats();
 }
 
 async function loadFeedback(){
   const tbody = $('fbTable').querySelector('tbody');
-  tbody.innerHTML = '<tr><td colspan="5" class="sub">加载中…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" class="sub">加载中…</td></tr>';
   try {
     const r = await proxy('mxAdmin', { action:'tables', adminKey: ADMIN_KEY });
-    if (!r || !r.ok) { tbody.innerHTML = '<tr><td colspan="5" class="sub" style="color:var(--bad)">'+(r&&r.msg||'加载失败')+'</td></tr>'; return; }
+    if (!r || !r.ok) { tbody.innerHTML = '<tr><td colspan="7" class="sub" style="color:var(--bad)">'+(r&&r.msg||'加载失败')+'</td></tr>'; return; }
     fillFb(tbody, r.feedback || []);
   } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="5" class="sub" style="color:var(--bad)">加载失败：'+esc(String(e.message||e))+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="sub" style="color:var(--bad)">加载失败：'+esc(String(e.message||e))+'</td></tr>';
   }
 }
 function fillFb(tbody, list){
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="sub">暂无用户反馈。用户提交后会自动出现在这里。</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="sub">暂无用户反馈。用户提交后会自动出现在这里。</td></tr>'; return; }
   tbody.innerHTML = list.map(function(f){
-    return '<tr><td style="white-space:nowrap">'+esc(f.date||'—')+'</td><td>'+esc(f.name)+'</td><td>'+esc(f.contact)+'</td><td>'+esc(f.page)+'</td><td style="max-width:320px;word-break:break-all">'+esc(f.text)+'</td></tr>';
+    return '<tr><td style="white-space:nowrap">'+esc(f.date||'—')+'</td><td>'+esc(f.name)+'</td><td>'+esc(f.contact)+'</td>'
+      + '<td>'+esc(f.account||'—')+'</td><td>'+esc(f.cards||'—')+'</td>'
+      + '<td>'+esc(f.page)+'</td><td style="max-width:320px;word-break:break-all">'+esc(f.text)+'</td></tr>';
   }).join('');
 }
 
@@ -336,7 +389,20 @@ async function loadData(){
     renderUsers(r.users || []);
     fillFb($('dataFbTable').querySelector('tbody'), r.feedback || []);
     renderUsage(r.usage || []);
-    setMsg('dataMsg','已加载（数据每 2 小时刷新一次，可点刷新实时拉取）','sub');
+    /* #D 头部块实内容化：各表条数汇总 + 服务端错误透出 */
+    const c = r.counts || {};
+    const errs = [];
+    if (r.cardsErr) errs.push('卡密表: '+r.cardsErr);
+    if (r.usersErr) errs.push('账号表: '+r.usersErr);
+    if (r.fbErr) errs.push('反馈表: '+r.fbErr);
+    if (r.usageErr) errs.push('调用表: '+r.usageErr);
+    $('dataCounts').innerHTML =
+      '<div class="metric pri"><b>'+esc(c.cards||0)+'</b><span>已激活卡密</span></div>'
+      + '<div class="metric ok"><b>'+esc(c.users||0)+'</b><span>注册账号</span></div>'
+      + '<div class="metric"><b>'+esc(c.feedback||0)+'</b><span>用户反馈</span></div>'
+      + '<div class="metric warn"><b>'+esc(c.usage||0)+'</b><span>有调用记录的用户</span></div>'
+      + '<div class="metric'+((r.blocked||[]).length?' bad':'')+'"><b>'+esc((r.blocked||[]).length)+'</b><span>已封锁设备</span></div>';
+    setMsg('dataMsg', errs.length ? ('⚠️ 部分表读取异常 → '+errs.join('；')) : '✅ 已加载（实时拉取云端）', errs.length ? 'bad' : 'sub');
   } catch(e) { setMsg('dataMsg','加载失败：'+esc(String(e.message||e)),'bad'); }
 }
 function renderCards(list){
@@ -349,10 +415,19 @@ function renderCards(list){
 }
 function renderUsers(list){
   const tb = $('usersTable').querySelector('tbody');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="sub">暂无账号</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="sub">暂无账号</td></tr>'; return; }
   tb.innerHTML = list.map(function(u){
-    return '<tr><td>'+esc(u.account)+'</td><td>'+esc(u.uid)+'</td><td>'+esc(u.isEmail)+'</td><td>'+esc(u.verified)+'</td><td>'+esc(u.createdAt)+'</td></tr>';
+    return '<tr><td>'+esc(u.account)+'</td><td>'+esc(u.uid)+'</td><td>'+esc(u.isEmail)+'</td><td>'+esc(u.verified)+'</td><td>'+esc(u.createdAt)+'</td>'
+      + '<td><button class="btn ghost sm" onclick="resetUserPassPrompt(\''+esc(u.uid)+'\',\''+esc(u.account)+'\')">🔑 重置密码</button></td></tr>';
   }).join('');
+}
+/* #F 重置用户密码（客服场景：用户忘记密码时管理员重置，重置后用户用新密码登录） */
+async function resetUserPassPrompt(uid, account){
+  const np = prompt('为账号「' + account + '」设置新密码（至少 6 位）：\n重置后请把新密码告知用户，用户即可用新密码登录。', '');
+  if (np === null) return;
+  if (np.length < 6) { alert('新密码至少 6 位'); return; }
+  const r = await proxy('mxAdmin', { action:'resetUserPass', adminKey: ADMIN_KEY, uid: uid, newPass: np });
+  alert((r && r.ok) ? '✅ ' + r.msg : '❌ ' + ((r && r.msg) || '操作失败'));
 }
 function renderUsage(list){
   const tb = $('usageTable').querySelector('tbody');

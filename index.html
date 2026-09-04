@@ -18950,6 +18950,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   var GAME_RENDER = { pvz: renderPVZ, pony: renderPony, frozen: renderFrozen, paw: renderPaw, shanhai: renderShanhai, rhythm: renderRhythm };
   function openGame(id, container) {
     if (!container) container = document.getElementById('page-games');
+    /* #B 二级埋点：游戏大厅内打开具体游戏（节流同菜单遥测：每设备每游戏每天 1 次） */
+    try {
+      if (typeof window.mxApiProxy === 'function' && id) {
+        var lk = 'mx_evt_' + new Date().toISOString().slice(0, 10) + '_game:' + id;
+        if (!localStorage.getItem(lk)) {
+          localStorage.setItem(lk, '1');
+          window.mxApiProxy('logSecurityEvent', { type: 'EVENT', module: 'game:' + id, deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : '', uid: window.__mx_uid__ || lsGet('mx_user') || '' }).catch(function () {});
+        }
+      }
+    } catch (e) {}
     if (mxGameLocked(id)) { mxUpsellGame(id); return; }
     stopAll();
     (GAME_RENDER[id] || function (c) { c.innerHTML = '<div class="mxg-wrap">未知游戏</div>'; })(container);
