@@ -9714,6 +9714,8 @@ function syncCloudGuarded(action, extra) {
   return mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code) }).then(function (vr) {
     if (!vr || !vr.ok || !vr.vip) { setVip(false); try { setSyncStatus('local'); } catch (e) {} return { ok: false, msg: 'VIP 复核未通过，已降级为本地模式' }; }
     mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' });
+    /* [syncfix] 自愈：本地丢失卡密号（密码登录不落 code）时从云端 VIP 记录恢复 */
+    try { if (vr.code && !localStorage.getItem(STORAGE.code)) localStorage.setItem(STORAGE.code, vr.code); } catch (e) {}
     return mxApiSync(action, extra);
   }).catch(function () { return mxApiSync(action, extra); });
 }
@@ -17001,7 +17003,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (!pvz.cid) return;
       localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
         lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
-        sunMap: pvz.sunMap || {}, sunDay: pvz._sunDay || pvzToday(), battleStarted: !!pvz.battleStarted
+        sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), battleStarted: !!pvz.battleStarted
       }));
     } catch (e) {}
   }
@@ -17013,6 +17015,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     for (var r = 0; r < 5; r++) { pvz.lawn.push([]); for (var c = 0; c < 9; c++) pvz.lawn[r].push(null); }
     pvz.zombies = [pvzMkZombie(Math.floor(Math.random() * 5))];
     pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; _roundAwarded['pvz'] = false;
+    pvz.sunPending = 0;
     pvz._sunDay = pvzToday();   /* [pvzfix] 新局从今天起算配额 */
     try { if (pvz.cid) localStorage.removeItem('mxg_pvz_state_' + pvz.cid); } catch (e) {}   /* 开新一轮 = 清档 */
   }
@@ -17029,8 +17032,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.zpos = (typeof _saved.zpos === 'number') ? _saved.zpos : 9;
         pvz.day = _saved.day || 1;
         pvz.sunMap = _saved.sunMap || {};
-        /* [pvzfix] 阳光配额按真实日历日重置：跨天（或旧存档无日期戳）→ 清零，当天可继续收集 */
-        if (_saved.sunDay !== pvzToday()) pvz.sunMap = {};
+        /* [pvzfix] 阳光配额按真实日历日重置：跨天（或旧存档无日期戳）→ 先把昨天未收集的阳光自动入账，再清零 */
+        pvz.sunPending = (typeof _saved.sunPending === 'number') ? _saved.sunPending : 0;
+        if (_saved.sunDay !== pvzToday()) {
+          if (pvz.sunPending > 0) {
+            try { addPts(cid, pvz.sunPending, '跨日自动收集阳光'); } catch (e) {}
+            pvz.sunPending = 0;
+          }
+          pvz.sunMap = {};
+        }
         pvz._sunDay = pvzToday();
         pvz.battleStarted = !!_saved.battleStarted;
         pvz.selected = null; _roundAwarded['pvz'] = false;
@@ -17039,6 +17049,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.sun = p;
         buildPVZ(container);
         startPVZTimers(container);
+        /* [pvzfix] 恢复存档中未收集的阳光：重新挂到场上等待收集（阳光常驻、跨日自动入账） */
+        try {
+          var _n = Math.min(pvz.sunPending || 0, 30);
+          for (var _si = 0; _si < _n; _si++) pvzSpawnSun(container);
+        } catch (e) {}
         publishHome('pvz', pvz.day);
         syncPvzPlants().then(function () {
           if (container.querySelector('#mxg-pvz-lawn')) { buildPVZ(container); startPVZTimers(container); }
@@ -17104,7 +17119,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '</div>'
       + '<div class="mxg-pvz-palette">' + palette + '</div>'
       + '<div class="mxg-pvz-lawn" id="mxg-pvz-lawn">' + rows + zhtml + '</div>'
-      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分；当日 0 点自动重置，阳光落地 6 秒未收会消失且不占配额）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
+      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分；阳光会一直留在场上等你收集，当天 24 点仍未收的由系统自动入账）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
     setWrap(container, 'pvz', pvz.sun, inner);
     wirePVZ(container);
     pvzSave();   /* [pvzfix] 界面重建即存档：种植/跨天/开战/重开等所有 lawn 变更都经过这里 */
@@ -17209,6 +17224,26 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
     step();
   }
+  /* [pvzfix] 生成一个常驻阳光（不设超时消失）：等待手动收集；跨自然日由轮询自动收集入账。
+     供产出定时器与存档恢复（同日重进后把未收集阳光重新挂回场上）共用。 */
+  function pvzSpawnSun(container) {
+    var lawnEl = container.querySelector('#mxg-pvz-lawn'); if (!lawnEl) return;
+    var rect = lawnEl.getBoundingClientRect();
+    var s = document.createElement('div'); s.className = 'mxg-pvz-sun'; s.textContent = '☀️';
+    s.style.position = 'fixed';   /* 坐标取自视口 rect，fixed 才能精确盖在草坪上 */
+    s.style.left = (rect.left + 20 + Math.random() * (rect.width - 60)) + 'px';
+    s.style.top = (rect.top + 20 + Math.random() * (rect.height - 60)) + 'px';
+    document.body.appendChild(s);
+    s.onclick = function () {
+      s.onclick = null;           /* 防重入：一次点击只加 1 积分 */
+      addPts(pvz.cid, 1, '向日葵产阳光');
+      pvz.sunPending = Math.max(0, (pvz.sunPending || 0) - 1);
+      s.remove();
+      pvzSave();
+      updPts(container, pvz.cid, pvz);
+      beep(880);
+    };
+  }
   function startPVZTimers(container) {
     /* [pvzfix 2026-09-04] 阳光定时器改为「全局唯一」：旧实现每次进页面都新开一个 10s 定时器且从不清理，
        进入 N 次后阳光以 N 倍速狂掉（症状：阳光一直存在、可无限点击刷积分）。先清旧再建新。 */
@@ -17216,8 +17251,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     // 向日葵产阳光：每 10 秒尝试产出，单棵每日产出上限 10 个（1 阳光 = 1 积分）
     pvz._sunTimer = interval(function () {
       if (!pvz.lawn.length) return;
-      /* [pvzfix] 跨自然日（页面开着过午夜也算）：配额即时重置 */
-      if (pvz._sunDay !== pvzToday()) { pvz._sunDay = pvzToday(); pvz.sunMap = {}; }
+      /* [pvzfix] 跨自然日（页面开着过午夜也算）：先把场上未收集的阳光自动收集入账，再重置配额。
+         取 DOM 元素数与存档计数的较大者，防同日重进后 DOM 丢失导致少入账 */
+      if (pvz._sunDay !== pvzToday()) {
+        var _stale = document.querySelectorAll('.mxg-pvz-sun');
+        var _auto = Math.max(_stale.length, pvz.sunPending || 0);
+        if (_auto > 0) { try { addPts(pvz.cid, _auto, '跨日自动收集阳光'); } catch (e) {} }
+        for (var _i = 0; _i < _stale.length; _i++) { _stale[_i].onclick = null; _stale[_i].remove(); }
+        pvz._sunDay = pvzToday(); pvz.sunMap = {}; pvz.sunPending = 0; pvzSave();
+      }
       var lawn = container.querySelector('#mxg-pvz-lawn'); if (!lawn) return;
       if (!pvz.sunMap) pvz.sunMap = {};
       for (var r = 0; r < 5; r++) for (var c = 0; c < 9; c++) {
@@ -17230,22 +17272,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
                旧实现两处缺陷：① var key 闭包陷阱——点击回调里 key 恒为最后一格，
                计数永远记不到产阳光的那棵向日葵头上，上限形同虚设；② 点击不加防重入。 */
             pvz.sunMap[key] = (pvz.sunMap[key] || 0) + 1;
-            (function (k) {
-              var rect = lawn.getBoundingClientRect();
-              var s = document.createElement('div'); s.className = 'mxg-pvz-sun'; s.textContent = '☀️';
-              s.style.position = 'fixed';   /* 坐标取自视口 rect，fixed 才能精确盖在草坪上 */
-              s.style.left = (rect.left + 20 + Math.random() * (rect.width - 60)) + 'px';
-              s.style.top = (rect.top + 20 + Math.random() * (rect.height - 60)) + 'px';
-              document.body.appendChild(s);
-              s.onclick = function () {
-                s.onclick = null;           /* 防重入：一次点击只加 1 积分 */
-                addPts(pvz.cid, 1, '向日葵产阳光');
-                s.remove();
-                updPts(container, pvz.cid, pvz);
-                beep(880);
-              };
-              setTimeout(function () { if (s.parentNode) s.remove(); }, 6000);
-            })(key);
+            pvz.sunPending = (pvz.sunPending || 0) + 1;   /* 场上未收集阳光计数（跨日自动入账用） */
+            pvzSpawnSun(container);
             pvzSave();   /* 产出计数落盘，刷新页面不重置每日上限 */
           }
         }
@@ -24533,27 +24561,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   function pushCloud() {
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
-    var code = lsGet(STORAGE.code); if (!code) { setSyncStatus('local'); return Promise.resolve(); }
+    /* [syncfix] 密码登录用户本地可能无卡密 code：服务端只认 uid（verifyVipOwner），
+       code 缺失不应阻断同步（空 code 由服务端保留历史值） */
+    var code = lsGet(STORAGE.code) || '';
     setSyncStatus(navigator.onLine === false ? 'offline' : 'syncing');
     return ensureUid().then(function (uid) {
-      if (!uid) { setSyncStatus('local'); return Promise.resolve(); } /* 未注册账号：仅本机，不同步 */
+      if (!uid) { setSyncStatus('local'); return 'BAILED'; } /* 未注册/登录过期：仅本机 */
       return buildSnapshot().then(function (snap) {
         /* token 由后端 sync.js 取出 uid；此处只传 code + snapshot */
         return syncCloudGuarded('push', { code: code, snapshot: snap });
-      });
-    }).then(function () { setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function () { setSyncStatus('local'); });
+      }).then(function (res) { return (res && res.ok) ? 'OK' : 'BAILED'; });
+    }).then(function (b) { setSyncStatus(navigator.onLine === false ? 'offline' : (b === 'OK' ? 'cloud' : 'local')); }).catch(function () { setSyncStatus('local'); });
   }
   function pullCloud() {
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
-    var code = lsGet(STORAGE.code); if (!code) { setSyncStatus('local'); return Promise.resolve(); }
+    var code = lsGet(STORAGE.code) || '';
     setSyncStatus(navigator.onLine === false ? 'offline' : 'syncing');
     return ensureUid().then(function (uid) {
-      if (!uid) { setSyncStatus('local'); return Promise.resolve(); } /* 未注册账号：仅本机，不同步 */
+      if (!uid) { setSyncStatus('local'); return 'BAILED'; } /* 未注册/登录过期：仅本机 */
       return syncCloudGuarded('pull', { code: code }).then(function (res) {
-        if (res && res.ok && res.snapshot) return applySnapshot(res.snapshot);
-        return null;
+        if (res && res.ok && res.snapshot) return applySnapshot(res.snapshot).then(function () { return 'OK'; });
+        return 'BAILED';
       });
-    }).then(function () { setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function () { setSyncStatus('local'); });
+    }).then(function (b) { setSyncStatus(navigator.onLine === false ? 'offline' : (b === 'OK' ? 'cloud' : 'local')); }).catch(function () { setSyncStatus('local'); });
   }
   function startVipSync() {
     if (window.__mx_sync_started__) return;
