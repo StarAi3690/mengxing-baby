@@ -16991,12 +16991,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* [pvzfix 2026-09-04] 种植/进度持久化：按 childId 存 localStorage，刷新页面不丢植物。
      存档时机：buildPVZ 重建后（覆盖种植/跨天/开战/重开）+ 向日葵产出计数变化时。 */
+  /* [pvzfix 2026-09-04] 真实日历日（本地时区），用于向日葵阳光配额的每日重置 */
+  function pvzToday() {
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
   function pvzSave() {
     try {
       if (!pvz.cid) return;
       localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
         lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
-        sunMap: pvz.sunMap || {}, battleStarted: !!pvz.battleStarted
+        sunMap: pvz.sunMap || {}, sunDay: pvz._sunDay || pvzToday(), battleStarted: !!pvz.battleStarted
       }));
     } catch (e) {}
   }
@@ -17008,6 +17013,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     for (var r = 0; r < 5; r++) { pvz.lawn.push([]); for (var c = 0; c < 9; c++) pvz.lawn[r].push(null); }
     pvz.zombies = [pvzMkZombie(Math.floor(Math.random() * 5))];
     pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; _roundAwarded['pvz'] = false;
+    pvz._sunDay = pvzToday();   /* [pvzfix] 新局从今天起算配额 */
     try { if (pvz.cid) localStorage.removeItem('mxg_pvz_state_' + pvz.cid); } catch (e) {}   /* 开新一轮 = 清档 */
   }
   function renderPVZ(container) {
@@ -17023,6 +17029,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.zpos = (typeof _saved.zpos === 'number') ? _saved.zpos : 9;
         pvz.day = _saved.day || 1;
         pvz.sunMap = _saved.sunMap || {};
+        /* [pvzfix] 阳光配额按真实日历日重置：跨天（或旧存档无日期戳）→ 清零，当天可继续收集 */
+        if (_saved.sunDay !== pvzToday()) pvz.sunMap = {};
+        pvz._sunDay = pvzToday();
         pvz.battleStarted = !!_saved.battleStarted;
         pvz.selected = null; _roundAwarded['pvz'] = false;
       } else if (!pvz.lawn.length) pvzInit();
@@ -17095,7 +17104,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '</div>'
       + '<div class="mxg-pvz-palette">' + palette + '</div>'
       + '<div class="mxg-pvz-lawn" id="mxg-pvz-lawn">' + rows + zhtml + '</div>'
-      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
+      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分；当日 0 点自动重置，阳光落地 6 秒未收会消失且不占配额）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
     setWrap(container, 'pvz', pvz.sun, inner);
     wirePVZ(container);
     pvzSave();   /* [pvzfix] 界面重建即存档：种植/跨天/开战/重开等所有 lawn 变更都经过这里 */
@@ -17207,6 +17216,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     // 向日葵产阳光：每 10 秒尝试产出，单棵每日产出上限 10 个（1 阳光 = 1 积分）
     pvz._sunTimer = interval(function () {
       if (!pvz.lawn.length) return;
+      /* [pvzfix] 跨自然日（页面开着过午夜也算）：配额即时重置 */
+      if (pvz._sunDay !== pvzToday()) { pvz._sunDay = pvzToday(); pvz.sunMap = {}; }
       var lawn = container.querySelector('#mxg-pvz-lawn'); if (!lawn) return;
       if (!pvz.sunMap) pvz.sunMap = {};
       for (var r = 0; r < 5; r++) for (var c = 0; c < 9; c++) {
@@ -17233,7 +17244,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
                 updPts(container, pvz.cid, pvz);
                 beep(880);
               };
-              setTimeout(function () { if (s.parentNode) s.remove(); }, 6000);
+              setTimeout(function () {
+                if (s.parentNode) {
+                  s.remove();
+                  /* [pvzfix] 超时未收集：退还今日配额（生成只防刷屏，收满的判定以实际收集为准） */
+                  try { pvz.sunMap[k] = Math.max(0, (pvz.sunMap[k] || 0) - 1); pvzSave(); } catch (e) {}
+                }
+              }, 6000);
             })(key);
             pvzSave();   /* 产出计数落盘，刷新页面不重置每日上限 */
           }
