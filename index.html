@@ -16989,18 +16989,43 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   var pvz = { lawn: [], zombies: [], selected: null, sun: 0, zpos: 9, cid: 'default', day: 1, sunMap: {}, battleStarted: false };
 
+  /* [pvzfix 2026-09-04] 种植/进度持久化：按 childId 存 localStorage，刷新页面不丢植物。
+     存档时机：buildPVZ 重建后（覆盖种植/跨天/开战/重开）+ 向日葵产出计数变化时。 */
+  function pvzSave() {
+    try {
+      if (!pvz.cid) return;
+      localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
+        lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
+        sunMap: pvz.sunMap || {}, battleStarted: !!pvz.battleStarted
+      }));
+    } catch (e) {}
+  }
+  function pvzTryLoad() {
+    try { return JSON.parse(localStorage.getItem('mxg_pvz_state_' + pvz.cid) || 'null'); } catch (e) { return null; }
+  }
   function pvzInit() {
     pvz.lawn = [];
     for (var r = 0; r < 5; r++) { pvz.lawn.push([]); for (var c = 0; c < 9; c++) pvz.lawn[r].push(null); }
     pvz.zombies = [pvzMkZombie(Math.floor(Math.random() * 5))];
     pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; _roundAwarded['pvz'] = false;
+    try { if (pvz.cid) localStorage.removeItem('mxg_pvz_state_' + pvz.cid); } catch (e) {}   /* 开新一轮 = 清档 */
   }
   function renderPVZ(container) {
     /* 非阻塞进入：先用本地默认/缓存植物配置立即渲染，再后台同步云端配置；
        避免每次进入都等 CloudBase 网关 /proxy 网络往返，导致「点好几下才进得去」。 */
     activeCid().then(function (cid) {
       pvz.cid = cid;
-      if (!pvz.lawn.length) pvzInit();
+      /* [pvzfix] 有存档则恢复（植物/天数/僵尸位置），否则初始化新局 */
+      var _saved = pvzTryLoad();
+      if (_saved && _saved.lawn && _saved.lawn.length === 5) {
+        pvz.lawn = _saved.lawn;
+        pvz.zombies = (_saved.zombies && _saved.zombies.length) ? _saved.zombies : [pvzMkZombie(Math.floor(Math.random() * 5))];
+        pvz.zpos = (typeof _saved.zpos === 'number') ? _saved.zpos : 9;
+        pvz.day = _saved.day || 1;
+        pvz.sunMap = _saved.sunMap || {};
+        pvz.battleStarted = !!_saved.battleStarted;
+        pvz.selected = null; _roundAwarded['pvz'] = false;
+      } else if (!pvz.lawn.length) pvzInit();
       getPts(cid).then(function (p) {
         pvz.sun = p;
         buildPVZ(container);
@@ -17073,6 +17098,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
     setWrap(container, 'pvz', pvz.sun, inner);
     wirePVZ(container);
+    pvzSave();   /* [pvzfix] 界面重建即存档：种植/跨天/开战/重开等所有 lawn 变更都经过这里 */
   }
   function wirePVZ(container) {
     container.querySelectorAll('.mxg-pvz-card').forEach(function (card) {
@@ -17175,8 +17201,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     step();
   }
   function startPVZTimers(container) {
-    // 向日葵产阳光：每 10 秒尝试产出，单棵每日最多 10 个（1 阳光 = 1 积分）
-    interval(function () {
+    /* [pvzfix 2026-09-04] 阳光定时器改为「全局唯一」：旧实现每次进页面都新开一个 10s 定时器且从不清理，
+       进入 N 次后阳光以 N 倍速狂掉（症状：阳光一直存在、可无限点击刷积分）。先清旧再建新。 */
+    if (pvz._sunTimer) { try { clearInterval(pvz._sunTimer); } catch (e) {} }
+    // 向日葵产阳光：每 10 秒尝试产出，单棵每日产出上限 10 个（1 阳光 = 1 积分）
+    pvz._sunTimer = interval(function () {
       if (!pvz.lawn.length) return;
       var lawn = container.querySelector('#mxg-pvz-lawn'); if (!lawn) return;
       if (!pvz.sunMap) pvz.sunMap = {};
@@ -17184,20 +17213,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         var p = pvz.lawn[r][c];
         if (p && p.kind === 'sun') {
           var key = r + ',' + c;
-          if ((pvz.sunMap[key] || 0) >= 10) continue; // 单棵每日上限 10
+          if ((pvz.sunMap[key] || 0) >= 10) continue; // 单棵每日产出上限 10
           if (Math.random() < 0.6) {
-            var rect = lawn.getBoundingClientRect();
-            var s = document.createElement('div'); s.className = 'mxg-pvz-sun'; s.textContent = '☀️';
-            s.style.left = (rect.left + 20 + Math.random() * (rect.width - 60)) + 'px';
-            s.style.top = (rect.top + 20 + Math.random() * (rect.height - 60)) + 'px';
-            document.body.appendChild(s);
-            s.onclick = function () {
-              addPts(pvz.cid, 1, '向日葵产阳光'); s.remove();
-              pvz.sunMap[key] = (pvz.sunMap[key] || 0) + 1;
-              updPts(container, pvz.cid, pvz);
-              beep(880);
-            };
-            setTimeout(function () { if (s.parentNode) s.remove(); }, 6000);
+            /* [pvzfix] 产出即计数（硬上限，超产不再生成）；点击只负责收集积分。
+               旧实现两处缺陷：① var key 闭包陷阱——点击回调里 key 恒为最后一格，
+               计数永远记不到产阳光的那棵向日葵头上，上限形同虚设；② 点击不加防重入。 */
+            pvz.sunMap[key] = (pvz.sunMap[key] || 0) + 1;
+            (function (k) {
+              var rect = lawn.getBoundingClientRect();
+              var s = document.createElement('div'); s.className = 'mxg-pvz-sun'; s.textContent = '☀️';
+              s.style.position = 'fixed';   /* 坐标取自视口 rect，fixed 才能精确盖在草坪上 */
+              s.style.left = (rect.left + 20 + Math.random() * (rect.width - 60)) + 'px';
+              s.style.top = (rect.top + 20 + Math.random() * (rect.height - 60)) + 'px';
+              document.body.appendChild(s);
+              s.onclick = function () {
+                s.onclick = null;           /* 防重入：一次点击只加 1 积分 */
+                addPts(pvz.cid, 1, '向日葵产阳光');
+                s.remove();
+                updPts(container, pvz.cid, pvz);
+                beep(880);
+              };
+              setTimeout(function () { if (s.parentNode) s.remove(); }, 6000);
+            })(key);
+            pvzSave();   /* 产出计数落盘，刷新页面不重置每日上限 */
           }
         }
       }
