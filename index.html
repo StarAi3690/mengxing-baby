@@ -16744,6 +16744,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     video: { desc: '教学视频资源', categories: ['拼音微课', '数学思维', '英语动画', '习惯养成'], items: [] },
     characters: { desc: '角色/精灵图库', categories: ['PVZ植物', '小马宝莉', '山海经', '节奏盒子'], items: [] }
   };
+  window.MX_IMG_VER = 1;   /* [imgopt B 2026-09-04] 图片缓存版本号：联动配置表 linkage_config.imgVer 改大即全端强制刷新图鉴/卡面图片缓存 */
   window.MX_LINKAGE = MX_LINKAGE_DEFAULT;
   window.MX_CONTENT = MX_CONTENT_DEFAULT;
   function applyLinkageOrder() {
@@ -16756,7 +16757,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try {
       if (window.mxApiProxy) {
         window.mxApiProxy('getConfig', { key: 'linkage_config' }).then(function (r) {
-          if (r && r.ok && r.linkage) { window.MX_LINKAGE = r.linkage; applyLinkageOrder(); if (window.renderAnnouncement) window.renderAnnouncement(); }
+          if (r && r.ok && r.linkage) {
+            window.MX_LINKAGE = r.linkage;
+            /* [imgopt B] 管理端在配置表把 imgVer 改大 → 全端图片URL带新?v= → 强制刷新图鉴/卡面缓存 */
+            try { var nv = parseInt(r.linkage.imgVer, 10); if (nv > 0) window.MX_IMG_VER = nv; } catch (e) {}
+            applyLinkageOrder(); if (window.renderAnnouncement) window.renderAnnouncement();
+          }
         }).catch(function () {});
         window.mxApiProxy('getConfig', { key: 'content_tables' }).then(function (r) {
           if (r && r.ok && r.content) window.MX_CONTENT = r.content;
@@ -18186,7 +18192,27 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       });
     }).catch(function () {});
   }
+  /* [imgopt C 2026-09-04] 进游戏一次性预载全部角色真图+切图源大图 →
+     之后无论怎么洗牌/新开局/开图鉴，全部命中浏览器缓存，零网络请求（比固定翻牌组合更彻底且不牺牲随机性）。
+     注意：切图源大图(sprite sheet)不带 ?v（与 spriteHtml 的引用形式保持一致，避免重复下载） */
+  function shPreloadAll() {
+    if (window.__MX_SH_PRE__) return; window.__MX_SH_PRE__ = true;
+    var vq = window.MX_IMG_VER ? ('?v=' + window.MX_IMG_VER) : '';
+    var urls = [];
+    (SH_ALL || []).forEach(function (ch) { if (ch && ch.img) urls.push(ch.img); });
+    try {
+      var coords = window.MX_SPRITE_COORDS || {};
+      Object.keys(coords).forEach(function (k) {
+        var s = coords[k] && coords[k].src;
+        if (s && urls.indexOf(s) < 0) urls.push(s);
+      });
+    } catch (e) {}
+    urls.forEach(function (u) {
+      try { var im = new Image(); im.src = u + (u.indexOf('assets/images/shanhai/') === 0 ? vq : ''); } catch (e) {}
+    });
+  }
   function renderShanhai(container) {
+    shPreloadAll();
     activeCid().then(function (cid) {
       shanhai.cid = cid;
       if (!shanhai.board.length || !SH_CHARS.length) shInit();
@@ -27524,18 +27550,28 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var imgTheme = (themeId === 'beat') ? 'rhythm' : (themeId || '');
     var ch = (window.MX_CHAR_REGISTRY && window.MX_CHAR_REGISTRY[characterId]) || null;
     var emoji = emojiFallback || (ch && ch.emoji) || '🎁';
+    /* [imgopt A/B 2026-09-04] 开发目录候选(temp/sprite_crops等)仅在本地(file://或localhost)启用——
+       线上环境这些路径必404，此前每个角色渲染=2~4个死请求；现线上直连真实素材，零404。
+       图片URL统一追加 ?v=<MX_IMG_VER>（联动配置表 imgVer 字段可全端强制刷新图片缓存） */
+    var isDev = (location.protocol === 'file:') || /^localhost$|^127(\.\d+){3}$/.test(location.hostname || '');
+    var vq = window.MX_IMG_VER ? ('?v=' + window.MX_IMG_VER) : '';
     var cands = [];
-    /* 节奏盒子主题：优先读取 sprite_crops/rhythm-v2/（带 -v2 强制浏览器重新下载新图，绕过旧缓存/旧CDN流量） */
-    if (imgTheme === 'rhythm' && characterId) {
-      cands.push('../sprite_crops/rhythm-v2/' + characterId + '.png');
-      cands.push('sprite_crops/rhythm-v2/' + characterId + '.png');
+    if (isDev) {
+      /* 节奏盒子主题：优先读取 sprite_crops/rhythm-v2/（本地开发可即时覆盖最新裁剪图） */
+      if (imgTheme === 'rhythm' && characterId) {
+        cands.push('../sprite_crops/rhythm-v2/' + characterId + '.png');
+        cands.push('sprite_crops/rhythm-v2/' + characterId + '.png');
+      }
+      if (imgTheme && characterId) {
+        cands.push('../temp/sprite_crops/' + imgTheme + '/' + characterId + '.png');   /* 用户源目录(上溯一级) */
+        cands.push('temp/sprite_crops/' + imgTheme + '/' + characterId + '.png');      /* 用户源目录(同级) */
+      }
+    } else if (imgTheme === 'rhythm' && characterId) {
+      cands.push('sprite_crops/rhythm-v2/' + characterId + '.png');   /* 线上已部署的真实目录 */
     }
-    if (imgTheme && characterId) {
-      cands.push('../temp/sprite_crops/' + imgTheme + '/' + characterId + '.png');   /* 用户源目录(上溯一级) */
-      cands.push('temp/sprite_crops/' + imgTheme + '/' + characterId + '.png');      /* 用户源目录(同级) */
-    }
-    if (ch && ch.img) cands.push(ch.img);                                            /* 节奏盒子真图 */
+    if (ch && ch.img) cands.push(ch.img);                                            /* 角色自带真图 */
     if (imgTheme && characterId) cands.push('assets/images/characters/' + imgTheme + '_' + characterId + '.png'); /* 运行时素材 */
+    if (vq) { for (var vi = 0; vi < cands.length; vi++) cands[vi] += vq; }
     var fb = '<span class="mx-char-fb" style="display:none;font-size:' + Math.round(size * 0.6) + 'px;line-height:1;vertical-align:middle">' + emoji + '</span>';
     if (!cands.length) {
       return '<span class="mx-char-fb" style="font-size:' + Math.round(size * 0.6) + 'px;line-height:1;vertical-align:middle">' + emoji + '</span>';
