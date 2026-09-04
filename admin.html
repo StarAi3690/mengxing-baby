@@ -25,6 +25,7 @@
   .row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
   .btn{padding:10px 18px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;font-size:14px;cursor:pointer}
   .btn.ghost{background:#eef2fb;color:var(--pri)}
+  .btn.sm{padding:7px 13px;font-size:13px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
   .metric{background:#f8fafd;border:1px solid var(--line);border-radius:12px;padding:14px}
   .metric b{display:block;font-size:24px;margin-bottom:4px}
@@ -110,7 +111,10 @@
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h3 style="margin:0">用户反馈列表</h3>
-        <button class="btn ghost" onclick="loadFeedback()">↺ 刷新</button>
+        <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="exportCSV('fbTable','用户反馈表')">⬇ 导出 CSV</button>
+          <button class="btn ghost sm" onclick="loadFeedback()">↺ 刷新</button>
+        </span>
       </div>
       <div class="sub">用户在「建议与反馈」模块提交的内容会同步到云端 <code>Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
       <div class="scroll"><table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
@@ -129,22 +133,34 @@
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 8px">🔑 卡密绑定设备表 <code>card_activation</code></h3>
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">🔑 卡密绑定设备表 <code>card_activation</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('cardsTable','卡密绑定设备表')">⬇ 导出 CSV</button>
+      </div>
       <div class="scroll"><table id="cardsTable"><thead><tr><th>卡号(脱敏)</th><th>类型</th><th>等级</th><th>状态</th><th>绑定UID</th><th>使用设备</th><th>首绑设备</th><th>激活时间</th><th>有效期</th><th>有效期(天)</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 8px">👤 账号密码表 <code>mx_users</code></h3>
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">👤 账号密码表 <code>mx_users</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('usersTable','账号密码表')">⬇ 导出 CSV</button>
+      </div>
       <div class="scroll"><table id="usersTable"><thead><tr><th>账号</th><th>UID</th><th>类型</th><th>验证状态</th><th>注册日期</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 8px">💌 反馈表 <code>Feedback</code></h3>
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">💌 反馈表 <code>Feedback</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('dataFbTable','用户反馈表')">⬇ 导出 CSV</button>
+      </div>
       <div class="scroll"><table id="dataFbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 8px">📡 各用户云调用次数 <code>mx_track</code>（上下行流量近似）</h3>
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">📡 各用户云调用次数 <code>mx_track</code>（上下行流量近似）</h3>
+        <button class="btn ghost sm" onclick="exportCSV('usageTable','云调用次数表')">⬇ 导出 CSV</button>
+      </div>
       <div class="hint">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
       <div class="scroll"><table id="usageTable"><thead><tr><th>用户(UID/设备)</th><th>调用次数</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
@@ -328,7 +344,7 @@ function renderCards(list){
   if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已绑定卡密</td></tr>'; return; }
   tb.innerHTML = list.map(function(c){
     const vip = (c.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通';
-    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days)+'</td></tr>';
+    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days||0)+'</td></tr>';
   }).join('');
 }
 function renderUsers(list){
@@ -346,6 +362,53 @@ function renderUsage(list){
     const w = Math.max(6, Math.min(120, Math.round(x.calls/top*120)));
     return '<tr><td>'+esc(x.who)+'</td><td>'+esc(x.calls)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('');
+}
+
+/* ---- #338 CSV 导出（通用：以表头列数为准，读取 tbody 数据行） ---- */
+function stamp(){
+  const d = new Date();
+  const p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());
+}
+function csvCell(v){
+  /* 压缩空白：单元格内换行虽符合 CSV 规范，但 Excel 兼容差，统一压成空格 */
+  let s = String(v==null?'':v).replace(/\s+/g,' ').trim();
+  /* 防 CSV 公式注入：以 = + - @ 开头时 Excel 会当公式执行，加前导单引号中和 */
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function downloadCSV(csv, filename){
+  /* 必须加 UTF-8 BOM，否则 Excel 打开中文会乱码 */
+  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+function exportCSV(tableId, label){
+  const table = $(tableId);
+  if (!table) { alert('未找到表格：'+tableId); return; }
+  const headCells = table.querySelectorAll('thead th');
+  if (!headCells.length) { alert('该表格没有表头，无法导出'); return; }
+  const cols = headCells.length;
+  const lines = [Array.prototype.map.call(headCells, function(th){ return csvCell(th.textContent); }).join(',')];
+  const bodyRows = table.querySelectorAll('tbody tr');
+  let n = 0;
+  for (let i=0;i<bodyRows.length;i++){
+    const tr = bodyRows[i];
+    /* 跳过占位/提示行（"加载中…"、"暂无数据"），其特征是单元格带 colspan */
+    if (tr.querySelector('td[colspan]')) continue;
+    const cells = tr.children;
+    if (cells.length < cols) continue;
+    const row = [];
+    for (let j=0;j<cols;j++) row.push(csvCell(cells[j] ? cells[j].textContent : ''));
+    lines.push(row.join(','));
+    n++;
+  }
+  if (!n) { alert('「'+label+'」当前没有可导出的数据（请先在「数据明细」点刷新加载）'); return; }
+  downloadCSV(lines.join('\r\n'), '萌星宝宝_'+label+'_'+stamp()+'.csv');
 }
 
 /* ---- 账号安全 ---- */
