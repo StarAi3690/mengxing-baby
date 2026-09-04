@@ -17244,13 +17244,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
                 updPts(container, pvz.cid, pvz);
                 beep(880);
               };
-              setTimeout(function () {
-                if (s.parentNode) {
-                  s.remove();
-                  /* [pvzfix] 超时未收集：退还今日配额（生成只防刷屏，收满的判定以实际收集为准） */
-                  try { pvz.sunMap[k] = Math.max(0, (pvz.sunMap[k] || 0) - 1); pvzSave(); } catch (e) {}
-                }
-              }, 6000);
+              setTimeout(function () { if (s.parentNode) s.remove(); }, 6000);
             })(key);
             pvzSave();   /* 产出计数落盘，刷新页面不重置每日上限 */
           }
