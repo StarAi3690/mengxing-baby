@@ -6785,6 +6785,7 @@ html, body {
 .mxg-help-bd li:before { content: '•'; position: absolute; left: -14px; color: #6b8ad6; }
 /* #207·反馈云/本地：右上角同步状态徽章 */
 .mx-sync-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #eef1f6; color: #6b7a90; border: 1px solid #dfe5ee; white-space: nowrap; }
+.mx-sync-badge.expired { background: #fff3e0; color: #d98200; border-color: #ffd699; animation: mxg-glow 1.6s ease infinite; cursor: pointer; }
 .mx-sync-badge.cloud { background: #e8f7ee; color: #2e9e5b; border-color: #bfe8cd; }
 .mx-sync-badge.syncing { background: #eaf1ff; color: #3f7ef5; border-color: #c5d8ff; }
 .mx-sync-badge.offline { background: #fdecec; color: #e0533d; border-color: #f6c9c9; }
@@ -10621,7 +10622,8 @@ window.DB = {
             if (v !== v2v) { fail('两次输入不一致'); return; }
             try { localStorage.setItem('mx_parent_pin', v); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {}
             // [修复#348] forceSetup 模式（忘记密码重置）：设完数字密码后，先弹「新密码设置成功」确认框，确认后再进入手势密码设置
-            if (forceSetup) {
+            if (forceSetup || window.__mxForgotFlow__) {
+              window.__mxForgotFlow__ = false; // [修复#350] 消费标记，确保只弹一次引导
               hasPin = true; // 已有 PIN，手势模式显示"或使用密码进入"
               /* 内联弹窗：复用全局 .mxg-overlay/.mxg-modal 样式（与 AI山海经/节奏盒子等弹窗同款），
                  不依赖其他 IIFE 块的 modal 函数（避免跨块未定义）。确认后跳转到「手势密码」页签重设手势。 */
@@ -10694,6 +10696,7 @@ window.DB = {
             localStorage.removeItem('mx_parent_has_pin');
             localStorage.removeItem('mx_parent_pattern');
           } catch (e) {}
+          window.__mxForgotFlow__ = true;   /* [修复#350] 标记忘记密码重置流，确保设完数字密码弹「去设置手势」引导 */
           window.__parentUnlocked = false;
           window.mxParentUnlock(onOk, true); // 重新打开 → 强制进入「设置密码」流程（孩子/数据全部保留）
         }
@@ -10958,6 +10961,7 @@ window.DB = {
         if (btn) btn.onclick = function () {
           close();
           try { localStorage.removeItem('mx_parent_pin'); localStorage.removeItem('mx_parent_has_pin'); localStorage.removeItem('mx_parent_pattern'); } catch (e) {}
+          try { window.__mxForgotFlow__ = true; } catch (e) {}   /* [修复#350] 安全问题线路同样打标，确保设完数字密码弹引导 */
           if (onSuccess) try { onSuccess(); } catch (e) {};
         };
         return;
@@ -16998,12 +17002,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var d = new Date();
     return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
   }
+  /* [修复#351] 两个「YYYY-M-D」日期相差的自然天数（本地时区，不受零填充影响） */
+  function pvzDayDiff(a, b) {
+    try {
+      function _p(s) { var x = String(s).split('-'); return new Date(+x[0], (+x[1]) - 1, +x[2]); }
+      return Math.max(0, Math.round((_p(b).getTime() - _p(a).getTime()) / 86400000));
+    } catch (e) { return 0; }
+  }
   function pvzSave() {
     try {
       if (!pvz.cid) return;
       localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
         lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
-        sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), battleStarted: !!pvz.battleStarted
+        sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), lastDay: pvz._lastDay || pvzToday(), battleStarted: !!pvz.battleStarted
       }));
     } catch (e) {}
   }
@@ -17014,7 +17025,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     pvz.lawn = [];
     for (var r = 0; r < 5; r++) { pvz.lawn.push([]); for (var c = 0; c < 9; c++) pvz.lawn[r].push(null); }
     pvz.zombies = [pvzMkZombie(Math.floor(Math.random() * 5))];
-    pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; _roundAwarded['pvz'] = false;
+    pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; pvz._lastDay = pvzToday(); _roundAwarded['pvz'] = false;
     pvz.sunPending = 0;
     pvz._sunDay = pvzToday();   /* [pvzfix] 新局从今天起算配额 */
     try { if (pvz.cid) localStorage.removeItem('mxg_pvz_state_' + pvz.cid); } catch (e) {}   /* 开新一轮 = 清档 */
@@ -17031,6 +17042,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.zombies = (_saved.zombies && _saved.zombies.length) ? _saved.zombies : [pvzMkZombie(Math.floor(Math.random() * 5))];
         pvz.zpos = (typeof _saved.zpos === 'number') ? _saved.zpos : 9;
         pvz.day = _saved.day || 1;
+        pvz._lastDay = _saved.lastDay || _saved.sunDay || pvzToday();
         pvz.sunMap = _saved.sunMap || {};
         /* [pvzfix] 阳光配额按真实日历日重置：跨天（或旧存档无日期戳）→ 先把昨天未收集的阳光自动入账，再清零 */
         pvz.sunPending = (typeof _saved.sunPending === 'number') ? _saved.sunPending : 0;
@@ -17045,6 +17057,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.battleStarted = !!_saved.battleStarted;
         pvz.selected = null; _roundAwarded['pvz'] = false;
       } else if (!pvz.lawn.length) pvzInit();
+      /* [修复#351] 跨自然日自动推进天数：第二天及以后进入，按已过去的日历天数把进度推进（封顶第7天）。
+         规则与 pvzAdvanceDay 一致：每天新增 1~3 只僵尸、僵尸前进半格。对无法核验的历史日不做「吃掉植物」惩罚，保护花园。 */
+      if (!pvz.battleStarted && pvz.day < 7) {
+        var _ld = pvz._lastDay || pvz._sunDay || pvzToday();
+        var _ed = pvzDayDiff(_ld, pvzToday());
+        if (_ed >= 1) {
+          var _steps = Math.min(_ed, 7 - pvz.day);
+          for (var _si = 0; _si < _steps; _si++) {
+            pvz.day++;
+            pvz.sunMap = {};
+            var _add = 1 + Math.floor(Math.random() * 3);
+            for (var _aj = 0; _aj < _add; _aj++) pvz.zombies.push(pvzMkZombie(Math.floor(Math.random() * 5)));
+            pvz.zpos = Math.max(0, pvz.zpos - 0.5);
+          }
+          pvz._lastDay = pvzToday();
+          pvzSave();
+        }
+      }
       getPts(cid).then(function (p) {
         pvz.sun = p;
         buildPVZ(container);
@@ -20583,7 +20613,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var impOpen = false;
       impBtn.onclick = function () {
         impOpen = !impOpen;
-        if (impOpen) { impPanel.style.display = 'block'; impBtn.classList.add('mx-btn-active'); try { renderImportPanel(); } catch (e) {} }
+        if (impOpen) { impPanel.style.display = 'block'; impBtn.classList.add('mx-btn-active'); try { window.renderImportPanel(); } catch (e) { console.error('[import] renderImportPanel 失败', e); } }
         else { impPanel.style.display = 'none'; impBtn.classList.remove('mx-btn-active'); }
       };
     })();
@@ -23999,6 +24029,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (uid) { window.__mx_uid__ = uid; return Promise.resolve(uid); }
     /* token 缺失/过期 → 清除 stale 状态 */
     window.__mx_uid__ = null;
+    var _hadTok = false; try { _hadTok = !!localStorage.getItem('mx_token'); } catch (e) {}
+    window.__mx_uid_none__ = _hadTok ? 'expired' : 'missing';   /* [badgefix] 记录原因供角标区分展示 */
     try { localStorage.removeItem('mx_token'); localStorage.removeItem('mx_user'); } catch (e) {}
     return Promise.resolve(null);
   }
@@ -24556,9 +24588,54 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var el = document.getElementById('mx-sync-badge');
     if (el) {
       el.className = 'mx-sync-badge ' + s;
-      el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
+      el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
+      /* [badgefix] 角标可点击：登录过期 → 一键去重登；其他状态 → 同步诊断弹窗 */
+      el.onclick = function () { if (s === 'expired') mxForceRelogin(); else mxSyncDiag(); };
     }
   }
+  /* [badgefix] 登录过期恢复：清激活标记刷新出登录门，重新登录即续 30 天令牌并自动恢复同步 */
+  function mxForceRelogin() {
+    if (!window.confirm('云端同步的登录凭证已过期（约 30 天需重新登录一次，数据不会丢失）。\n\n点击「确定」前往重新登录；登录成功后右上角会变回「☁️ 云端已同步」。')) return;
+    try { localStorage.removeItem('mengxing_device_activated'); } catch (e) {}
+    location.reload();
+  }
+  /* [badgefix] 同步诊断弹窗：展示每个闸门的实际状态，终结「为什么显示仅本地」的黑盒 */
+  function mxSyncDiag() {
+    var vFlag = '', code = '', tok = null, tokExp = null;
+    try { vFlag = localStorage.getItem('mengxing_activated_vip') || '(空)'; } catch (e) {}
+    try { code = localStorage.getItem('mengxing_activated_code') || '(空)'; } catch (e) {}
+    try { tok = localStorage.getItem('mx_token'); } catch (e) {}
+    var tokState = '❌ 无令牌';
+    if (tok) {
+      try {
+        var p = tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (p.length % 4) p += '=';
+        var o = JSON.parse(decodeURIComponent(escape(window.atob(p))));
+        tokExp = o.exp ? new Date(o.exp * 1000) : null;
+        tokState = tokExp && tokExp.getTime() < Date.now() ? '❌ 已过期（' + tokExp.toLocaleString() + '）' : '✅ 有效' + (tokExp ? '（至 ' + tokExp.toLocaleString() + '）' : '');
+      } catch (e) { tokState = '❌ 无法解析'; }
+    }
+    var lastErr = ''; try { lastErr = localStorage.getItem('mx_sync_last_err') || '（无）'; } catch (e) {}
+    var m = document.createElement('div');
+    m.className = 'mxg-overlay';
+    m.innerHTML = '<div class="mxg-modal" style="text-align:left;max-width:420px">' +
+      '<h3 style="text-align:center">🔍 云端同步诊断</h3>' +
+      '<div style="font-size:13.5px;line-height:2;color:#444">' +
+      'VIP 标记：<b>' + vFlag + '</b><br>' +
+      '卡密号：<b>' + (code === '(空)' ? '(空)' : code.slice(0, 4) + '****') + '</b><br>' +
+      '登录令牌：' + tokState + '<br>' +
+      '登录身份：' + (window.__mx_uid__ ? '✅ ' + String(window.__mx_uid__).slice(0, 8) + '…' : '❌ 无（令牌过期或未登录）') + '<br>' +
+      '当前状态：<b>' + (window.__MX_SYNC_STATUS || '-') + '</b><br>' +
+      '最近同步问题：' + lastErr + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button id="mx-diag-ok" style="flex:1;padding:11px;border:none;border-radius:12px;background:#4facfe;color:#fff;font-weight:800;cursor:pointer">知道了</button></div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#mx-diag-ok').onclick = function () { if (m.parentNode) m.remove(); };
+    m.onclick = function (e) { if (e.target === m && m.parentNode) m.remove(); };
+  }
+  window.mxSyncDiag = mxSyncDiag;
+  /* [badgefix] 记录最近一次同步失败原因（诊断弹窗读取） */
+  function mxSyncErr(msg) { try { localStorage.setItem('mx_sync_last_err', new Date().toLocaleString() + ' ' + String(msg || '').slice(0, 120)); } catch (e) {} }
   function pushCloud() {
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
     /* [syncfix] 密码登录用户本地可能无卡密 code：服务端只认 uid（verifyVipOwner），
@@ -24566,24 +24643,33 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var code = lsGet(STORAGE.code) || '';
     setSyncStatus(navigator.onLine === false ? 'offline' : 'syncing');
     return ensureUid().then(function (uid) {
-      if (!uid) { setSyncStatus('local'); return 'BAILED'; } /* 未注册/登录过期：仅本机 */
+      if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); setSyncStatus(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
       return buildSnapshot().then(function (snap) {
         /* token 由后端 sync.js 取出 uid；此处只传 code + snapshot */
         return syncCloudGuarded('push', { code: code, snapshot: snap });
-      }).then(function (res) { return (res && res.ok) ? 'OK' : 'BAILED'; });
-    }).then(function (b) { setSyncStatus(navigator.onLine === false ? 'offline' : (b === 'OK' ? 'cloud' : 'local')); }).catch(function () { setSyncStatus('local'); });
+      }).then(function (res) {
+        if (res && res.ok) return 'OK';
+        mxSyncErr(res && res.msg ? res.msg : '推送未成功');
+        if (res && res.msg && /未登录/.test(res.msg)) { setSyncStatus('expired'); return 'BAILED'; }
+        return 'BAILED';
+      });
+    }).then(function (b) { if (b !== 'BAILED') setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
   }
   function pullCloud() {
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
     var code = lsGet(STORAGE.code) || '';
     setSyncStatus(navigator.onLine === false ? 'offline' : 'syncing');
     return ensureUid().then(function (uid) {
-      if (!uid) { setSyncStatus('local'); return 'BAILED'; } /* 未注册/登录过期：仅本机 */
+      if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); setSyncStatus(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
       return syncCloudGuarded('pull', { code: code }).then(function (res) {
-        if (res && res.ok && res.snapshot) return applySnapshot(res.snapshot).then(function () { return 'OK'; });
+        if (res && res.ok) {
+          if (res.snapshot) return applySnapshot(res.snapshot).then(function () { return 'OK'; });
+          return 'OK';
+        }
+        mxSyncErr(res && res.msg ? res.msg : '拉取未成功');
         return 'BAILED';
       });
-    }).then(function (b) { setSyncStatus(navigator.onLine === false ? 'offline' : (b === 'OK' ? 'cloud' : 'local')); }).catch(function () { setSyncStatus('local'); });
+    }).then(function (b) { if (b !== 'BAILED') setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
   }
   function startVipSync() {
     if (window.__mx_sync_started__) return;
