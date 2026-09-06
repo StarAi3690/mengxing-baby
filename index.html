@@ -17057,37 +17057,37 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.battleStarted = !!_saved.battleStarted;
         pvz.selected = null; _roundAwarded['pvz'] = false;
       } else if (!pvz.lawn.length) pvzInit();
-      /* [修复#351] 跨自然日自动推进天数：第二天及以后进入，按已过去的日历天数把进度推进（封顶第7天）。
-         规则与 pvzAdvanceDay 一致：每天新增 1~3 只僵尸、僵尸前进半格。对无法核验的历史日不做「吃掉植物」惩罚，保护花园。 */
+      /* [pvzfix-完整规则] 跨自然日自动推进：逐日核查那天任务完成情况（未完->吃植物+前进1格、完成->前进0.5格）；
+         收集被吃植物，进入后弹跨日战报汇总窗。复用 pvzStepOnce / pvzRunCrossDays / pvzShowCrossDayPopup。 */
+      var _crossP = Promise.resolve();
       if (!pvz.battleStarted && pvz.day < 7) {
         var _ld = pvz._lastDay || pvz._sunDay || pvzToday();
         var _ed = pvzDayDiff(_ld, pvzToday());
         if (_ed >= 1) {
           var _steps = Math.min(_ed, 7 - pvz.day);
-          for (var _si = 0; _si < _steps; _si++) {
-            pvz.day++;
-            pvz.sunMap = {};
-            var _add = 1 + Math.floor(Math.random() * 3);
-            for (var _aj = 0; _aj < _add; _aj++) pvz.zombies.push(pvzMkZombie(Math.floor(Math.random() * 5)));
-            pvz.zpos = Math.max(0, pvz.zpos - 0.5);
-          }
-          pvz._lastDay = pvzToday();
-          pvzSave();
+          _crossP = pvzRunCrossDays(cid, _ld, _steps).then(function (_eaten) {
+            pvz._lastDay = pvzToday();
+            pvzSave();
+            pvz._crossEaten = _eaten || [];
+          });
         }
       }
-      getPts(cid).then(function (p) {
-        pvz.sun = p;
-        buildPVZ(container);
-        startPVZTimers(container);
-        /* [pvzfix] 恢复存档中未收集的阳光：重新挂到场上等待收集（阳光常驻、跨日自动入账） */
-        try {
-          var _n = Math.min(pvz.sunPending || 0, 30);
-          for (var _si = 0; _si < _n; _si++) pvzSpawnSun(container);
-        } catch (e) {}
-        publishHome('pvz', pvz.day);
-        syncPvzPlants().then(function () {
-          if (container.querySelector('#mxg-pvz-lawn')) { buildPVZ(container); startPVZTimers(container); }
-        }).catch(function () {});
+      _crossP.then(function () {
+        getPts(cid).then(function (p) {
+          pvz.sun = p;
+          buildPVZ(container);
+          startPVZTimers(container);
+          /* [pvzfix] 恢复存档中未收集的阳光：重新挂到场上等待收集（阳光常驻、跨日自动入账） */
+          try {
+            var _n = Math.min(pvz.sunPending || 0, 30);
+            for (var _si = 0; _si < _n; _si++) pvzSpawnSun(container);
+          } catch (e) {}
+          publishHome('pvz', pvz.day);
+          syncPvzPlants().then(function () {
+            if (container.querySelector('#mxg-pvz-lawn')) { buildPVZ(container); startPVZTimers(container); }
+          }).catch(function () {});
+          if (pvz._crossEaten && pvz._crossEaten.length) { pvzShowCrossDayPopup(container, pvz._crossEaten); pvz._crossEaten = []; }
+        });
       });
     });
   }
@@ -17204,43 +17204,75 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var gBtn = container.querySelector('[data-act="guard"]');
     if (gBtn) gBtn.onclick = function () { pvzStartBattle(container); };
   }
+  /* [pvzfix-完整规则] 单日推进核心逻辑（与 pvzAdvanceDay 一致）：
+     done=true（当日基础任务全完成）-> 僵尸前进 0.5 格；done=false -> 前进 1 格并随机吃掉 1 株植物。
+     返回被吃掉的植物信息 {emoji,name} 或 null。每行攻击植物当天清除本行 1 只僵尸。 */
+  function pvzStepOnce(done) {
+    pvz.day++;
+    pvz.sunMap = {};
+    var add = 1 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < add; i++) pvz.zombies.push(pvzMkZombie(Math.floor(Math.random() * 5)));
+    var eaten = null;
+    if (!done) {
+      var cells = [];
+      for (var r = 0; r < 5; r++) for (var c = 0; c < 9; c++) if (pvz.lawn[r][c]) cells.push({ r: r, c: c });
+      if (cells.length) {
+        var pk = cells[Math.floor(Math.random() * cells.length)];
+        var pn = pvz.lawn[pk.r][pk.c];
+        pvz.lawn[pk.r][pk.c] = null;
+        eaten = { emoji: (pn && pn.emoji) || '🌱', name: (pn && pn.name) ? pn.name : '' };
+      }
+    }
+    for (var r2 = 0; r2 < 5; r2++) {
+      var shootersInRow = 0;
+      for (var c2 = 0; c < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && (pp.kind === 'pea' || pp.kind === 'ice' || pp.kind === 'bomb')) shootersInRow++; }
+      for (var k = 0; k < shootersInRow; k++) {
+        var cand = pvz.zombies.filter(function (z) { return z.row === r2; });
+        if (!cand.length) break;
+        pvz.zombies = pvz.zombies.filter(function (z) { return z !== cand[0]; });
+      }
+    }
+    pvz.zpos = Math.max(0, pvz.zpos - (done ? 0.5 : 1));
+    return eaten;
+  }
+  /* 任意日期的任务完成率（复用 getDailySchedule 按日期查询）；空日程视为已完成（无任务可完成） */
+  function pvzDayDoneRatio(cid, dateStr) {
+    return window.getDailySchedule(cid, dateStr).then(function (s) {
+      var items = (s && s.items) || [];
+      if (!items.length) return { total: 0, done: 0, allDone: true };
+      var done = items.filter(function (t) { return t.done; }).length;
+      return { total: items.length, done: done, allDone: done === items.length };
+    }).catch(function () { return { total: 0, done: 0, allDone: true }; });
+  }
+  /* 跨自然日：逐日推进（封顶第7天），每天按那天任务完成情况判定；收集被吃植物 */
+  function pvzRunCrossDays(cid, lastDay, steps) {
+    var keys = [];
+    for (var i = 1; i <= steps; i++) { var d = new Date(lastDay); d.setDate(d.getDate() + i); keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
+    var eatenAll = [];
+    var chain = Promise.resolve();
+    keys.forEach(function (key) {
+      chain = chain.then(function () { return pvzDayDoneRatio(cid, key).then(function (tc) { var done = !!(tc && tc.allDone); var eaten = pvzStepOnce(done); if (eaten) eatenAll.push(eaten); }); });
+    });
+    return chain.then(function () { return eatenAll; });
+  }
+  /* 进入游戏后弹跨日战报：说明为什么被吃、消掉的是谁 */
+  function pvzShowCrossDayPopup(container, eaten) {
+    if (!eaten || !eaten.length) return;
+    var lines = eaten.map(function (e) { return '· ' + (e.emoji || '🌱') + (e.name ? ' ' + e.name : ''); });
+    var body = '你离开的日子里，有 <b>' + eaten.length + '</b> 天没完成全部基础任务，僵尸趁机吃掉了花园里的植物：<br><br>' + lines.join('<br>') + '<br><br>💡 每天完成全部基础任务就能保护花园，僵尸也只前进半格哦~';
+    modal(container, '🧟 跨日战报·花园失守', body);
+  }
   /* 白天阶段：推进 1 天（应用每日规则）。返回 Promise，便于跳天时链式调用。 */
   function pvzAdvanceDay(container) {
     if (pvz.battleStarted) return Promise.resolve();
-    if (pvz.day >= 7) return Promise.resolve(); // 第 7 天由「开启守卫战」接管
-    pvz.day++;
-    pvz.sunMap = {}; // 新的一天，向日葵产量重置
-    // 每日随机新增 1~3 只僵尸（等级随机）
-    var add = 1 + Math.floor(Math.random() * 3);
-    for (var i = 0; i < add; i++) pvz.zombies.push(pvzMkZombie(Math.floor(Math.random() * 5)));
+    if (pvz.day >= 7) return Promise.resolve(); // 第 7 天由开启守卫战接管
     return todayDoneRatio(pvz.cid).then(function (tc) {
       var done = !!(tc && tc.allDone);
-      // 每日基础任务未完成 → 随机消失 1 株植物，并明确提示被吃掉的植物名称
-      if (!done) {
-        var cells = [];
-        for (var r = 0; r < 5; r++) for (var c = 0; c < 9; c++) if (pvz.lawn[r][c]) cells.push({ r: r, c: c });
-        if (cells.length) {
-          var pk = cells[Math.floor(Math.random() * cells.length)];
-          var pn = pvz.lawn[pk.r][pk.c];
-          pvz.lawn[pk.r][pk.c] = null;
-          modal(container, '🧟 僵尸吃掉了一株植物！', '「' + (pn && pn.emoji || '🌱') + (pn && pn.name ? ' ' + pn.name : '') + '」被吃掉了——完成今日全部基础任务才能保护花园哦~');
-        }
-      }
-      // 每个攻击类植物当天清除「本行」1 只僵尸（必须每行都布防才能守住；白天阶段为每日结算，非实时）
-      for (var r2 = 0; r2 < 5; r2++) {
-        var shootersInRow = 0;
-        for (var c2 = 0; c2 < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && (pp.kind === 'pea' || pp.kind === 'ice' || pp.kind === 'bomb')) shootersInRow++; }
-        for (var k = 0; k < shootersInRow; k++) {
-          var cand = pvz.zombies.filter(function (z) { return z.row === r2; });
-          if (!cand.length) break;
-          pvz.zombies = pvz.zombies.filter(function (z) { return z !== cand[0]; });
-        }
-      }
-      // 僵尸前进：完成任务当天只前进半格，否则前进 1 格
-      pvz.zpos = Math.max(0, pvz.zpos - (done ? 0.5 : 1));
+      var eaten = pvzStepOnce(done);
       beep(300);
       buildPVZ(container);
       publishHome('pvz', pvz.day);
+      if (eaten) modal(container, '🧟 僵尸吃掉了一株植物！', '「' + (eaten.emoji || '🌱') + (eaten.name ? ' ' + eaten.name : '') + '」被吃掉了——完成今日全部基础任务才能保护花园哦~');
     });
   }
   /* 测试用：跳到指定天数（预览第 2~7 天状态），逐日应用规则 */
@@ -20619,7 +20651,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           impPanel.innerHTML = '<p style="color:#666;font-size:12px;padding:8px 0">正在加载导入面板…</p>';
           try {
             if (!window.renderImportPanel) { impPanel.innerHTML = '<p style="color:#e0533d;padding:8px 0">❌ 导入模块未加载，请刷新页面重试</p>'; return; }
-            window.renderImportPanel();
+            /* [修复#357] 必须显式传入 impPanel 作为 host：renderImportPanel 默认优先写设置页的 #import-panel-body（常驻 DOM），
+               导致家长工作台面板永远停在「正在加载…」——这正是「点击无反应」的根因 */
+            window.renderImportPanel(impPanel);
           } catch (e) { impPanel.innerHTML = '<p style="color:#e0533d;padding:8px 0">❌ 导入面板打开失败：' + (e && e.message || e) + '</p>'; console.error('[import] renderImportPanel 失败', e); }
         } else {
           impPanel.style.display = 'none';
