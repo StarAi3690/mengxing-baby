@@ -10044,8 +10044,6 @@ window.DB = {
 
       children: [
 
-        { id: 'tool-rescenter', label: '资源中心·导入', icon: '📥', page: 'page-resource-center' },
-
         { id: 'tool-resources', label: '免费资源', icon: '📦', page: 'page-tool-resources' },
 
         { id: 'tool-pinyin', label: '拼音拼读生成器', icon: '✍️', page: 'page-tool-pinyin' },
@@ -10439,7 +10437,7 @@ window.DB = {
 
     'page-tool-resources': { title: '免费资源', desc: '幼小衔接福利资源库：点读包、绘本PDF、练习册PDF等，免费获取下载。', icon: '📦', tag: '智能工具' },
 
-    'page-resource-center': { title: '资源中心', desc: '全模块傻瓜式导入：上传本地文件夹自动归类到古诗/识字/拼音/英语/数学/熏听等模块，文件保存在本设备，不消耗云端。', icon: '📥', tag: '唯一导入入口' },
+    'page-resource-center': { title: '资源中心', desc: '全模块傻瓜式导入：上传本地文件夹自动归类到古诗/识字/拼音/英语/数学/熏听等模块，文件保存在本设备，不消耗云端。（主入口：家长工作台 → 📥 资源中心）', icon: '📥', tag: '家长专属' },
 
     'page-tool-pinyin': { title: '拼音拼读生成器', desc: '输入任意文字/词组，生成带声调标注的拼音拼读卡，支持逐字与全文 TTS 发音。', icon: '✍️', tag: '智能工具·已实装' },
 
@@ -20645,9 +20643,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="calendar">🗓️ 个人日历·日程</button>' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="tasks">🗂️ 学习任务·套组</button>' +
-      '<button type="button" class="mx-btn mx-btn-main" id="pt-import-btn">📥 自主导入</button>' +
+      '<button type="button" class="mx-btn mx-btn-main" data-ptab="resources">📥 资源中心</button>' +
     '</div>';
-    h += '<div id="pt-import-panel" style="display:none;margin-top:10px"></div>';
     h += '<div class="mx-sub-t" style="font-size:13px;font-weight:700;margin:6px 0 6px">🆘 异常任务处理（今日）</div>';
     h += '<div id="pt-exception-tasks" style="font-size:12.5px;color:#8a93a6">加载中…</div>';
     h += '</div>';
@@ -20666,6 +20663,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<button type="button" class="mx-tab on" data-ptab="home">' + (_tabL.home || '工作台主页') + '</button>' +
       '<button type="button" class="mx-tab" data-ptab="calendar">🗓️ ' + (_tabL.calendar || '个人日历·日程') + '</button>' +
       '<button type="button" class="mx-tab" data-ptab="tasks">🗂️ ' + (_tabL.tasks || '学习任务·套组') + '</button>' +
+      '<button type="button" class="mx-tab" data-ptab="resources">📥 资源中心</button>' +
       '</div>';
     s.innerHTML = _tabBar + '<div id="mx-parent-home">' + h + '</div>' + '<div id="mx-parent-tab-body" style="display:none"></div>';
 
@@ -20676,30 +20674,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     s.querySelectorAll('[data-ptab]').forEach(function (b) {
       b.onclick = function () { switchParentTab(b.getAttribute('data-ptab')); };
     });
-    /* [修复#345] 工具箱「自主导入」按钮：展开/收起导入面板 */
-    (function () {
-      var impBtn = s.querySelector('#pt-import-btn');
-      var impPanel = s.querySelector('#pt-import-panel');
-      if (!impBtn || !impPanel) { console.warn('[import] 按钮或面板未找到', !!impBtn, !!impPanel); return; }
-      var impOpen = false;
-      impBtn.onclick = function () {
-        impOpen = !impOpen;
-        if (impOpen) {
-          impPanel.style.display = 'block';
-          impBtn.classList.add('mx-btn-active');
-          impPanel.innerHTML = '<p style="color:#666;font-size:12px;padding:8px 0">正在加载导入面板…</p>';
-          try {
-            if (!window.renderImportPanel) { impPanel.innerHTML = '<p style="color:#e0533d;padding:8px 0">❌ 导入模块未加载，请刷新页面重试</p>'; return; }
-            /* [修复#357] 必须显式传入 impPanel 作为 host：renderImportPanel 默认优先写设置页的 #import-panel-body（常驻 DOM），
-               导致家长工作台面板永远停在「正在加载…」——这正是「点击无反应」的根因 */
-            window.renderImportPanel(impPanel);
-          } catch (e) { impPanel.innerHTML = '<p style="color:#e0533d;padding:8px 0">❌ 导入面板打开失败：' + (e && e.message || e) + '</p>'; console.error('[import] renderImportPanel 失败', e); }
-        } else {
-          impPanel.style.display = 'none';
-          impBtn.classList.remove('mx-btn-active');
-        }
-      };
-    })();
+    /* [资源中心#358] 旧「自主导入」按钮/面板已下线（2026-09-06 用户决策）：统一走家长工作台「📥 资源中心」Tab，
+       避免两个导入入口并存造成困惑。renderImportPanel 保留（设置页仍引用）。 */
     (function () {
       var exBox = s.querySelector('#pt-exception-tasks'); if (!exBox) return;
       function esc2(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -20818,6 +20794,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         bodyEl.innerHTML = '<div class="mx-empty" style="padding:22px;text-align:center;color:#9aa">加载中…</div>';
         if (tab === 'calendar') { window.__parentCalMount = bodyEl; if (window.renderMyCalendar) window.renderMyCalendar(); }
         else if (tab === 'tasks') { window.__parentTaskMount = bodyEl; if (window.__mxRenderTasksets) window.__mxRenderTasksets(); }
+        else if (tab === 'resources') { /* [资源中心#358] 显式传 host（红线#357：禁依赖 getElementById 全局查找） */ if (window.MX_RESOURCE_CENTER && window.MX_RESOURCE_CENTER.render) { try { window.MX_RESOURCE_CENTER.render(bodyEl); } catch (e) { bodyEl.innerHTML = '<div class="mx-empty" style="padding:22px;text-align:center;color:#c0392b">❌ 资源中心加载失败：' + (e && e.message || e) + '</div>'; } } else { bodyEl.innerHTML = '<div class="mx-empty" style="padding:22px;text-align:center;color:#9aa">资源中心模块未加载，请刷新页面重试</div>'; } }
       }
     }
   }
@@ -22662,9 +22639,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).catch(function(){ if (window.showToast) window.showToast('⚠️ 预览失败'); });
   }
 
-  /* 页面渲染 */
-  function renderResourceCenter(){
-    var page = document.getElementById('page-resource-center');
+  /* 页面渲染（hostOverride：家长工作台 Tab 内嵌时显式传入容器；红线#357） */
+  var _rcHost = null;
+  function renderResourceCenter(hostOverride){
+    var page = hostOverride || document.getElementById('page-resource-center');
+    _rcHost = page;
     if (!page) return;
     page.innerHTML =
       '<div class="section-header" style="margin-bottom:14px">'
@@ -22724,9 +22703,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     renderResList();
   }
 
-  /* 已导入列表：按模块分组 + 统计 chips + 预览/删除 */
+  /* 已导入列表：按模块分组 + 统计 chips + 预览/删除（host 跟随最近一次 renderResourceCenter） */
   function renderResList(){
-    var page = document.getElementById('page-resource-center');
+    var page = _rcHost || document.getElementById('page-resource-center');
     if (!page) return;
     var chipsBox = page.querySelector('#res-stat-chips');
     var listBox = page.querySelector('#res-list');
@@ -22775,7 +22754,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).catch(function(){ listBox.innerHTML = '<div class="empty-tip">资源列表加载失败</div>'; });
   }
 
-  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup };
+  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup };
 })();
 
 </script>
