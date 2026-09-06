@@ -7096,6 +7096,14 @@ html, body {
                 if (cid && cid !== 'default' && window.DB && window.DB.get) {
                   try { var ch = await window.DB.get('children', cid); if (ch && ch.name) name = ch.name; } catch (e) {}
                 }
+                /* [#361] 兜底：activeChildId 缺失（存量设备/云同步恢复）时取第一个孩子的名字，
+                   避免「第一个创建的宝宝改了名，标题仍只显示萌星宝宝」 */
+                if (!name && window.DB && window.DB.getAll) {
+                  try {
+                    var kids = await window.DB.getAll('children');
+                    if (kids && kids.length && kids[0] && kids[0].name) name = kids[0].name;
+                  } catch (e2) {}
+                }
                 if (name) {
                   el.innerHTML = escName(name) + '的学习园地<span style="font-size:.6em;opacity:.72;font-weight:700;margin-left:2px;letter-spacing:.5px">·萌星宝宝</span>';
                 } else {
@@ -7110,7 +7118,7 @@ html, body {
 
       </div>
 
-      <div class="header-center" data-page-node-id="HLOAztADTczWUqpSR9xskF">
+      <div class="header-center" id="header-center" data-page-node-id="HLOAztADTczWUqpSR9xskF">
 
         <!-- 预留：顶部公告栏 / 弹幕 -->
 
@@ -15699,9 +15707,14 @@ window.MX_SEED = data;
     if (cloud && cloud.enabled && cloud.text) { paintAnnouncement(box, cloud); return; }
     // 回退：本机本地配置（DB.getSetting('announcement')）
     DB.getSetting('announcement', null).then(function (cfg) {
-      if (!cfg || !cfg.enabled || !cfg.text) { box.innerHTML = ''; return; }
+      if (!cfg || !cfg.enabled || !cfg.text) {
+        /* [#362] 默认欢迎滚动条：无任何公告时也让「公告栏位置」可见（就在标题「XX的学习园地·萌星宝宝」旁边），
+           管理后台「📢 全站公告」发布后自动覆盖为真实公告 */
+        paintAnnouncement(box, { text: '欢迎来到萌星宝宝 · 快乐启蒙，每天进步一点点 🌈' });
+        return;
+      }
       paintAnnouncement(box, cfg);
-    }).catch(function () { box.innerHTML = ''; });
+    }).catch(function () { paintAnnouncement(box, { text: '欢迎来到萌星宝宝 · 快乐启蒙，每天进步一点点 🌈' }); });
   }
   window.renderAnnouncement = renderAnnouncement;
 
@@ -20012,7 +20025,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<button class="sp-btn sp-btn-ghost gx-click" data-act="reshuffle">🔀 换一套运动</button>' +
       '</div>' +
       '<div class="sp-plan">' + cards + '</div>' +
-      '<div class="content-section-title sm">📚 动作要领库 <span class="sub">点任意动作听语音讲解</span></div>' +
+      '<div class="content-section-title sm">📚 动作要领库 <span class="sub">点任意动作展开卡片：听要领 · 倒计时开练</span></div>' +
+      '<div id="sp-lib-card"></div>' +
       '<div class="sp-lib">' + libGrid + '</div>';
 
     renderStats(doneMap);
@@ -20021,9 +20035,36 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     page.querySelector('.sp-lib').onclick = function (e) {
       var b = e.target.closest('[data-sp-lib]'); if (!b) return;
       var nm = b.getAttribute('data-sp-lib');
-      // 在 LIB 里找对应 tip
-      outer: for (var k in LIB) { for (var j = 0; j < LIB[k].items.length; j++) { if (LIB[k].items[j].n === nm) { speak(LIB[k].items[j].n + '。' + LIB[k].items[j].tip); break outer; } } }
+      // [#366] 点击动作 → 展开运动卡片（播报要领 + 倒计时开始），替代原先的直接语音播报
+      var found = null, fkey = '';
+      outer: for (var k in LIB) { for (var j = 0; j < LIB[k].items.length; j++) { if (LIB[k].items[j].n === nm) { found = LIB[k].items[j]; fkey = k; break outer; } } }
+      if (found) showLibCard(page, fkey, found);
     };
+  }
+
+  /* [#366] 要领库展开卡片：同「每日运动排期」卡片样式（图标+名称+要领+播报+倒计时），完成得 3 分 */
+  function showLibCard(page, key, it) {
+    var wrap = page.querySelector('#sp-lib-card');
+    if (!wrap) return;
+    var uidv = 'lib_' + key + '_' + it.n;
+    if (timers[uidv]) stopTimer(uidv);
+    var holder = document.createElement('div');
+    holder.innerHTML = cardHTML({ uid: uidv, n: it.n, icon: it.icon, dur: it.dur, rep: it.rep, tip: it.tip, color: LIB[key].color }, false);
+    wrap.innerHTML = '';
+    wrap.appendChild(holder.firstChild);
+    var card = wrap.querySelector('[data-sp-card]');
+    var spk = card.querySelector('[data-act="speak"]');
+    var st = card.querySelector('[data-act="start"]');
+    if (spk) spk.onclick = function () { speak(it.n + '。' + it.tip); };
+    if (st) st.onclick = function () {
+      startTimer(uidv, it.dur, function () {
+        toast('🎉 太棒了！「' + it.n + '」完成！');
+        try {
+          cidOf().then(function (cid) { return DB.addPoints(cid, 3, '要领库练习:' + it.n); }).then(function () { toast('要领库练习 +3 分 ⭐'); }).catch(function () {});
+        } catch (e) {}
+      });
+    };
+    try { wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
   }
 
   function init() {
@@ -22436,6 +22477,46 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     { key:'lchinese',    label:'熏听·国学',  icon:'🀄' }
   ];
   function resModLabel(k){ for (var i=0;i<RES_MODULES.length;i++) if (RES_MODULES[i].key===k) return RES_MODULES[i]; return { key:k||'other', label:k||'其他', icon:'📁' }; }
+
+  /* [#364] 手动归类：弹出 13 模块菜单，改写资源归属（导入时未识别到的补救通道） */
+  function resRecatMenu(resId, anchorBtn){
+    window.DB.getAll('resources').then(function(all){
+      var rec = (all||[]).filter(function(r){ return r && r.id === resId; })[0];
+      if (!rec) { if (window.showToast) window.showToast('未找到该资源'); return; }
+      var old = resModLabel(rec.module);
+      var items = RES_MODULES.map(function(m){
+        return '<button data-recat-key="' + m.key + '" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:9px 12px;border:none;border-bottom:1px solid #f2f4f8;background:' + (m.key===rec.module ? '#f0f7ff' : '#fff') + ';font-size:13.5px;color:' + (m.key===rec.module ? '#1f6fd9;font-weight:700' : '#333') + ';cursor:pointer;text-align:left">'
+          + '<span style="font-size:17px">' + m.icon + '</span><span style="flex:1">' + resEsc(m.label) + '</span>' + (m.key===rec.module ? '<span style="font-size:11px;color:#1f6fd9">当前</span>' : '') + '</button>';
+      }).join('');
+      var mask = document.createElement('div');
+      mask.style.cssText = 'position:fixed;inset:0;background:rgba(15,35,70,.45);z-index:10050;display:flex;align-items:center;justify-content:center';
+      mask.innerHTML = '<div style="width:min(92vw,360px);max-height:78vh;overflow:auto;background:#fff;border-radius:16px;padding:14px">'
+        + '<div style="font-size:15px;font-weight:800;color:#1f3a5f;margin-bottom:4px">📦 调整归属模块</div>'
+        + '<div style="font-size:12px;color:#8a97a8;margin-bottom:10px;word-break:break-all">' + resEsc(rec.title || rec.original_filename || resId) + '</div>'
+        + '<div style="font-size:12px;color:#8a97a8;margin-bottom:8px">当前：' + old.icon + ' ' + resEsc(old.label) + '　→　点击目标模块：</div>'
+        + items
+        + '<button id="recat-cancel" style="width:100%;margin-top:10px;padding:10px;border:1px solid #d5e3f7;border-radius:10px;background:#f3f6fb;color:#5b6b80;font-size:13.5px;cursor:pointer">取消</button>'
+        + '</div>';
+      document.body.appendChild(mask);
+      function close(){ if (mask.parentNode) mask.parentNode.removeChild(mask); }
+      mask.querySelector('#recat-cancel').onclick = close;
+      mask.addEventListener('click', function(ev){ if (ev.target === mask) close(); });
+      mask.querySelectorAll('[data-recat-key]').forEach(function(b){
+        b.onclick = function(){
+          var nk = b.getAttribute('data-recat-key');
+          if (nk === rec.module) { close(); return; }
+          rec.module = nk;
+          var m = resModLabel(nk);
+          rec.category = m.label;
+          window.DB.putResource(rec).then(function(){
+            close();
+            if (window.showToast) window.showToast('✅ 已归类到「' + m.label + '」，模块页即可看到');
+            renderResList();
+          }).catch(function(e){ if (window.showToast) window.showToast('归类失败：' + (e && e.message || e)); });
+        };
+      });
+    });
+  }
   function resEsc(x){ return String(x==null?'':x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function resFmtSize(n){ if(!n) return '0KB'; if(n<1048576) return Math.max(1,Math.round(n/1024))+'KB'; return (n/1048576).toFixed(1)+'MB'; }
 
@@ -22694,6 +22775,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* 页面渲染（hostOverride：家长工作台 Tab 内嵌时显式传入容器；红线#357） */
   var _rcHost = null;
+  var _resSearchKw = '';   /* [#363] 已导入资源列表搜索关键词 */
   function renderResourceCenter(hostOverride){
     var page = hostOverride || document.getElementById('page-resource-center');
     _rcHost = page;
@@ -22710,11 +22792,31 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       +     '<div style="font-size:30px">📁</div><div style="flex:1"><b>模式一：上传本地文件夹（推荐）</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">整包选择电脑/手机里的学习资源文件夹，自动按文件名归类到对应模块</div></div>'
       +     '<button class="btn mx-btn-main" id="res-btn-folder" style="white-space:nowrap">选择文件夹</button>'
       +   '</div>'
+      +   '<div id="res-naming-guide" style="display:none;background:#fffdf5;border:1px solid #f0e0b0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#5d4a1a;line-height:2">'
+      +     '<b>📋 文件命名指引</b>（文件名里带上关键词，系统自动归类到对应模块）：<br/>'
+      +     '<b>语文</b>：'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">古诗_静夜思.mp3</code> 含「古诗/诗词」→ 古诗　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">识字_基础100字.pdf</code> 含「识字/生字/汉字/字卡」→ 识字　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">拼音_声母韵母.mp3</code> 含「拼音/声母/韵母」→ 拼音　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">绘本_猜猜我有多爱你.pdf</code> 含「绘本/story」→ 绘本<br/>'
+      +     '<b>英语</b>：'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">自然拼读_PhonicsA.mp3</code> 含「自然拼读/phonics/单词」→ 自然拼读　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">单词_sight-words.pdf</code> 含「单词/words」→ 英语单词<br/>'
+      +     '<b>熏听</b>：'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">分级_Raz-A-01.mp3</code> 含「分级/Raz/牛津树/海尼曼」→ 熏听英语　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">儿歌_Twinkle.mp3</code> 含「儿歌/sss/童谣/song」→ 儿歌　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">国学_三字经.mp3</code> 含「国学/三字经/论语」→ 熏听语文<br/>'
+      +     '<b>数学</b>：'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">数学_凑十法.mp3</code> 含「数学/口算/凑十/奥数」→ 数学　'
+      +       '<code style="background:#f6f2e6;border-radius:5px;padding:1px 6px">练习册_口算天天练.pdf</code> 含「练习/练习册/卷子」→ 练习册<br/>'
+      +     '<span style="color:#a08a50">💡 支持格式：音频 mp3/m4a/wav、视频 mp4/mov、图片 jpg/png、文档 pdf/ppt。名字里没有关键词也没关系，导入后可在下方列表点「归类」手动调整。</span>'
+      +   '</div>'
+      +   '<div style="margin-top:6px"><button class="btn" id="res-btn-guide" style="font-size:12px;padding:3px 12px;border:1px solid #d9c98a;color:#8a7430;background:#fffdf5;border-radius:8px">📋 查看文件命名指引</button></div>'
       +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:2px dashed #7ec850;border-radius:12px;background:#f2faf0">'
       +     '<div style="font-size:30px">📊</div><div style="flex:1"><b>模式二：Excel 表格导入（VIP 专属）</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">下载 CSV 模板 → 用 Excel/WPS 填写资源名称和网盘链接 → 上传，自动挂到模块；支持云端多设备同步</div></div>'
       +     '<div style="display:flex;flex-direction:column;gap:6px;white-space:nowrap"><button class="btn" id="res-btn-csv-tpl" style="white-space:nowrap">⬇️ 下载模板</button><button class="btn mx-btn-main" id="res-btn-csv" style="white-space:nowrap">📤 上传表格</button></div>'
       +   '</div>'
-      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
+      +   '<div style="display:none;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
       +     '<div style="font-size:30px">☁️</div><div style="flex:1"><b>模式三：粘贴网盘链接</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">粘贴百度网盘/阿里云盘分享链接，一键保存到资源列表，随时跳转下载</div></div>'
       +   '</div>'
       +   '<div id="res-link-row" style="display:none;gap:8px;margin-top:2px">'
@@ -22728,6 +22830,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '</div>'
       /* 已导入总览 */
       + '<div class="mx-card"><div class="mx-card-t">📚 已导入资源 <span id="res-total-badge" style="font-size:12px;color:#9aa;font-weight:400"></span></div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="res-search" placeholder="🔍 输入关键词，快速定位已导入的资源…" style="flex:1;padding:8px 12px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px;outline:none" /></div>'
       + '<div id="res-stat-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>'
       + '<div id="res-list" style="max-height:340px;overflow:auto"><div class="empty-tip" style="font-size:13px">加载中…</div></div>'
       + '<div style="font-size:12px;color:#9aa;margin-top:8px">💡 免费用户与 VIP 均可无限本地导入；数据仅存本机 IndexedDB，不产生任何云端费用。导入后进入对应学习模块（古诗/识字/拼音/绘本/英语/数学/熏听），页内即可直接播放。</div>'
@@ -22737,6 +22840,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var btn = page.querySelector('#res-btn-folder');
     var step1 = page.querySelector('#res-step1');
     var prog = page.querySelector('#res-progress');
+    /* [#362] 文件命名指引折叠 */
+    var guideBtn = page.querySelector('#res-btn-guide');
+    var guideBox = page.querySelector('#res-naming-guide');
+    if (guideBtn && guideBox) guideBtn.onclick = function(){ guideBox.style.display = (guideBox.style.display === 'none') ? 'block' : 'none'; guideBtn.textContent = (guideBox.style.display === 'none') ? '📋 查看文件命名指引' : '📋 收起命名指引'; };
     if (btn && input) {
       btn.onclick = function(){ input.click(); };
       if (step1) step1.onclick = function(ev){ if (ev.target !== btn) input.click(); };
@@ -22819,24 +22926,40 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
   }
 
-  /* 已导入列表：按模块分组 + 统计 chips + 预览/删除（host 跟随最近一次 renderResourceCenter） */
+  /* 已导入列表：按模块分组 + 统计 chips + 预览/删除/手动归类/搜索（host 跟随最近一次 renderResourceCenter） */
   function renderResList(){
     var page = _rcHost || document.getElementById('page-resource-center');
     if (!page) return;
     var chipsBox = page.querySelector('#res-stat-chips');
     var listBox = page.querySelector('#res-list');
+    var searchBox = page.querySelector('#res-search');
     if (!listBox) return;
+    /* [#363] 搜索框绑定（防重复绑定用 data-sg 标记） */
+    if (searchBox && !searchBox.getAttribute('data-sg')) {
+      searchBox.setAttribute('data-sg', '1');
+      searchBox.oninput = function(){ _resSearchKw = (searchBox.value || '').trim().toLowerCase(); renderResList(); };
+      if (_resSearchKw) searchBox.value = _resSearchKw;
+    }
     window.DB.getAll('resources').then(function(all){
       var rows = (all||[]).filter(function(r){ return r && (r.source === 'folder-import' || r.source === 'csv-link' || r.source === 'cloud-link'); });
+      /* [#363] 关键词过滤（匹配资源名/原始文件名/模块名） */
+      if (_resSearchKw) {
+        rows = rows.filter(function(r){
+          var hay = ((r.title || '') + ' ' + (r.original_filename || '') + ' ' + resModLabel(r.module).label).toLowerCase();
+          return hay.indexOf(_resSearchKw) >= 0;
+        });
+      }
+      var allCount = (all||[]).filter(function(r){ return r && (r.source === 'folder-import' || r.source === 'csv-link' || r.source === 'cloud-link'); }).length;
       rows.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
       var byMod = {}, totalSize = 0;
       rows.forEach(function(r){ byMod[r.module] = (byMod[r.module]||0)+1; totalSize += (r.size||0); });
       if (chipsBox) {
-        var chips = ['<span style="font-size:12px;background:#f0f7ff;color:#1f3a5f;border-radius:10px;padding:3px 10px">共 '+rows.length+' 个 · '+resFmtSize(totalSize)+'</span>'];
+        var chips = ['<span style="font-size:12px;background:#f0f7ff;color:#1f3a5f;border-radius:10px;padding:3px 10px">'+(_resSearchKw ? '匹配 '+rows.length : '共 '+allCount+' 个 · '+resFmtSize(totalSize))+'</span>'];
         Object.keys(byMod).forEach(function(k){ var m = resModLabel(k); chips.push('<span style="font-size:12px;background:#fff;border:1px solid #e3e8f0;border-radius:10px;padding:3px 10px">'+m.icon+' '+resEsc(m.label)+' '+byMod[k]+'</span>'); });
         chipsBox.innerHTML = chips.join('');
       }
-      if (!rows.length) { listBox.innerHTML = '<div class="empty-tip" style="font-size:13px">还没有导入过资源，用上面的「选择文件夹」试试吧 🚀</div>'; return; }
+      if (!allCount) { listBox.innerHTML = '<div class="empty-tip" style="font-size:13px">还没有导入过资源，用上面的「选择文件夹」试试吧 🚀</div>'; return; }
+      if (!rows.length) { listBox.innerHTML = '<div class="empty-tip" style="font-size:13px">没有匹配「'+resEsc(_resSearchKw)+'」的资源，换个关键词试试</div>'; return; }
       var html = '';
       Object.keys(byMod).forEach(function(k){
         var m = resModLabel(k);
@@ -22852,6 +22975,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             + '<span style="flex:1;font-size:13px;' + (isLink ? 'color:#5b6b80' : 'cursor:pointer;color:#1f3a5f') + '"' + (isLink ? '' : ' data-res-pv="' + resEsc(r.id) + '" title="点击预览"') + '>' + (isLink ? '🔗 ' : '▶ ') + resEsc(r.title||r.original_filename) + '</span>'
             + '<span style="font-size:11.5px;color:#9aa;white-space:nowrap">' + (isLink ? resEsc((r.tags && r.tags[0]) || '网盘') : resFmtSize(r.size)) + '</span>'
             + actionHtml
+            /* [#364] 手动归类：导入时没识别到，可手动调整归属模块 */
+            + '<button class="btn" data-res-recat="' + resEsc(r.id) + '" style="font-size:11px;padding:2px 8px;border:1px solid #c9d8f0;color:#1f3a5f;background:#f7faff;border-radius:6px;white-space:nowrap">📦 归类</button>'
             + '<button class="btn" data-res-del="' + resEsc(r.id) + '" style="font-size:11px;padding:2px 8px;border:1px solid #f0b4ad;color:#c0392b;background:#fff;border-radius:6px">删除</button>'
             + '</div>';
         });
@@ -22859,6 +22984,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       listBox.innerHTML = html;
       listBox.querySelectorAll('[data-res-pv]').forEach(function(el){
         el.onclick = function(){ resPreview(el.getAttribute('data-res-pv')); };
+      });
+      /* [#364] 手动归类菜单 */
+      listBox.querySelectorAll('[data-res-recat]').forEach(function(el){
+        el.onclick = function(){ resRecatMenu(el.getAttribute('data-res-recat'), el); };
       });
       listBox.querySelectorAll('[data-res-link]').forEach(function(el){
         el.onclick = function(){
@@ -22921,7 +23050,84 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (u) { try { window.open(u, '_blank'); } catch (e) { location.href = u; } }
       return;
     }
+    /* [#365] 模块内学习已导入资源 → 计积分（同资源每天首次播放 +2，防连点刷分） */
+    try {
+      var _d = new Date(), _today = _d.getFullYear() + '-' + (_d.getMonth()+1) + '-' + _d.getDate();
+      var _k = 'mx_res_pts_' + r.id + '_' + _today;
+      if (!localStorage.getItem(_k)) {
+        localStorage.setItem(_k, '1');
+        Promise.resolve(window.DB && window.DB.getActiveChildId ? window.DB.getActiveChildId() : Promise.resolve('default')).then(function(cid){
+          return window.DB.addPoints(cid || 'default', 2, '学习导入资源·' + (r.title || r.original_filename || ''));
+        }).then(function(){ try { if (window.__refreshCoinBanner) window.__refreshCoinBanner(); } catch (e2) {} }).catch(function(){});
+      }
+    } catch (ePts) {}
     resPreview(r.id);
+  }
+  /* [#365] 熏听类导入资源 → 一键创建排期任务（进入每日排期表，按 repeat 周期提醒） */
+  function modResSchedule(r, anchorEl){
+    if (!r) return;
+    var xtSubject = '熏听';
+    var mask = document.createElement('div');
+    mask.style.cssText = 'position:fixed;inset:0;background:rgba(15,35,70,.45);z-index:10050;display:flex;align-items:center;justify-content:center';
+    mask.innerHTML = '<div style="width:min(92vw,360px);background:#fff;border-radius:16px;padding:16px">'
+      + '<div style="font-size:15px;font-weight:800;color:#1f3a5f;margin-bottom:4px">📅 创建熏听排期</div>'
+      + '<div style="font-size:12px;color:#8a97a8;margin-bottom:12px;word-break:break-all">' + resEsc(r.title || r.original_filename || '') + '</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">'
+      +   '<label style="font-size:13px;color:#5b6b80;white-space:nowrap">开始时间</label>'
+      +   '<input type="time" id="mxrs-time" value="19:30" style="flex:1;padding:8px;border:1px solid #d5e3f7;border-radius:8px;font-size:13px"/>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">'
+      +   '<label style="font-size:13px;color:#5b6b80;white-space:nowrap">时长(分)</label>'
+      +   '<input type="number" id="mxrs-dur" value="15" min="5" max="60" step="5" style="flex:1;padding:8px;border:1px solid #d5e3f7;border-radius:8px;font-size:13px"/>'
+      + '</div>'
+      + '<div style="font-size:13px;color:#5b6b80;margin-bottom:6px">重复</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="mxrs-rep">'
+      +   '<button data-rep="daily" class="btn mx-btn-main" style="font-size:12px;padding:4px 12px">每天</button>'
+      +   '<button data-rep="weekdays" class="btn" style="font-size:12px;padding:4px 12px;border:1px solid #d5e3f7;color:#5b6b80;background:#fff">工作日</button>'
+      +   '<button data-rep="weekend" class="btn" style="font-size:12px;padding:4px 12px;border:1px solid #d5e3f7;color:#5b6b80;background:#fff">周末</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:10px">'
+      +   '<button id="mxrs-cancel" style="flex:1;padding:10px;border:1px solid #d5e3f7;border-radius:10px;background:#f3f6fb;color:#5b6b80;font-size:13.5px;cursor:pointer">取消</button>'
+      +   '<button id="mxrs-ok" style="flex:1.4;padding:10px;border:none;border-radius:10px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:13.5px;font-weight:700;cursor:pointer">创建</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(mask);
+    var rep = 'daily';
+    mask.querySelectorAll('#mxrs-rep [data-rep]').forEach(function(b){
+      b.onclick = function(){
+        rep = b.getAttribute('data-rep');
+        mask.querySelectorAll('#mxrs-rep [data-rep]').forEach(function(x){
+          x.style.border = '1px solid #d5e3f7'; x.style.color = '#5b6b80'; x.style.background = '#fff'; x.classList.remove('mx-btn-main');
+        });
+        b.style.border = 'none'; b.style.color = '#fff'; b.style.background = 'linear-gradient(90deg,#4facfe,#3f7ef5)'; b.classList.add('mx-btn-main');
+      };
+    });
+    mask.querySelector('#mxrs-cancel').onclick = function(){ if (mask.parentNode) mask.parentNode.removeChild(mask); };
+    mask.addEventListener('click', function(ev){ if (ev.target === mask && mask.parentNode) mask.parentNode.removeChild(mask); });
+    mask.querySelector('#mxrs-ok').onclick = function(){
+      var time = mask.querySelector('#mxrs-time').value || '19:30';
+      var dur = parseInt(mask.querySelector('#mxrs-dur').value, 10) || 15;
+      var rpt = rep === 'weekdays' ? { mon:true,tue:true,wed:true,thu:true,fri:true }
+              : rep === 'weekend' ? { sat:true,sun:true } : { daily:true };
+      var nameTxt = '熏听：' + (r.title || r.original_filename || '导入资源');
+      Promise.resolve(window.DB && window.DB.getActiveChildId ? window.DB.getActiveChildId() : Promise.resolve('default')).then(function(cid){
+        return window.DB.addScheduleTask({
+          childId: cid || 'default',
+          name: nameTxt,
+          subject: xtSubject,
+          duration: dur,
+          time: time,
+          repeat: rpt,
+          module: r.module || 'lchinese',
+          task: nameTxt
+        });
+      }).then(function(){
+        if (mask.parentNode) mask.parentNode.removeChild(mask);
+        if (window.showToast) window.showToast('✅ 已创建熏听排期（' + time + (rep==='daily' ? ' · 每天' : rep==='weekdays' ? ' · 工作日' : ' · 周末') + '），可在「每日排期」查看');
+      }).catch(function(e){
+        if (window.showToast) window.showToast('创建失败：' + (e && e.message || e));
+      });
+    };
   }
   /* 音频连播小播放器（熏听场景：儿歌/分级播完自动下一首） */
   var _qOv = null, _qUrl = null;
@@ -22989,8 +23195,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var html = '';
       rows.forEach(function(r){
         var isLink = r.mediaType === 'link' && (r.externalLink || r.linkUrl);
+        var isXt = /^(listen-en|listen-music|lchinese)$/.test(r.module || '');   /* [#365] 熏听类可一键排期 */
         html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
           + '<span data-mrp="' + resEsc(r.id) + '" style="flex:1;font-size:13px;cursor:pointer;color:#1f3a5f">' + resMediaIcon(r) + ' ' + resEsc(r.title || r.original_filename || '未命名资源') + '</span>'
+          + (isXt ? '<button class="btn" data-mrs="' + resEsc(r.id) + '" title="创建熏听排期任务" style="font-size:11px;padding:2px 8px;border:1px solid #c9d8f0;color:#1f3a5f;background:#f7faff;border-radius:6px;white-space:nowrap">📅 排期</button>' : '')
           + '<span style="font-size:11.5px;color:#9aa;white-space:nowrap">' + (isLink ? resEsc((r.tags && r.tags[0]) || '网盘') : resFmtSize(r.size)) + '</span>'
           + '</div>';
       });
@@ -23010,6 +23218,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           var rec = null;
           for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { rec = rows[i]; break; }
           modResPlay(rec);
+        };
+      });
+      /* [#365] 熏听排期按钮 */
+      box.querySelectorAll('[data-mrs]').forEach(function(el){
+        el.onclick = function(){
+          var id = el.getAttribute('data-mrs');
+          var rec = null;
+          for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { rec = rows[i]; break; }
+          modResSchedule(rec, el);
         };
       });
       var qb = box.querySelector('#mx-mr-queue');
