@@ -9119,6 +9119,8 @@ async function putResource(res) {
 
     seed: !!res.seed,
 
+    source: res.source || '',                     // [资源中心#358] 导入来源标识（folder-import 等）
+
     createdAt: Date.now()
 
   };
@@ -9605,6 +9607,35 @@ async function saveLocalFile(resourceId, blob, mediaType) {
 
 
 
+/* [资源中心#358] blob 直存 IndexedDB（audioCache 权威存储）。
+   存 ArrayBuffer（结构化克隆在所有环境稳定），读回时重建 Blob；blob 字段仅作旧记录兼容。 */
+async function saveResourceBlob(resourceId, blob, mediaType) {
+  const cacheKey = 'res:' + resourceId;
+  const type = mediaType || (blob && blob.type) || 'application/octet-stream';
+  let data = null;
+  try {
+    if (blob && blob.arrayBuffer) data = await blob.arrayBuffer();
+    else if (blob) data = await new Promise(function (resolve, reject) { var fr = new FileReader(); fr.onload = function () { resolve(fr.result); }; fr.onerror = reject; fr.readAsArrayBuffer(blob); });
+  } catch (e) { data = null; }
+  const size = data ? data.byteLength : ((blob && blob.size) || 0);
+  await put('audioCache', { key: cacheKey, blobKey: cacheKey, type: type, size: size, data: data, blob: data ? undefined : blob, cachedAt: Date.now() });
+  await put('downloads', { id: resourceId, resourceId: resourceId, cached: true, cachedAt: Date.now(), size: size });
+  return true;
+}
+
+/* [资源中心#358] 读回 blob（供各学习模块播放导入的本地文件） */
+async function getResourceBlob(resourceId) {
+  const cacheKey = 'res:' + resourceId;
+  const rec = await get('audioCache', cacheKey);
+  if (!rec) return null;
+  if (rec.blob) return { blob: rec.blob, type: rec.type };
+  if (rec.data) {
+    try { return { blob: new Blob([rec.data], { type: rec.type || 'application/octet-stream' }), type: rec.type }; }
+    catch (e) { return { data: rec.data, type: rec.type }; }
+  }
+  return null;
+}
+
 /** 检查某资源是否已缓存本地 */
 
 async function hasLocalCache(resourceId) {
@@ -9811,6 +9842,10 @@ window.DB = {
 
   saveLocalFile, hasLocalCache, isWifiOnlyMode, setWifiOnlyMode, isVip, setVip,
 
+  // [资源中心#358] blob 直存 / 读回 / 通用遍历与删除
+
+  saveResourceBlob, getResourceBlob, getAll, del,
+
   // 防滥用签名
 
   computeAppSignature, APP_ID,
@@ -10008,6 +10043,8 @@ window.DB = {
       id: 'tools', label: '智能工具', icon: '🛠️',
 
       children: [
+
+        { id: 'tool-rescenter', label: '资源中心·导入', icon: '📥', page: 'page-resource-center' },
 
         { id: 'tool-resources', label: '免费资源', icon: '📦', page: 'page-tool-resources' },
 
@@ -10401,6 +10438,8 @@ window.DB = {
     'page-errors':   { title: '错题集', desc: '自动汇集识字/古诗/数学/英语等全模块错题，支持清零、删除、A4打印。按当天/当周/当月/季度维度统计。', icon: '📕', tag: '联动全模块' },
 
     'page-tool-resources': { title: '免费资源', desc: '幼小衔接福利资源库：点读包、绘本PDF、练习册PDF等，免费获取下载。', icon: '📦', tag: '智能工具' },
+
+    'page-resource-center': { title: '资源中心', desc: '全模块傻瓜式导入：上传本地文件夹自动归类到古诗/识字/拼音/英语/数学/熏听等模块，文件保存在本设备，不消耗云端。', icon: '📥', tag: '唯一导入入口' },
 
     'page-tool-pinyin': { title: '拼音拼读生成器', desc: '输入任意文字/词组，生成带声调标注的拼音拼读卡，支持逐字与全文 TTS 发音。', icon: '✍️', tag: '智能工具·已实装' },
 
@@ -22480,9 +22519,263 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if(p==='page-shop') setTimeout(renderShop,60);
     else if(p==='page-mall') setTimeout(renderMall,60);
     else if(p==='page-tool-resources') setTimeout(renderResources,60);
+    else if(p==='page-resource-center') setTimeout(renderResourceCenter,60);
   });
 
   window.MX_MALL={renderShop:renderShop,renderMall:renderMall,renderResources:renderResources,renderCollectionAdv:renderCollectionAdv};
+
+  /* ============================================================
+     📥 资源中心·全模块傻瓜式导入（#358 阶段一）
+     - 模式一：本地文件夹直传（webkitdirectory 遍历 → 按文件/文件夹名智能归类 → blob 存本机 IndexedDB）
+     - 模式二：Excel/CSV 表格导入（阶段二接线）
+     - 模式三：网盘链接粘贴（阶段二接线）
+     - 数据永远只存本机 IndexedDB，不消耗任何云端资源；云端同步仅 VIP 元数据索引（阶段二）
+     ============================================================ */
+  var RES_MODULES = [
+    { key:'poem',        label:'古诗',       icon:'📜' },
+    { key:'literacy',    label:'识字',       icon:'✍️' },
+    { key:'pinyin',      label:'拼音',       icon:'🔤' },
+    { key:'story',       label:'绘本',       icon:'📚' },
+    { key:'estory',      label:'英语绘本',   icon:'📖' },
+    { key:'abc',         label:'26字母',     icon:'🔠' },
+    { key:'phonics',     label:'自然拼读',   icon:'🗣️' },
+    { key:'words',       label:'英语单词',   icon:'🇬🇧' },
+    { key:'algo',        label:'数学算法',   icon:'➕' },
+    { key:'workbook',    label:'练习册',     icon:'📓' },
+    { key:'listen-en',   label:'熏听·英文',  icon:'🎧' },
+    { key:'listen-music',label:'熏听·儿歌',  icon:'🎵' },
+    { key:'lchinese',    label:'熏听·国学',  icon:'🀄' }
+  ];
+  function resModLabel(k){ for (var i=0;i<RES_MODULES.length;i++) if (RES_MODULES[i].key===k) return RES_MODULES[i]; return { key:k||'other', label:k||'其他', icon:'📁' }; }
+  function resEsc(x){ return String(x==null?'':x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function resFmtSize(n){ if(!n) return '0KB'; if(n<1048576) return Math.max(1,Math.round(n/1024))+'KB'; return (n/1048576).toFixed(1)+'MB'; }
+
+  /* 从 File.webkitRelativePath 提取直属文件夹名 */
+  function resFolderOf(f){
+    var rel = f.webkitRelativePath || f.relativePath || f.name || '';
+    var parts = String(rel).split('/');
+    parts.pop();
+    return parts.length ? parts[parts.length-1] : '';
+  }
+
+  /* 判定文件归属模块：优先文件夹规则，其次文件名智能识别 */
+  function resClassify(f){
+    var folder = resFolderOf(f);
+    var meta = window.DB.inferResourceMeta(f.name);
+    var rule = window.DB.matchFolderRule(folder, f.name);
+    return {
+      module: (rule && rule.module) || meta.module,
+      category: (rule && rule.category) || meta.category,
+      mediaType: meta.mediaType,
+      tags: meta.tags || []
+    };
+  }
+
+  /* 文件夹直传主流程：遍历 → 归类 → blob 落盘 IndexedDB → 资源记录 */
+  async function resImportFolder(fileList, onProgress){
+    var files = [];
+    for (var i=0;i<fileList.length;i++){
+      var f = fileList[i];
+      if (!f || !f.size || /^(\._|\.DS_Store|Thumbs\.db|desktop\.ini)/i.test(f.name) || /^\./.test(f.name)) continue;
+      files.push(f);
+    }
+    var stats = {}, errors = [], done = 0;
+    for (var j=0;j<files.length;j++){
+      var file = files[j];
+      try {
+        var cls = resClassify(file);
+        var rel = file.webkitRelativePath || file.name;
+        var id = window.DB.makeResourceId(file.name + '|' + rel + '|' + file.size);
+        await window.DB.saveResourceBlob(id, file, cls.mediaType);
+        await window.DB.putResource({
+          id: id,
+          module: cls.module,
+          category: cls.category,
+          title: String(file.name).replace(/\.[^.]+$/, ''),
+          original_filename: file.name,
+          size: file.size,
+          mediaType: cls.mediaType,
+          tags: cls.tags,
+          source: 'folder-import'
+        });
+        stats[cls.module] = (stats[cls.module]||0)+1;
+      } catch(e) { errors.push(file.name + '：' + (e && e.message || e)); }
+      done++;
+      if (onProgress) onProgress(done, files.length);
+    }
+    return { stats: stats, errors: errors, total: files.length };
+  }
+
+  /* 导入完成总览弹窗（傻瓜式反馈：导入了什么、存在哪里） */
+  function resSummaryPopup(container, stats, errors, total){
+    var keys = Object.keys(stats);
+    var parts = [];
+    for (var i=0;i<keys.length;i++){
+      var m = resModLabel(keys[i]);
+      parts.push('<b style="color:#1f3a5f">'+m.icon+'【'+resEsc(m.label)+'】'+stats[keys[i]]+'</b>');
+    }
+    var statLine = parts.length ? parts.join('<span style="color:#9aa">、</span>') : '没有识别到可导入的文件';
+    var errLine = errors && errors.length
+      ? '<div style="margin-top:8px;padding:8px 10px;background:#fff3f0;border-radius:8px;font-size:12px;color:#c0392b;max-height:90px;overflow:auto"><b>'+errors.length+' 个文件导入失败：</b><br>'+resEsc(errors.slice(0,8).join('<br>'))+(errors.length>8?'<br>…':'')+'</div>'
+      : '';
+    var ov = document.createElement('div');
+    ov.className = 'mxg-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px 20px;text-align:center;font-size:14px">'
+      + '<div style="font-size:40px">🎉</div>'
+      + '<div style="font-weight:700;font-size:16px;margin:6px 0 12px">导入完成！共 ' + total + ' 个文件</div>'
+      + '<div style="line-height:2">' + statLine + '</div>'
+      + errLine
+      + '<div style="margin:12px 0 4px;padding:9px 10px;background:#f0f7ff;border-radius:8px;font-size:12.5px;color:#1f3a5f">💾 这些文件现在<b>保存在你当前设备上</b>，不消耗任何云端空间；换设备需重新导入（VIP 云同步即将开放）。</div>'
+      + '<button class="btn" id="res-sum-ok" style="width:100%;margin-top:10px">好的，我知道了</button>'
+      + '</div>';
+    container.appendChild(ov);
+    var ok = ov.querySelector('#res-sum-ok');
+    if (ok) ok.onclick = function(){ if (ov.parentNode) ov.parentNode.removeChild(ov); };
+    return ov;
+  }
+
+  /* 预览：音视频/图片就地弹窗播放，PDF 新标签打开（全部走本地 blob URL，零云端流量） */
+  function resPreview(resourceId){
+    window.DB.getResourceBlob(resourceId).then(function(r){
+      if (!r || !r.blob) { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); return; }
+      var type = r.type || '';
+      if (/^pdf/.test(type) || /\.(pdf)$/i.test(resourceId)) {
+        try { var u0 = URL.createObjectURL(r.blob); window.open(u0, '_blank'); return; } catch(e){}
+      }
+      if (typeof URL === 'undefined' || !URL.createObjectURL) { if (window.showToast) window.showToast('当前环境不支持预览'); return; }
+      var url = URL.createObjectURL(r.blob);
+      var ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+      var inner = '';
+      if (/^audio/.test(type)) inner = '<audio controls autoplay src="'+url+'" style="width:100%"></audio>';
+      else if (/^video/.test(type)) inner = '<video controls autoplay src="'+url+'" style="max-width:100%;max-height:70vh"></video>';
+      else if (/^image/.test(type)) inner = '<img src="'+url+'" style="max-width:100%;max-height:70vh;border-radius:10px">';
+      else inner = '<a href="'+url+'" target="_blank" style="color:#4a90d9">打开文件</a>';
+      ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:14px;text-align:center">'
+        + '<div id="res-pv-close" style="text-align:right;cursor:pointer;color:#888;font-size:18px;padding:0 4px">✕</div>' + inner + '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(ev){
+        if (ev.target === ov || (ev.target && ev.target.id === 'res-pv-close')) { if (ov.parentNode) ov.parentNode.removeChild(ov); try { URL.revokeObjectURL(url); } catch(e){} }
+      });
+    }).catch(function(){ if (window.showToast) window.showToast('⚠️ 预览失败'); });
+  }
+
+  /* 页面渲染 */
+  function renderResourceCenter(){
+    var page = document.getElementById('page-resource-center');
+    if (!page) return;
+    page.innerHTML =
+      '<div class="section-header" style="margin-bottom:14px">'
+      + '<h2 style="margin:0 0 4px">📥 资源中心</h2>'
+      + '<p style="margin:0;color:var(--text-secondary);font-size:13px">全模块导入 · 三步搞定 · 文件保存在本设备，不消耗云端</p>'
+      + '</div>'
+      /* 三步傻瓜式引导 */
+      + '<div class="mx-card"><div class="mx-card-t">🪜 三步导入（选一种适合你的）</div>'
+      + '<div id="res-steps" style="display:flex;flex-direction:column;gap:10px">'
+      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:2px dashed #4a90d9;border-radius:12px;background:#f0f7ff;cursor:pointer" id="res-step1">'
+      +     '<div style="font-size:30px">📁</div><div style="flex:1"><b>模式一：上传本地文件夹（推荐）</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">整包选择电脑/手机里的学习资源文件夹，自动按文件名归类到对应模块</div></div>'
+      +     '<button class="btn mx-btn-main" id="res-btn-folder" style="white-space:nowrap">选择文件夹</button>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
+      +     '<div style="font-size:30px">📊</div><div style="flex:1"><b>模式二：Excel 表格导入</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">下载模板 → 填写资源名称和网盘/文件路径 → 上传，自动挂到模块（即将开放）</div></div>'
+      +     '<span style="font-size:12px;color:#9aa">即将开放</span>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
+      +     '<div style="font-size:30px">☁️</div><div style="flex:1"><b>模式三：粘贴网盘链接</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">粘贴百度网盘/阿里云盘分享链接，生成一键跳转下载（即将开放）</div></div>'
+      +     '<span style="font-size:12px;color:#9aa">即将开放</span>'
+      +   '</div>'
+      + '</div>'
+      + '<input type="file" id="res-folder-input" webkitdirectory directory multiple style="display:none">'
+      + '<div id="res-progress" style="display:none;margin-top:10px;font-size:13px;color:#1f3a5f"></div>'
+      + '</div>'
+      /* 已导入总览 */
+      + '<div class="mx-card"><div class="mx-card-t">📚 已导入资源 <span id="res-total-badge" style="font-size:12px;color:#9aa;font-weight:400"></span></div>'
+      + '<div id="res-stat-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>'
+      + '<div id="res-list" style="max-height:340px;overflow:auto"><div class="empty-tip" style="font-size:13px">加载中…</div></div>'
+      + '<div style="font-size:12px;color:#9aa;margin-top:8px">💡 免费用户与 VIP 均可无限本地导入；数据仅存本机 IndexedDB，不产生任何云端费用。播放由各学习模块自动读取（逐步开放中）。</div>'
+      + '</div>';
+
+    var input = page.querySelector('#res-folder-input');
+    var btn = page.querySelector('#res-btn-folder');
+    var step1 = page.querySelector('#res-step1');
+    var prog = page.querySelector('#res-progress');
+    if (btn && input) {
+      btn.onclick = function(){ input.click(); };
+      if (step1) step1.onclick = function(ev){ if (ev.target !== btn) input.click(); };
+      input.onchange = function(){
+        var fl = input.files;
+        if (!fl || !fl.length) return;
+        if (prog) { prog.style.display = 'block'; prog.textContent = '正在归类导入 0/' + fl.length + ' …'; }
+        resImportFolder(fl, function(d, t){ if (prog) prog.textContent = '正在归类导入 ' + d + '/' + t + ' …'; })
+          .then(function(r){
+            if (prog) { prog.textContent = '✅ 完成：共处理 ' + r.total + ' 个文件' + (r.errors.length ? '，失败 ' + r.errors.length + ' 个' : ''); setTimeout(function(){ prog.style.display='none'; }, 5000); }
+            input.value = '';
+            resSummaryPopup(page, r.stats, r.errors, r.total);
+            renderResList();
+          })
+          .catch(function(e){
+            if (prog) prog.textContent = '❌ 导入出错：' + (e && e.message || e);
+            if (window.showToast) window.showToast('❌ 导入出错：' + (e && e.message || e));
+          });
+      };
+    }
+    renderResList();
+  }
+
+  /* 已导入列表：按模块分组 + 统计 chips + 预览/删除 */
+  function renderResList(){
+    var page = document.getElementById('page-resource-center');
+    if (!page) return;
+    var chipsBox = page.querySelector('#res-stat-chips');
+    var listBox = page.querySelector('#res-list');
+    if (!listBox) return;
+    window.DB.getAll('resources').then(function(all){
+      var rows = (all||[]).filter(function(r){ return r.source === 'folder-import'; });
+      rows.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
+      var byMod = {}, totalSize = 0;
+      rows.forEach(function(r){ byMod[r.module] = (byMod[r.module]||0)+1; totalSize += (r.size||0); });
+      if (chipsBox) {
+        var chips = ['<span style="font-size:12px;background:#f0f7ff;color:#1f3a5f;border-radius:10px;padding:3px 10px">共 '+rows.length+' 个 · '+resFmtSize(totalSize)+'</span>'];
+        Object.keys(byMod).forEach(function(k){ var m = resModLabel(k); chips.push('<span style="font-size:12px;background:#fff;border:1px solid #e3e8f0;border-radius:10px;padding:3px 10px">'+m.icon+' '+resEsc(m.label)+' '+byMod[k]+'</span>'); });
+        chipsBox.innerHTML = chips.join('');
+      }
+      if (!rows.length) { listBox.innerHTML = '<div class="empty-tip" style="font-size:13px">还没有导入过资源，用上面的「选择文件夹」试试吧 🚀</div>'; return; }
+      var html = '';
+      Object.keys(byMod).forEach(function(k){
+        var m = resModLabel(k);
+        html += '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">'+m.icon+' '+resEsc(m.label)+' <span style="color:#9aa;font-weight:400">'+byMod[k]+'个</span></div>';
+        rows.forEach(function(r){
+          if (r.module !== k) return;
+          html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
+            + '<span style="flex:1;font-size:13px;cursor:pointer;color:#1f3a5f" data-res-pv="'+resEsc(r.id)+'" title="点击预览">▶ '+resEsc(r.title||r.original_filename)+'</span>'
+            + '<span style="font-size:11.5px;color:#9aa">'+resFmtSize(r.size)+'</span>'
+            + '<button class="btn" data-res-del="'+resEsc(r.id)+'" style="font-size:11px;padding:2px 8px;border:1px solid #f0b4ad;color:#c0392b;background:#fff;border-radius:6px">删除</button>'
+            + '</div>';
+        });
+      });
+      listBox.innerHTML = html;
+      listBox.querySelectorAll('[data-res-pv]').forEach(function(el){
+        el.onclick = function(){ resPreview(el.getAttribute('data-res-pv')); };
+      });
+      listBox.querySelectorAll('[data-res-del]').forEach(function(el){
+        el.onclick = function(){
+          var id = el.getAttribute('data-res-del');
+          var sure = true;
+          try { if (typeof window.confirm === 'function') sure = window.confirm('确定删除该资源吗？（仅删除本机记录与文件）'); } catch (e) { sure = true; }
+          if (!sure) return;
+          Promise.all([
+            window.DB.del('resources', id),
+            window.DB.del('audioCache', 'res:' + id),
+            window.DB.del('downloads', id)
+          ]).then(function(){ if (window.showToast) window.showToast('🗑️ 已删除'); renderResList(); }).catch(function(e){ if (window.showToast) window.showToast('删除失败：'+(e&&e.message||e)); });
+        };
+      });
+    }).catch(function(){ listBox.innerHTML = '<div class="empty-tip">资源列表加载失败</div>'; });
+  }
+
+  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup };
 })();
 
 </script>
