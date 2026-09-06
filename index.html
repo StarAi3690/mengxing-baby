@@ -7520,7 +7520,7 @@ html, body {
 
           <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 12px; line-height: 1.6;" data-page-node-id="rbkgnkHgxUqLEOayCjfN2o">
 
-            拖动或点击上下箭头调整模块显示顺序，<b data-page-node-id="mHYzd7rEZm40euEw5N5rvI">越靠前优先级越高</b>。一级模块与二级子菜单均可排序，自动保存。
+            拖动或点击上下箭头调整<b data-page-node-id="mHYzd7rEZm40euEw5N5rvI">一级菜单</b>显示顺序，<b>越靠前优先级越高</b>，自动保存。<br>二级子菜单顺序已锁定，由管理后台统一设定初始位置。
 
           </p>
 
@@ -10156,15 +10156,24 @@ window.DB = {
 
 
 
-  /** 交换两个导航项的权重（用于上下移动 UI） */
-
+  /** 交换两个导航项的权重（用于上下移动 UI）
+      [#360 修复] 旧版对两个未自定义过的项交换：双方默认权重同为 9999，交换后仍 9999 → 第一次点击箭头无效。
+      现改为按「当前生效权重」（用户 > 云端初始 > 代码下标）取值后再交换。 */
   function swapNavOrder(aId, bId) {
 
     const map = getNavOrderMap();
 
-    const wa = map[aId] != null ? map[aId] : NAV_DEFAULT_WEIGHT;
+    const cloud = getCloudNavOrder();
 
-    const wb = map[bId] != null ? map[bId] : NAV_DEFAULT_WEIGHT;
+    const ids = (window.NAV_STRUCTURE || []).map(x => x.id);
+
+    const ia = ids.indexOf(aId), ib = ids.indexOf(bId);
+
+    if (ia < 0 || ib < 0) return;
+
+    const curW = (id, idx) => (map[id] != null ? map[id] : (cloud && cloud[id] != null ? cloud[id] : idx));
+
+    const wa = curW(aId, ia), wb = curW(bId, ib); /* 先取值再赋值：避免第一条赋值污染第二条的闭包读取 */
 
     map[aId] = wb;
 
@@ -10196,13 +10205,26 @@ window.DB = {
 
   /** 带默认顺序的排序包装：给每个导航项附加默认权重并排序 */
 
-  function orderItems(items) {
+  /* [导航权限#360] 菜单顺序分级：
+     - 一级菜单 = 本机用户调整(localStorage) > 云端「初始顺序」 > 代码默认
+     - 二级菜单 = 云端「初始顺序」(管理后台统一设定) > 代码默认（用户不可调） */
+  function getCloudNavOrder() {
+    try { return (window.MX_NAV_ORDER_CLOUD && typeof window.MX_NAV_ORDER_CLOUD === 'object') ? window.MX_NAV_ORDER_CLOUD : null; } catch (e) { return null; }
+  }
+
+  function orderItems(items, isTop) {
 
     const map = getNavOrderMap();
 
+    const cloud = getCloudNavOrder();
+
     return items.map((item, idx) => {
 
-      const w = map[item.id] != null ? map[item.id] : idx; // 默认按数组下标
+      let w = idx; // 默认按数组下标
+
+      if (cloud && cloud[item.id] != null) w = cloud[item.id];
+
+      if (isTop && map[item.id] != null) w = map[item.id]; // 仅一级允许用户覆盖
 
       return { item, w };
 
@@ -10244,7 +10266,7 @@ window.DB = {
 
     let html = '';
 
-    const topItems = orderItems(window.NAV_STRUCTURE); // v1.3.0 一级排序
+    const topItems = orderItems(window.NAV_STRUCTURE, true); // v1.3.0 一级排序（#360：用户可调）
 
 
 
@@ -10276,7 +10298,7 @@ window.DB = {
 
         html += `<div class="nav-submenu" data-submenu="${group.id}" style="${isExpanded ? '' : 'display:none;'}">`;
 
-        orderItems(group.children).forEach(child => {   // v1.3.0 二级排序
+        orderItems(group.children, false).forEach(child => {   // #360 二级排序：仅认云端初始顺序，用户不可调
 
           if (child.id in moduleVisibility && !moduleVisibility[child.id]) return;
 
@@ -11813,9 +11835,9 @@ window.DB = {
 
 
 
-  // ===== 7.5 模块优先级排序面板（v1.3.0）=====
+  // ===== 7.5 模块优先级排序面板（v1.3.0 / #360 收敛权限）=====
 
-  // 在系统设置页渲染可调排序列表，一级模块 + 二级子菜单均可上下移动
+  // 在系统设置页渲染可调排序列表；#360 起仅一级菜单可排序，二级子菜单由管理后台统一设定
 
   function renderNavOrderPanel() {
 
@@ -11841,7 +11863,7 @@ window.DB = {
 
 
 
-    // 一段嵌套列表的 HTML
+    // 一级菜单排序列表（#360：不再递归渲染二级子菜单）
 
     function listHTML(items, depth) {
 
@@ -11852,8 +11874,6 @@ window.DB = {
         const isFirst = i === 0;
 
         const isLast = i === sorted.length - 1;
-
-        const indent = depth > 0 ? 'padding-left:18px;' : '';
 
         const hasChildren = it.children && it.children.length;
 
@@ -11867,25 +11887,19 @@ window.DB = {
 
         const nextId = sorted[i + 1] ? idForSwap(sorted[i + 1]) : '';
 
-        let row = `
+        const row = `
 
-          <div class="navorder-row" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;margin-bottom:6px;${indent}background:#fff;">
+          <div class="navorder-row" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;margin-bottom:6px;background:#fff;">
 
             <span style="min-width:22px;">${it.icon}</span>
 
-            <span style="flex:1;font-size:14px;font-weight:${depth===0?'700':'400'};color:#333;">${it.label}</span>
+            <span style="flex:1;font-size:14px;font-weight:700;color:#333;">${it.label}${hasChildren ? ' <span style="font-size:11px;color:#9aa;font-weight:400">（含子菜单，顺序由管理后台设定）</span>' : ''}</span>
 
             <button data-up="${idForSwap(sorted[i])}" data-prev="${prevId}" ${upDisabled} style="border:none;background:#f0f0f0;border-radius:6px;width:28px;height:28px;cursor:pointer;">↑</button>
 
             <button data-down="${idForSwap(sorted[i])}" data-next="${nextId}" ${downDisabled} style="border:none;background:#f0f0f0;border-radius:6px;width:28px;height:28px;cursor:pointer;">↓</button>
 
           </div>`;
-
-        if (hasChildren) {
-
-          row += listHTML(it.children, depth + 1);
-
-        }
 
         return row;
 
@@ -16693,6 +16707,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             window.MX_LINKAGE = r.linkage;
             /* [imgopt B] 管理端在配置表把 imgVer 改大 → 全端图片URL带新?v= → 强制刷新图鉴/卡面缓存 */
             try { var nv = parseInt(r.linkage.imgVer, 10); if (nv > 0) window.MX_IMG_VER = nv; } catch (e) {}
+            /* [导航权限#360] 云端「菜单初始顺序」：管理后台 → 🧭 初始菜单顺序 写入 linkage_config.navOrder（平铺 {navId:权重}），
+               二级子菜单顺序与一级默认顺序由此统一设定；一级仍可被用户本机调整覆盖 */
+            try {
+              var no = r.linkage.navOrder;
+              if (no && typeof no === 'object') {
+                window.MX_NAV_ORDER_CLOUD = no;
+                if (window.navSystem && window.navSystem.renderNav) window.navSystem.renderNav();
+              }
+            } catch (eNO) {}
             applyLinkageOrder(); if (window.renderAnnouncement) window.renderAnnouncement();
           }
         }).catch(function () {});
@@ -25226,6 +25249,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.mxSyncDiag = mxSyncDiag;
   /* [badgefix] 记录最近一次同步失败原因（诊断弹窗读取） */
   function mxSyncErr(msg) { try { localStorage.setItem('mx_sync_last_err', new Date().toLocaleString() + ' ' + String(msg || '').slice(0, 120)); } catch (e) {} }
+  /* [syncfix#360] 同步成功后把「最近同步问题」标注为已恢复，避免诊断弹窗长期显示旧网络错误误导用户 */
+  function mxSyncMarkRecovered() {
+    try {
+      var le = localStorage.getItem('mx_sync_last_err');
+      if (le && le.indexOf('【已恢复】') < 0) localStorage.setItem('mx_sync_last_err', '【已恢复】' + le + '（' + new Date().toLocaleString() + ' 同步成功，链路已恢复正常）');
+    } catch (e) {}
+  }
+  window.mxSyncMarkRecovered = mxSyncMarkRecovered;
   function pushCloud() {
     /* [资源中心#358] 导出供资源中心导入完成后手动触发元数据同步（跨 IIFE 红线；置于首行保证任何路径都完成导出） */
     window.pushCloud = pushCloud;
@@ -25245,7 +25276,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (res && res.msg && /未登录/.test(res.msg)) { setSyncStatus('expired'); return 'BAILED'; }
         return 'BAILED';
       });
-    }).then(function (b) { if (b !== 'BAILED') setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
+    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
   }
   function pullCloud() {
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
@@ -25261,7 +25292,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         mxSyncErr(res && res.msg ? res.msg : '拉取未成功');
         return 'BAILED';
       });
-    }).then(function (b) { if (b !== 'BAILED') setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
+    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
   }
   function startVipSync() {
     if (window.__mx_sync_started__) return;

@@ -58,6 +58,7 @@
   <div class="sub">公网端运营控制台 · <a href="https://StarAi3690.github.io/mengxing-baby/" target="_blank" style="color:var(--pri)">打开公网端 ↗</a> · <a href="javascript:logout()" style="color:var(--sub)">退出登录</a></div>
   <div class="tabs">
     <div class="tab on" id="tab-ann" onclick="switchTab('ann')">📢 全站公告</div>
+    <div class="tab" id="tab-nav" onclick="switchTab('nav')">🧭 初始菜单顺序</div>
     <div class="tab" id="tab-mon" onclick="switchTab('mon')">📊 运营监控</div>
     <div class="tab" id="tab-fb" onclick="switchTab('fb')">💌 用户反馈</div>
     <div class="tab" id="tab-data" onclick="switchTab('data')">📋 数据明细</div>
@@ -82,6 +83,24 @@
         <span id="annMsg" class="msg"></span>
       </div>
       <div class="sub" style="margin-top:12px">提示：公告数据存储于云端 <code>CFG::linkage_config.announcement</code>，孩子端首页顶部自动展示。</div>
+    </div>
+  </div>
+
+  <!-- 菜单初始顺序（#360） -->
+  <div id="pane-nav" hidden>
+    <div class="card">
+      <h3 style="margin:0 0 4px">菜单初始顺序设定</h3>
+      <div class="sub">
+        这里设定的顺序就是<b>所有用户</b>看到的「初始位置」：一级菜单作为默认顺序（用户可在系统设置里自行微调），<b>二级子菜单顺序完全锁定</b>，用户不可更改。发布后全端生效。
+      </div>
+      <div id="navTree" style="margin-top:8px"></div>
+      <div class="row">
+        <button class="btn" onclick="saveNavOrder()">🚀 发布到全站</button>
+        <button class="btn ghost" onclick="loadNavOrder()">↺ 还原为云端已存顺序</button>
+        <button class="btn ghost" onclick="clearNavOrder()">🗑️ 清除云端初始顺序（回到代码默认）</button>
+        <span id="navMsg" class="msg"></span>
+      </div>
+      <div class="sub" style="margin-top:12px">提示：数据存储于云端 <code>CFG::linkage_config.navOrder</code>，与全站公告同一配置文档。</div>
     </div>
   </div>
 
@@ -251,13 +270,14 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','mon','fb','data','sec'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
   if (t==='fb') loadFeedback();
   if (t==='data') loadData();
   if (t==='sec') loadSecQ();
+  if (t==='nav') loadNavOrder();
 }
 
 async function loadAnnounce(){
@@ -277,6 +297,120 @@ async function saveAnnounce(){
     announcement: { text: text, url: $('annUrl').value.trim(), enabled: $('annEnabled').checked } });
   if (r && r.ok) setMsg('annMsg','✅ 已发布，全站用户即将看到','ok');
   else setMsg('annMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
+}
+
+/* ============ 🧭 初始菜单顺序（#360）============
+   NAV_TREE 与 index.html 的 NAV_STRUCTURE 保持一致（结构性改动需同步更新此处）。
+   状态 navState = { top:[一级id...], sub:{ 组id:[二级id...] } }，↑↓ 交换位置，
+   发布时换算成平铺权重 {navId:下标} 写入 CFG::linkage_config.navOrder。 */
+const NAV_TREE = [
+  { id:'home', label:'首页看板', icon:'🏠', children:[ {id:'home-main',label:'首页看板',icon:'🏠'} ] },
+  { id:'chinese', label:'语文', icon:'📖', children:[
+    {id:'pinyin',label:'拼音',icon:'🔤'},{id:'literacy',label:'识字',icon:'✍️'},{id:'words',label:'生字',icon:'🔤'},
+    {id:'poem',label:'古诗',icon:'📜'},{id:'story',label:'绘本',icon:'📚'} ] },
+  { id:'english', label:'英语', icon:'🇬🇧', children:[
+    {id:'abc',label:'26个字母',icon:'🔠'},{id:'phonics',label:'自然拼读',icon:'🗣️'},{id:'estory',label:'绘本',icon:'📚'} ] },
+  { id:'math', label:'数学', icon:'🧮', children:[
+    {id:'maththink',label:'数学思维',icon:'🧠'},{id:'algo',label:'四大算法',icon:'➕'},
+    {id:'clock',label:'认识时钟',icon:'🕐'},{id:'sudoku',label:'数独游戏',icon:'🧩'} ] },
+  { id:'sport', label:'体能', icon:'🏃' },
+  { id:'listen', label:'熏听', icon:'🎧', children:[
+    {id:'lmath',label:'数学',icon:'🔢'},{id:'lchinese',label:'语文',icon:'📖'},{id:'lenglish',label:'英语',icon:'🔤'},
+    {id:'lsci',label:'科普',icon:'🔬'},{id:'lnews',label:'实事',icon:'📰'},{id:'lstory',label:'绘本',icon:'📚'},
+    {id:'lschedule',label:'排期',icon:'📆'} ] },
+  { id:'daily', label:'日常表现', icon:'🌟' },
+  { id:'games', label:'游戏互动', icon:'🎮' },
+  { id:'points', label:'积分兑换', icon:'⭐' },
+  { id:'gacha', label:'盲盒卡牌', icon:'🎁' },
+  { id:'achievements', label:'成就墙', icon:'🏆' },
+  { id:'pet', label:'宠物养成', icon:'🐾' },
+  { id:'mall', label:'萌星好物', icon:'🏪' },
+  { id:'tools', label:'智能工具', icon:'🛠️', children:[
+    {id:'tool-resources',label:'免费资源',icon:'📦'},{id:'tool-pinyin',label:'拼音拼读生成器',icon:'✍️'},
+    {id:'tool-math',label:'口算随机生成器',icon:'➕'},{id:'tool-tomato',label:'专注力番茄计时器',icon:'🍅'},
+    {id:'tool-errors',label:'错题集',icon:'📕'},{id:'tool-ai',label:'AI擦除/标记图片',icon:'🖼️'},
+    {id:'tool-print',label:'口算题卡打印',icon:'🖨️'},{id:'tool-flash',label:'学习闪卡生成',icon:'🃏'},
+    {id:'tool-feedback',label:'建议与反馈',icon:'💌'} ] },
+  { id:'parent', label:'家长工作台', icon:'📊' },
+  { id:'account', label:'账号中心', icon:'👤' },
+  { id:'settings', label:'系统设置', icon:'⚙️' }
+];
+let navState = { top: NAV_TREE.map(x=>x.id), sub: {} };
+NAV_TREE.forEach(g => { if (g.children) navState.sub[g.id] = g.children.map(c=>c.id); });
+
+function navRowsHTML(list, isTop, groupId){
+  return list.map((id, i) => {
+    let item;
+    if (isTop) item = NAV_TREE.find(x=>x.id===id) || {label:id, icon:'❓'};
+    else { const g = NAV_TREE.find(x=>x.id===groupId); item = (g&&g.children||[]).find(x=>x.id===id) || {label:id, icon:'❓'}; }
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;background:#fff">
+      <span style="min-width:22px">${item.icon||''}</span>
+      <span style="flex:1;font-size:14px;${isTop?'font-weight:600':''}">${esc(item.label)}</span>
+      <button class="btn sm ghost" ${i===0?'disabled':''} onclick="navMove(${isTop},'${groupId||''}','${id}',-1)">↑</button>
+      <button class="btn sm ghost" ${i===list.length-1?'disabled':''} onclick="navMove(${isTop},'${groupId||''}','${id}',1)">↓</button>
+    </div>`;
+  }).join('');
+}
+
+function renderNavTree(){
+  let h = '<div style="font-size:13px;color:var(--sub);margin-bottom:6px">一级菜单（用户可在系统设置里微调，这里定默认）</div>';
+  h += navRowsHTML(navState.top, true, '');
+  NAV_TREE.filter(g=>g.children).forEach(g => {
+    h += `<div style="font-size:13px;color:var(--sub);margin:14px 0 6px;border-top:1px dashed var(--line);padding-top:10px">${g.icon} ${esc(g.label)} · 二级子菜单（<b style="color:var(--bad)">用户不可调，完全锁定</b>）</div>`;
+    h += navRowsHTML(navState.sub[g.id], false, g.id);
+  });
+  $('navTree').innerHTML = h;
+}
+
+function navMove(isTop, groupId, id, dir){
+  const list = isTop ? navState.top : navState.sub[groupId];
+  const i = list.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  renderNavTree();
+}
+
+function navOrderPayload(){
+  const flat = {};
+  navState.top.forEach((id, i) => { flat[id] = i; });
+  Object.keys(navState.sub).forEach(gid => { navState.sub[gid].forEach((id, i) => { flat[id] = i; }); });
+  return flat;
+}
+
+function navStateFromFlat(flat){
+  const byW = (a, b) => ((flat[a] != null ? flat[a] : 9999) - (flat[b] != null ? flat[b] : 9999));
+  navState.top = NAV_TREE.map(x=>x.id).slice().sort(byW);
+  NAV_TREE.forEach(g => { if (g.children) navState.sub[g.id] = g.children.map(c=>c.id).slice().sort(byW); });
+}
+
+async function loadNavOrder(){
+  setMsg('navMsg','读取中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'navorder', adminKey: ADMIN_KEY });
+    const flat = (r && r.navOrder) || {};
+    navStateFromFlat(flat);
+    renderNavTree();
+    setMsg('navMsg', (r && r.ok) ? (Object.keys(flat).length ? '已读取云端初始顺序' : '云端暂无初始顺序，当前展示代码默认') : '读取失败', 'sub');
+  } catch(e){ setMsg('navMsg','读取失败：'+String(e.message||e),'bad'); }
+}
+
+async function saveNavOrder(){
+  setMsg('navMsg','发布中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'navorder', adminKey: ADMIN_KEY, action2:'set', navOrder: navOrderPayload() });
+    if (r && r.ok) setMsg('navMsg','✅ 已发布，全端用户下次打开/刷新即生效','ok');
+    else setMsg('navMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
+  } catch(e){ setMsg('navMsg','发布失败：'+String(e.message||e),'bad'); }
+}
+
+async function clearNavOrder(){
+  setMsg('navMsg','清除中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'navorder', adminKey: ADMIN_KEY, action2:'set', navOrder: {} });
+    if (r && r.ok) { navStateFromFlat({}); renderNavTree(); setMsg('navMsg','✅ 已清除，全端回到代码默认顺序','ok'); }
+    else setMsg('navMsg','❌ ' + ((r&&r.msg)||'清除失败'),'bad');
+  } catch(e){ setMsg('navMsg','清除失败：'+String(e.message||e),'bad'); }
 }
 
 async function loadStats(){
