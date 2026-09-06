@@ -7537,10 +7537,11 @@ html, body {
         <!-- Tab 内容：家长自主导入 -->
         <div class="mx-set-pane" data-pane="content" style="display:none" data-page-node-id="F0T5YpdJxwXP5woEw7Zrol">
 
-        <!-- 家长自主导入（#210） -->
-        <div class="card" id="import-panel" style="max-width: 420px; margin: 20px auto;" data-page-node-id="dIus3hjJ8GJv7YTRJ8BoB3">
-          <div class="card-title" data-page-node-id="3stYGzXSH0TijBhTtEGuxL">📥 家长自主导入 <span class="vip-badge" id="import-vip-badge" data-page-node-id="GghMvrGCG7Q82MVzr4UNFy">免费版</span></div>
-          <div id="import-panel-body" data-page-node-id="6pAxG6iTVcyvMjD2x59FFr"></div>
+        <!-- [资源中心#358] 旧「家长自主导入」（JSON/CSV 手工格式）已下线，统一走家长工作台 → 📥 资源中心 -->
+        <div class="card" style="max-width: 420px; margin: 20px auto;">
+          <div class="card-title">📥 资源导入已升级</div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:10px">导入功能已全面升级为「<b>资源中心</b>」：上传本地文件夹自动归类、CSV 表格、网盘链接三种傻瓜式方式，不再需要手动编写 JSON。</div>
+          <button class="btn" id="goto-rescenter-btn" style="width:100%">📥 前往资源中心（家长工作台）</button>
         </div>
 
 
@@ -11749,7 +11750,6 @@ window.DB = {
 
             if (window.renderNavOrderPanel) window.renderNavOrderPanel();
 
-            if (window.renderImportPanel) window.renderImportPanel();
 
             if (window.setupSettingsTabs) window.setupSettingsTabs();
 
@@ -12119,122 +12119,6 @@ window.DB = {
 
   }
 
-  /* #210 家长自主导入：导入识字词库(CSV) / 内容表(JSON)，含文件制式标准 + 月度配额 */
-  var IMPORT_QUOTA_MB = 100; // 非 VIP 月度导入上限
-  function importMonthKey() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-  function importUsedBytes() {
-    return window.DB.getSetting('importBytes:' + importMonthKey()).then(function (r) { return (r && r.value) ? (parseInt(r.value, 10) || 0) : 0; }).catch(function () { return 0; });
-  }
-  function importAddBytes(n) {
-    return importUsedBytes().then(function (u) { return window.DB.setSetting('importBytes:' + importMonthKey(), String(u + n)); });
-  }
-  function importRemainingMB() {
-    return importUsedBytes().then(function (u) { return Math.max(0, IMPORT_QUOTA_MB - Math.floor(u / 1048576)); });
-  }
-  function downloadTemplate(kind) {
-    var content, name, type;
-    if (kind === 'words') {
-      content = 'word,pinyin,def,group\n苹果,píng guǒ,一种常见的水果,食物\n汽车,qì chē,陆地交通工具,交通\n太阳,tài yáng,恒星，白天发光,自然\n';
-      name = '识字词库模板.csv'; type = 'text/csv;charset=utf-8';
-    } else {
-      content = JSON.stringify({ audio: { items: [{ id: 'audio_demo', title: '示例音频', cat: '古诗吟唱', url: 'assets/audio/demo.mp3', dur: 60 }] }, video: { items: [] }, characters: { items: [] } }, null, 2);
-      name = '内容表模板.json'; type = 'application/json';
-    }
-    try {
-      var blob = new Blob([content], { type: type });
-      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      if (window.showToast) window.showToast('⬇️ 已下载模板：' + name);
-    } catch (e) { if (window.showToast) window.showToast('模板下载失败：' + (e && e.message || e)); }
-  }
-  function parseWordsCsv(text) {
-    var lines = (text || '').split(/\r?\n/).filter(function (l) { return l.trim().length; });
-    if (!lines.length) return [];
-    var start = /^(word|字|词语|pinyin)/i.test(lines[0].trim()) ? 1 : 0; // 跳过表头
-    var out = [];
-    for (var i = start; i < lines.length; i++) {
-      var cells = lines[i].split(',');
-      if (cells.length < 2) continue;
-      var word = (cells[0] || '').trim();
-      if (!word) continue;
-      out.push({ word: word, pinyin: (cells[1] || '').trim(), def: (cells[2] || '').trim(), group: (cells[3] || '自定义').trim(), level: '初级', is_mastered: false, created: Date.now() });
-    }
-    return out;
-  }
-  function mergeContent(obj) {
-    try {
-      if (!window.MX_CONTENT) window.MX_CONTENT = { audio: { items: [] }, video: { items: [] }, characters: { items: [] } };
-      ['audio', 'video', 'characters'].forEach(function (k) {
-        if (obj[k] && Array.isArray(obj[k].items)) {
-          window.MX_CONTENT[k].items = (window.MX_CONTENT[k].items || []).concat(obj[k].items);
-          if (obj[k].categories) window.MX_CONTENT[k].categories = obj[k].categories;
-        }
-      });
-      return true;
-    } catch (e) { return false; }
-  }
-  function renderImportPanel(hostOverride) {
-    var host = hostOverride || document.getElementById('import-panel-body');
-    if (!host) { host = document.getElementById('pt-import-panel'); }
-    if (!host) return;
-    var vip = !!(window.isVip && window.isVip());
-    var badge = document.getElementById('import-vip-badge');
-    if (badge) badge.textContent = vip ? 'VIP·无限' : '免费版';
-    if (!window.DB || !window.DB.put) { host.innerHTML = '<p style="color:#e0533d;font-size:13px">本地数据库不可用，无法导入。</p>'; return; }
-    importRemainingMB().then(function (remain) {
-      host.innerHTML =
-        '<p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:10px;line-height:1.65">'
-        + '家长可导入自定义<b>识字词库(CSV)</b>或<b>内容表(JSON)</b>。文件制式：'
-        + 'CSV 列 = <code>word,pinyin,def,group</code>（首行表头可省略）；JSON 需含 <code>audio/video/characters</code> 的 items 数组。'
-        + (vip ? '' : '<br>免费版每月导入上限 <b>' + IMPORT_QUOTA_MB + 'MB</b>，本月剩余 <b>' + remain + 'MB</b>；VIP 不限。')
-        + '</p>'
-        + '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
-        + '<button class="btn sm" id="imp-tpl-words">⬇️ 识字CSV模板</button>'
-        + '<button class="btn sm" id="imp-tpl-json">⬇️ 内容JSON模板</button>'
-        + '</div>'
-        + '<div style="margin-bottom:10px"><input type="file" id="imp-file" accept=".csv,.json" style="width:100%;font-size:13px"></div>'
-        + '<button class="btn" id="imp-start" style="width:100%">📥 开始导入</button>'
-        + '<div id="imp-result" style="margin-top:10px;font-size:13px;min-height:18px"></div>';
-      var tplW = host.querySelector('#imp-tpl-words'); if (tplW) tplW.onclick = function () { downloadTemplate('words'); };
-      var tplJ = host.querySelector('#imp-tpl-json'); if (tplJ) tplJ.onclick = function () { downloadTemplate('json'); };
-      var startBtn = host.querySelector('#imp-start');
-      if (startBtn) startBtn.onclick = function () {
-        var fileInput = host.querySelector('#imp-file');
-        var file = fileInput && fileInput.files && fileInput.files[0];
-        var res = host.querySelector('#imp-result');
-        if (!file) { res.innerHTML = '<span style="color:#e0533d">请先选择文件</span>'; return; }
-        if (!vip && file.size > remain * 1048576) {
-          res.innerHTML = '<span style="color:#e0533d">⚠️ 已超过本月导入额度（剩余 ' + remain + 'MB），升级 VIP 可无限导入。</span>';
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function () {
-          try {
-            var text = reader.result;
-            if (file.name.toLowerCase().endsWith('.csv')) {
-              var rows = parseWordsCsv(text);
-              if (!rows.length) { res.innerHTML = '<span style="color:#e0533d">未解析到有效行（需 word,pinyin,def,group）</span>'; return; }
-              Promise.all(rows.map(function (r) { return window.DB.put('words', r); })).then(function () {
-                if (!vip) importAddBytes(file.size);
-                res.innerHTML = '<span style="color:#2e9e5b">✅ 成功导入 ' + rows.length + ' 个词语到识字词库。</span>';
-                if (window.showToast) window.showToast('📥 已导入 ' + rows.length + ' 个词语');
-              }).catch(function (e) { res.innerHTML = '<span style="color:#e0533d">导入失败：' + (e && e.message || e) + '</span>'; });
-            } else {
-              var obj = JSON.parse(text);
-              if (!mergeContent(obj)) { res.innerHTML = '<span style="color:#e0533d">JSON 格式不正确（需含 audio/video/characters 的 items）</span>'; return; }
-              window.DB.setSetting('mx_content_import', JSON.stringify(window.MX_CONTENT)).then(function () {
-                if (!vip) importAddBytes(file.size);
-                res.innerHTML = '<span style="color:#2e9e5b">✅ 已合并内容表（audio=' + window.MX_CONTENT.audio.items.length + ' 等）。</span>';
-                if (window.showToast) window.showToast('📥 已导入内容表');
-              });
-            }
-          } catch (e) { res.innerHTML = '<span style="color:#e0533d">解析失败：' + (e && e.message || e) + '</span>'; }
-        };
-        reader.readAsText(file);
-      };
-    });
-  }
-  window.renderImportPanel = renderImportPanel;
 
 
 
@@ -22583,6 +22467,143 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return { stats: stats, errors: errors, total: files.length };
   }
 
+  /* ===== [资源中心#358-阶段二] CSV 表格导入（VIP）+ 网盘链接（全员）+ VIP 云端配额 ===== */
+  var RES_CLOUD_QUOTA_MB = 20; /* 用户拍板：VIP 云端累计配额 20MB 硬顶（文件本体永不上云，仅元数据） */
+  function resIsVip(){ try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
+
+  /* 识别网盘分享链接 */
+  function resDetectNetdisk(url){
+    var u = String(url || '');
+    if (/pan\.baidu\.com\/(s|share)\//i.test(u)) return { name: '百度网盘', icon: '🌐' };
+    if (/(alipan|aliyundrive)\.com/i.test(u)) return { name: '阿里云盘', icon: '☁️' };
+    return null;
+  }
+
+  /* CSV「类型」列 → 模块 key；识别不了时回退 inferResourceMeta 按名称智能归类 */
+  function resCsvTypeToModule(type, title){
+    var t = String(type || '');
+    if (/古诗|诗词|poem/i.test(t)) return 'poem';
+    if (/识字|认字|literacy/i.test(t)) return 'literacy';
+    if (/拼音|pinyin/i.test(t)) return 'pinyin';
+    if (/英语绘本|estory/i.test(t)) return 'estory';
+    if (/绘本|story|图画书/i.test(t)) return 'story';
+    if (/字母|abc/i.test(t)) return 'abc';
+    if (/自然拼读|phonics/i.test(t)) return 'phonics';
+    if (/单词|words/i.test(t)) return 'words';
+    if (/数学|算法|math|algo/i.test(t)) return 'algo';
+    if (/练习册|workbook|试卷/i.test(t)) return 'workbook';
+    if (/英文熏听|熏听英文|listen-en/i.test(t)) return 'listen-en';
+    if (/儿歌|熏听儿歌|listen-music/i.test(t)) return 'listen-music';
+    if (/国学|中文熏听|熏听|倾听|lchinese/i.test(t)) return 'lchinese';
+    try { var meta = window.DB.inferResourceMeta(title); return (meta && meta.module) || 'community'; } catch (e) { return 'community'; }
+  }
+
+  /* 简易 CSV 解析：支持双引号包裹、引号内逗号/换行；自动去 BOM、跳表头与「（示例）」行 */
+  function resParseCsv(text){
+    var t = String(text || '').replace(/^\uFEFF/, '');
+    var rows = [], row = [], cell = '', inQ = false;
+    function pushRow(){ row.push(cell); cell = ''; if (row.some(function(c){ return String(c).trim().length; })) rows.push(row); row = []; }
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+      if (inQ) {
+        if (ch === '"') { if (t[i+1] === '"') { cell += '"'; i++; } else inQ = false; }
+        else cell += ch;
+      } else if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i+1] === '\n') i++; pushRow(); }
+      else cell += ch;
+    }
+    if (cell.length || row.length) pushRow();
+    if (rows.length && /资源名称|文件路径/.test(rows[0].join(','))) rows.shift();
+    return rows.map(function(r){
+      return { title: String(r[0] || '').trim(), type: String(r[1] || '').trim(), path: String(r[2] || '').trim() };
+    }).filter(function(r){ return r.title && !/^（?示例/.test(r.title); });
+  }
+
+  /* CSV 模板下载（UTF-8 BOM，Excel/WPS 双击可编辑） */
+  function resDownloadCsvTemplate(){
+    var content = '\uFEFF资源名称,类型,文件路径/网盘链接\n'
+      + '（示例）静夜思跟读,古诗,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + '（示例）ABC字母歌,26字母,https://www.alipan.com/s/1xxxxxxxx\n'
+      + '（示例）十以内加法,数学,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + '（示例）睡前国学故事,国学,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + ',,\n提示：类型可填 古诗/识字/拼音/绘本/英语绘本/26字母/自然拼读/英语单词/数学/练习册/熏听英文/儿歌/国学；链接列填网盘分享链接，本地文件请用模式一上传文件夹\n';
+    try {
+      var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '资源导入模板.csv'; a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（Excel/WPS 可直接编辑）');
+    } catch (e) { if (window.showToast) window.showToast('模板下载失败：' + (e && e.message || e)); }
+  }
+
+  /* CSV 行导入：链接 → 跳转型资源；本地路径 → 引导用模式一 */
+  async function resImportCsvRows(rows, onProgress){
+    var stats = {}, errors = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      try {
+        if (/^（?示例/.test(r.title)) { if (onProgress) onProgress(i + 1, rows.length); continue; }
+        var mod = resCsvTypeToModule(r.type, r.title);
+        if (/^https?:\/\//i.test(r.path)) {
+          var net = resDetectNetdisk(r.path);
+          if (!net) errors.push(r.title + '：链接暂只支持百度网盘/阿里云盘，本地文件请用模式一上传');
+          else {
+            var id = window.DB.makeResourceId('csv|' + r.title + '|' + r.path);
+            await window.DB.putResource({ id: id, module: mod, category: net.name + '链接', title: r.title, original_filename: r.path, size: 0, mediaType: 'link', externalLink: r.path, tags: [net.name], source: 'csv-link' });
+            stats[mod] = (stats[mod] || 0) + 1;
+          }
+        } else if (r.path) {
+          errors.push(r.title + '：表格里是本地路径，请用「模式一：上传文件夹」把文件传进来');
+        } else {
+          errors.push(r.title + '：缺少「文件路径/网盘链接」');
+        }
+      } catch (e) { errors.push((r && r.title || '?') + '：' + (e && e.message || e)); }
+      if (onProgress) onProgress(i + 1, rows.length);
+    }
+    return { stats: stats, errors: errors, total: rows.length, bytes: 0 };
+  }
+
+  /* 模式三：保存网盘链接（全员可用，仅存本地 IndexedDB） */
+  async function resAddCloudLink(url, net){
+    var id = window.DB.makeResourceId('link|' + url);
+    await window.DB.putResource({ id: id, module: 'community', category: net.name + '链接', title: net.name + '分享资源 ' + new Date().toISOString().slice(0, 10), original_filename: url, size: 0, mediaType: 'link', externalLink: url, tags: [net.name], source: 'cloud-link' });
+    return id;
+  }
+
+  /* VIP 云端配额：累计导入体积（元数据同步的硬顶；文件本体永不上云） */
+  function resCloudUsedBytes(){
+    return window.DB.getAll('resources').then(function (rows) {
+      var s = 0; (rows || []).forEach(function (r) { s += (r && r.size) || 0; });
+      return s;
+    }).catch(function () { return 0; });
+  }
+  /* 导入完成后的云端动作：VIP → 未超限则触发元数据同步；免费用户零云端消耗 */
+  function resAfterImport(){
+    if (!resIsVip()) return;
+    resCloudUsedBytes().then(function (used) {
+      if (used > RES_CLOUD_QUOTA_MB * 1048576) {
+        if (window.showToast) window.showToast('☁️ 云端空间已满（' + RES_CLOUD_QUOTA_MB + 'MB 上限），请移步本地使用');
+      } else if (window.pushCloud) { try { window.pushCloud(); } catch (e) {} }
+    });
+  }
+
+  /* 通用提示弹窗（非导入统计场景） */
+  function resSummaryNotice(container, title, body){
+    var ov = document.createElement('div');
+    ov.className = 'mxg-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:16px;max-width:400px;width:100%;padding:22px 20px;text-align:center;font-size:14px">'
+      + '<div style="font-weight:700;font-size:16px;margin-bottom:10px">' + resEsc(title) + '</div>'
+      + '<div style="font-size:13px;color:#5b6b80;line-height:1.7;text-align:left">' + body + '</div>'
+      + '<button class="btn" id="res-notice-ok" style="width:100%;margin-top:12px">知道了</button>'
+      + '</div>';
+    container.appendChild(ov);
+    var ok = ov.querySelector('#res-notice-ok');
+    if (ok) ok.onclick = function(){ if (ov.parentNode) ov.parentNode.removeChild(ov); };
+    return ov;
+  }
+
   /* 导入完成总览弹窗（傻瓜式反馈：导入了什么、存在哪里） */
   function resSummaryPopup(container, stats, errors, total){
     var keys = Object.keys(stats);
@@ -22604,7 +22625,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '<div style="font-weight:700;font-size:16px;margin:6px 0 12px">导入完成！共 ' + total + ' 个文件</div>'
       + '<div style="line-height:2">' + statLine + '</div>'
       + errLine
-      + '<div style="margin:12px 0 4px;padding:9px 10px;background:#f0f7ff;border-radius:8px;font-size:12.5px;color:#1f3a5f">💾 这些文件现在<b>保存在你当前设备上</b>，不消耗任何云端空间；换设备需重新导入（VIP 云同步即将开放）。</div>'
+      + '<div style="margin:12px 0 4px;padding:9px 10px;background:#f0f7ff;border-radius:8px;font-size:12.5px;color:#1f3a5f">'
+      + (resIsVip()
+        ? '☁️ 资源清单已同步到你的 <b>VIP 云端</b>（仅清单，文件本体始终保存在本地播放，不烧流量）；换设备登录后自动恢复列表。'
+        : '💾 这些文件现在<b>保存在你当前设备上</b>，不消耗任何云端空间。')
+      + '</div>'
       + '<button class="btn" id="res-sum-ok" style="width:100%;margin-top:10px">好的，我知道了</button>'
       + '</div>';
     container.appendChild(ov);
@@ -22657,16 +22682,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       +     '<div style="font-size:30px">📁</div><div style="flex:1"><b>模式一：上传本地文件夹（推荐）</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">整包选择电脑/手机里的学习资源文件夹，自动按文件名归类到对应模块</div></div>'
       +     '<button class="btn mx-btn-main" id="res-btn-folder" style="white-space:nowrap">选择文件夹</button>'
       +   '</div>'
-      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
-      +     '<div style="font-size:30px">📊</div><div style="flex:1"><b>模式二：Excel 表格导入</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">下载模板 → 填写资源名称和网盘/文件路径 → 上传，自动挂到模块（即将开放）</div></div>'
-      +     '<span style="font-size:12px;color:#9aa">即将开放</span>'
+      +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:2px dashed #7ec850;border-radius:12px;background:#f2faf0">'
+      +     '<div style="font-size:30px">📊</div><div style="flex:1"><b>模式二：Excel 表格导入（VIP 专属）</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">下载 CSV 模板 → 用 Excel/WPS 填写资源名称和网盘链接 → 上传，自动挂到模块；支持云端多设备同步</div></div>'
+      +     '<div style="display:flex;flex-direction:column;gap:6px;white-space:nowrap"><button class="btn" id="res-btn-csv-tpl" style="white-space:nowrap">⬇️ 下载模板</button><button class="btn mx-btn-main" id="res-btn-csv" style="white-space:nowrap">📤 上传表格</button></div>'
       +   '</div>'
       +   '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #e3e8f0;border-radius:12px">'
-      +     '<div style="font-size:30px">☁️</div><div style="flex:1"><b>模式三：粘贴网盘链接</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">粘贴百度网盘/阿里云盘分享链接，生成一键跳转下载（即将开放）</div></div>'
-      +     '<span style="font-size:12px;color:#9aa">即将开放</span>'
+      +     '<div style="font-size:30px">☁️</div><div style="flex:1"><b>模式三：粘贴网盘链接</b><div style="font-size:12.5px;color:#5b6b80;margin-top:3px">粘贴百度网盘/阿里云盘分享链接，一键保存到资源列表，随时跳转下载</div></div>'
+      +   '</div>'
+      +   '<div id="res-link-row" style="display:none;gap:8px;margin-top:2px">'
+      +     '<input type="text" id="res-link-input" placeholder="https://pan.baidu.com/s/…" style="flex:1;padding:8px 10px;border:1px solid #d5e3f7;border-radius:9px;font-size:13px">'
+      +     '<button class="btn mx-btn-main" id="res-btn-link" style="white-space:nowrap">🔗 保存链接</button>'
       +   '</div>'
       + '</div>'
       + '<input type="file" id="res-folder-input" webkitdirectory directory multiple style="display:none">'
+      + '<input type="file" id="res-csv-input" accept=".csv,text/csv" style="display:none">'
       + '<div id="res-progress" style="display:none;margin-top:10px;font-size:13px;color:#1f3a5f"></div>'
       + '</div>'
       /* 已导入总览 */
@@ -22693,6 +22722,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             input.value = '';
             resSummaryPopup(page, r.stats, r.errors, r.total);
             renderResList();
+            resAfterImport();
           })
           .catch(function(e){
             if (prog) prog.textContent = '❌ 导入出错：' + (e && e.message || e);
@@ -22701,6 +22731,64 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       };
     }
     renderResList();
+
+    /* [资源中心#358-阶段二] 模式二：CSV 表格导入（VIP 专属） */
+    var csvTpl = page.querySelector('#res-btn-csv-tpl');
+    var csvBtn = page.querySelector('#res-btn-csv');
+    var csvInput = page.querySelector('#res-csv-input');
+    if (csvTpl) csvTpl.onclick = function(){ resDownloadCsvTemplate(); };
+    if (csvBtn && csvInput) {
+      csvBtn.onclick = function(){
+        if (!resIsVip()) { resSummaryNotice(page, '🔒 Excel 表格导入是 VIP 专属功能', '免费用户可用「模式一：上传文件夹」和「模式三：粘贴网盘链接」，导入内容永远保存在本设备。升级 VIP 后可用表格批量导入，并支持云端多设备同步。'); return; }
+        csvInput.click();
+      };
+      csvInput.onchange = function(){
+        var f = csvInput.files && csvInput.files[0];
+        if (!f) return;
+        if (!resIsVip()) { csvInput.value = ''; return; }
+        if (prog) { prog.style.display = 'block'; prog.textContent = '正在解析表格…'; }
+        var reader = new FileReader();
+        reader.onload = function(){
+          var rows = resParseCsv(String(reader.result || ''));
+          if (!rows.length) { if (prog) { prog.textContent = '❌ 表格为空或格式不正确'; setTimeout(function(){ prog.style.display='none'; }, 4000); } csvInput.value = ''; return; }
+          resImportCsvRows(rows, function(d, t){ if (prog) prog.textContent = '正在导入 ' + d + '/' + t + ' …'; })
+            .then(function(r){
+              if (prog) { prog.textContent = '✅ 完成：共处理 ' + r.total + ' 条' + (r.errors.length ? '，失败 ' + r.errors.length + ' 条' : ''); setTimeout(function(){ prog.style.display='none'; }, 5000); }
+              csvInput.value = '';
+              resSummaryPopup(page, r.stats, r.errors, r.total);
+              renderResList();
+              resAfterImport(r.bytes || 0);
+            })
+            .catch(function(e){ if (prog) prog.textContent = '❌ 导入出错：' + (e && e.message || e); csvInput.value = ''; });
+        };
+        reader.readAsText(f, 'utf-8');
+      };
+    }
+
+    /* [资源中心#358-阶段二] 模式三：网盘链接粘贴（全员可用，仅存本地） */
+    var linkRow = page.querySelector('#res-link-row');
+    var linkInput = page.querySelector('#res-link-input');
+    var linkBtn = page.querySelector('#res-btn-link');
+    var step3Card = null;
+    var divs = page.querySelectorAll('#res-steps > div');
+    for (var di = 0; di < divs.length; di++) { if (/模式三/.test(divs[di].textContent)) { step3Card = divs[di]; break; } }
+    if (step3Card && linkRow) step3Card.onclick = function(){ linkRow.style.display = (linkRow.style.display === 'flex') ? 'none' : 'flex'; if (linkRow.style.display === 'flex' && linkInput) linkInput.focus(); };
+    if (linkBtn && linkInput) {
+      var doAdd = function(){
+        var url = (linkInput.value || '').trim();
+        if (!url) { if (window.showToast) window.showToast('请先粘贴网盘分享链接'); return; }
+        var net = resDetectNetdisk(url);
+        if (!net) { if (window.showToast) window.showToast('⚠️ 暂只支持百度网盘/阿里云盘分享链接'); return; }
+        resAddCloudLink(url, net).then(function(){
+          linkInput.value = '';
+          if (linkRow) linkRow.style.display = 'none';
+          if (window.showToast) window.showToast('✅ 已保存到资源列表（仅本设备）');
+          renderResList();
+        }).catch(function(e){ if (window.showToast) window.showToast('保存失败：' + (e && e.message || e)); });
+      };
+      linkBtn.onclick = doAdd;
+      linkInput.onkeydown = function(ev){ if (ev && ev.key === 'Enter') { try { ev.preventDefault(); } catch (e) {} doAdd(); } };
+    }
   }
 
   /* 已导入列表：按模块分组 + 统计 chips + 预览/删除（host 跟随最近一次 renderResourceCenter） */
@@ -22711,7 +22799,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var listBox = page.querySelector('#res-list');
     if (!listBox) return;
     window.DB.getAll('resources').then(function(all){
-      var rows = (all||[]).filter(function(r){ return r.source === 'folder-import'; });
+      var rows = (all||[]).filter(function(r){ return r && (r.source === 'folder-import' || r.source === 'csv-link' || r.source === 'cloud-link'); });
       rows.sort(function(a,b){ return (b.createdAt||0) - (a.createdAt||0); });
       var byMod = {}, totalSize = 0;
       rows.forEach(function(r){ byMod[r.module] = (byMod[r.module]||0)+1; totalSize += (r.size||0); });
@@ -22727,16 +22815,31 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         html += '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">'+m.icon+' '+resEsc(m.label)+' <span style="color:#9aa;font-weight:400">'+byMod[k]+'个</span></div>';
         rows.forEach(function(r){
           if (r.module !== k) return;
+          var isLink = (r.mediaType === 'link') && (r.externalLink || r.linkUrl);
+          var linkUrl = r.externalLink || r.linkUrl || '';
+          var actionHtml = isLink
+            ? '<button class="btn" data-res-link="' + resEsc(r.id) + '" style="font-size:11px;padding:2px 10px;border:1px solid #7ec850;color:#2e7d32;background:#f2faf0;border-radius:6px;white-space:nowrap">🔗 去网盘下载</button>'
+            : '<span style="font-size:11.5px;color:#9aa;white-space:nowrap" title="点击左侧名称预览">▶</span>';
           html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
-            + '<span style="flex:1;font-size:13px;cursor:pointer;color:#1f3a5f" data-res-pv="'+resEsc(r.id)+'" title="点击预览">▶ '+resEsc(r.title||r.original_filename)+'</span>'
-            + '<span style="font-size:11.5px;color:#9aa">'+resFmtSize(r.size)+'</span>'
-            + '<button class="btn" data-res-del="'+resEsc(r.id)+'" style="font-size:11px;padding:2px 8px;border:1px solid #f0b4ad;color:#c0392b;background:#fff;border-radius:6px">删除</button>'
+            + '<span style="flex:1;font-size:13px;' + (isLink ? 'color:#5b6b80' : 'cursor:pointer;color:#1f3a5f') + '"' + (isLink ? '' : ' data-res-pv="' + resEsc(r.id) + '" title="点击预览"') + '>' + (isLink ? '🔗 ' : '▶ ') + resEsc(r.title||r.original_filename) + '</span>'
+            + '<span style="font-size:11.5px;color:#9aa;white-space:nowrap">' + (isLink ? resEsc((r.tags && r.tags[0]) || '网盘') : resFmtSize(r.size)) + '</span>'
+            + actionHtml
+            + '<button class="btn" data-res-del="' + resEsc(r.id) + '" style="font-size:11px;padding:2px 8px;border:1px solid #f0b4ad;color:#c0392b;background:#fff;border-radius:6px">删除</button>'
             + '</div>';
         });
       });
       listBox.innerHTML = html;
       listBox.querySelectorAll('[data-res-pv]').forEach(function(el){
         el.onclick = function(){ resPreview(el.getAttribute('data-res-pv')); };
+      });
+      listBox.querySelectorAll('[data-res-link]').forEach(function(el){
+        el.onclick = function(){
+          var id = el.getAttribute('data-res-link');
+          var rec = rows.filter(function(r){ return r.id === id; })[0];
+          var url = (rec && (rec.externalLink || rec.linkUrl)) || '';
+          if (!url) return;
+          try { window.open(url, '_blank'); } catch (e) { location.href = url; }
+        };
       });
       listBox.querySelectorAll('[data-res-del]').forEach(function(el){
         el.onclick = function(){
@@ -22754,7 +22857,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).catch(function(){ listBox.innerHTML = '<div class="empty-tip">资源列表加载失败</div>'; });
   }
 
-  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup };
+  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup, parseCsv: resParseCsv, importCsvRows: resImportCsvRows, detectNetdisk: resDetectNetdisk, addCloudLink: resAddCloudLink, csvTypeToModule: resCsvTypeToModule, downloadCsvTemplate: resDownloadCsvTemplate, cloudUsedBytes: resCloudUsedBytes, isVip: resIsVip };
+
+  /* [资源中心#358-阶段二] 设置页「前往资源中心」按钮（静态 HTML，事件委托） */
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.id === 'goto-rescenter-btn' && window.navigateTo) { try { window.navigateTo('page-parent'); } catch (err) {} }
+  });
 })();
 
 </script>
@@ -24847,7 +24956,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         return ensureUid().then(function (uid) {
           var p = ''; try { p = localStorage.getItem('mx_parent_pin') || ''; } catch (e) {}
           if (p) { try { out.__parentPinEnc = encPin(p, uid); } catch (e) {} }
-          return out;
+          /* [资源中心#358] VIP 仅同步资源元数据清单（文件本体永不上云）；累计超 20MB 配额则不同步，引导本地使用 */
+          return (window.DB && window.DB.getAll ? window.DB.getAll('resources') : Promise.resolve([])).then(function (rrows) {
+            var _sum = 0; (rrows || []).forEach(function (r) { _sum += (r && r.size) || 0; });
+            if (_sum <= 20 * 1048576) { out.resources = (rrows || []); }
+            else { try { window.__mxResCloudFull = true; } catch (e) {} }
+            return out;
+          }).catch(function () { return out; });
         }).catch(function () { return out; });
       }
       return out;
@@ -24954,6 +25069,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* [badgefix] 记录最近一次同步失败原因（诊断弹窗读取） */
   function mxSyncErr(msg) { try { localStorage.setItem('mx_sync_last_err', new Date().toLocaleString() + ' ' + String(msg || '').slice(0, 120)); } catch (e) {} }
   function pushCloud() {
+    /* [资源中心#358] 导出供资源中心导入完成后手动触发元数据同步（跨 IIFE 红线；置于首行保证任何路径都完成导出） */
+    window.pushCloud = pushCloud;
     if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
     /* [syncfix] 密码登录用户本地可能无卡密 code：服务端只认 uid（verifyVipOwner），
        code 缺失不应阻断同步（空 code 由服务端保留历史值） */
