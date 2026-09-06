@@ -1201,6 +1201,22 @@ html, body {
 
   gap: 12px;
 
+  /* [#375] 左侧整体不收缩，公告在右侧空间内自适应；标题超长由 .header-title 截断 */
+
+  flex: 0 0 auto;
+
+  min-width: 0;
+
+}
+
+.app-header .header-title {
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
 }
 
 
@@ -1295,6 +1311,14 @@ html, body {
   flex: 1;
 
   text-align: center;
+
+  /* [#375] 公告避让标题：左侧留出 5~6 字符间距，右侧留出口；空间不足时公告收缩而非压字 */
+
+  min-width: 0;
+
+  overflow: hidden;
+
+  margin: 0 12px 0 84px;
 
 }
 
@@ -1419,6 +1443,12 @@ html, body {
   overflow-y: auto;
 
   overflow-x: hidden;
+
+  /* [#382 iOS] 侧栏滚动到底不再连带整页橡皮筋回弹（否则底部「系统设置」点不到）：
+     overscroll-behavior 隔离滚动链 + 平滑触摸滚动 + 底部安全区留白 */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 
   transition: transform var(--transition-normal), background var(--transition-normal);
 
@@ -4652,13 +4682,16 @@ html, body {
 /* 顶部公告栏 */
 .gx-announce {
   display: flex; align-items: center; gap: 8px;
-  background: linear-gradient(90deg, #ffd54a, #ffc107);
-  color: #5d3b00; font-size: 13px; font-weight: 600;
-  border-radius: 999px; padding: 3px 12px; max-width: 420px;
+  /* [#375 弱化] 磨砂半透明：跟随各皮肤 header 底色，不再扎眼 */
+  background: rgba(255,255,255,0.26);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: var(--text-on-primary, #fff); font-size: 12.5px; font-weight: 500;
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 999px; padding: 3px 12px; max-width: 400px;
   overflow: hidden; white-space: nowrap; height: 24px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.gx-announce-label { flex: 0 0 auto; font-weight: 800; }
+.gx-announce-label { flex: 0 0 auto; font-weight: 700; opacity: .9; }
 .gx-announce-track {
   display: inline-block; padding-left: 0;
   animation: gxMarq 16s linear infinite;
@@ -4747,7 +4780,10 @@ html, body {
 .dash-progress-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #5d3b00; }
 
 @media (max-width: 720px) {
-  .gx-announce { max-width: 200px; }
+  /* [#375] 移动端：标题截断 + 公告收窄，同排不互相压字 */
+  .app-header .header-title { max-width: 46vw; }
+  .app-header .header-center { margin: 0 8px 0 10px; }
+  .gx-announce { max-width: 44vw; font-size: 11.5px; padding: 3px 9px; }
   .gx-pet-status-t { display: none; }
 }
 
@@ -4988,9 +5024,10 @@ html, body {
 .mx-seg-btn.active{background:#fff;color:#5b6ee1;box-shadow:0 2px 8px rgba(91,110,225,.2)}
 /* 家长工作台页签控制台 */
 .mx-tabs{display:flex;gap:6px;background:#eef1f6;padding:5px;border-radius:14px;margin-bottom:16px;flex-wrap:wrap}
-.mx-tab{flex:1;min-width:120px;min-height:42px;border:2px solid transparent;background:transparent;border-radius:11px;font-size:14.5px;font-weight:800;color:#5b6478;cursor:pointer;transition:.15s}
+/* [#380] 家长工作台等页签：未选中态加磨砂底+描边（任何皮肤下都可见），选中态高对比 */
+.mx-tab{flex:1;min-width:120px;min-height:42px;border:2px solid rgba(0,0,0,.10);background:rgba(255,255,255,.62);border-radius:11px;font-size:14.5px;font-weight:800;color:#33415c;cursor:pointer;transition:.15s;box-shadow:0 1px 4px rgba(0,0,0,.07)}
 .mx-tab:hover{background:#fff}
-.mx-tab.on{background:#fff;border-color:#7ec850;color:#2e7d32;box-shadow:0 3px 10px rgba(126,200,80,.22)}
+.mx-tab.on{background:#fff;border-color:var(--accent-primary,#7ec850);color:#1f3a5f;box-shadow:0 3px 10px rgba(0,0,0,.16);border-bottom-width:3px}
 .mx-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:16px}
 .mx-stat{background:linear-gradient(135deg,#fff,#f6f8fc);border:2px solid #eaf0f7;border-radius:16px;padding:14px;text-align:center}
 .mx-stat b{display:block;font-size:26px;color:#5b6ee1;font-weight:900}
@@ -13459,7 +13496,8 @@ window.MX_SEED = data;
 
       // 需求三：首次打开今日打卡，自动生成本周全部任务排期（全科均衡套组，7 天）
       // 若已存在排期则不重复生成；改动计划可前往「学习任务套组 / 家长工作台」调整。
-      if (!sched || !sched.items || !sched.items.length) {
+      // [#377 多端一致] 旧版生成的排期行没有 setId 标记（各设备模板不同导致 3 vs 6 不一致）→ 一并用当前模板重生成（已完成项自动保留）
+      if (!sched || !sched.items || !sched.items.length || !sched.setId) {
         try {
           if (window.MX_TASKSETS && typeof window.MX_TASKSETS.apply === 'function') {
             await window.MX_TASKSETS.apply('set_all', 7);
@@ -16738,6 +16776,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }
     } catch (e) {}
   }
+  /* [#378 公告准实时] 定时 + 回前台时重拉配置：管理后台发布公告后，用户端最长 3 分钟内自动可见；
+     切回前台立即刷新一次（60s 节流），无需重启页面。 */
+  (function () {
+    var _lastCfgFetch = 0;
+    function refreshCfg() {
+      var now = Date.now();
+      if (now - _lastCfgFetch < 60000) return;
+      _lastCfgFetch = now;
+      try { loadConfigTables(); } catch (e) {}
+    }
+    setInterval(refreshCfg, 3 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCfg(); });
+    window.addEventListener('focus', refreshCfg);
+  })();
   function mxIsVip() { try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
   function mxEnabledGames() {
     if (mxIsVip()) return MX_GAME_ORDER.slice();
@@ -22555,6 +22607,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       try {
         var cls = resClassify(file);
         var rel = file.webkitRelativePath || file.name;
+        /* [#379 模块类型白名单] 熏听类仅收音频；绘本/练习册等放行视频口子；不符→跳过并记入报告 */
+        var _allow = RES_MODULE_TYPES[cls.module];
+        if (_allow && _allow.indexOf(cls.mediaType) < 0) {
+          var _typeName = { audio: '音频', video: '视频', pdf: 'PDF', image: '图片', link: '链接' }[cls.mediaType] || cls.mediaType;
+          var _modName = (resModLabel(cls.module) || {}).label || cls.module;
+          errors.push(file.name + '：' + _modName + '模块不支持' + _typeName + '文件（已跳过）');
+          done++;
+          if (onProgress) onProgress(done, files.length);
+          continue;
+        }
         var id = window.DB.makeResourceId(file.name + '|' + rel + '|' + file.size);
         await window.DB.saveResourceBlob(id, file, cls.mediaType);
         await window.DB.putResource({
@@ -22591,6 +22653,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* CSV「类型」列 → 模块 key；识别不了时回退 inferResourceMeta 按名称智能归类 */
   function resCsvTypeToModule(type, title){
     var t = String(type || '');
+    /* [#379] 先查标准别名表（支持「熏听-英语」「语文-古诗」等模板标准写法，精确优先） */
+    try { if (RES_MODULE_ALIAS[t.trim()]) return RES_MODULE_ALIAS[t.trim()]; } catch (e) {}
     if (/古诗|诗词|poem/i.test(t)) return 'poem';
     if (/识字|认字|literacy/i.test(t)) return 'literacy';
     if (/拼音|pinyin/i.test(t)) return 'pinyin';
@@ -22631,12 +22695,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* CSV 模板下载（UTF-8 BOM，Excel/WPS 双击可编辑） */
   function resDownloadCsvTemplate(){
-    var content = '\uFEFF资源名称,类型,文件路径/网盘链接\n'
-      + '（示例）静夜思跟读,古诗,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + '（示例）ABC字母歌,26字母,https://www.alipan.com/s/1xxxxxxxx\n'
-      + '（示例）十以内加法,数学,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + '（示例）睡前国学故事,国学,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + ',,\n提示：类型可填 古诗/识字/拼音/绘本/英语绘本/26字母/自然拼读/英语单词/数学/练习册/熏听英文/儿歌/国学；链接列填网盘分享链接，本地文件请用模式一上传文件夹\n';
+    /* [#379] 模板带「模块」标准列（13 类全名可选）+ 各模块允许文件类型说明 */
+    var content = '\uFEFF资源名称,模块,文件路径/网盘链接\n'
+      + '（示例）静夜思跟读,语文-古诗,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + '（示例）ABC字母歌,英语-26字母,https://www.alipan.com/s/1xxxxxxxx\n'
+      + '（示例）十以内加法,数学-算法,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + '（示例）睡前国学故事,熏听-语文,https://pan.baidu.com/s/1xxxxxxxx\n'
+      + ',,\n'
+      + '【模块列可选值（13 类）】\n'
+      + '语文-古诗｜语文-识字｜语文-拼音｜语文-绘本｜英语-绘本｜英语-26字母｜英语-自然拼读｜英语-单词｜数学-算法｜数学-练习册｜熏听-英语｜熏听-儿歌｜熏听-语文\n'
+      + '【各模块建议文件类型】\n'
+      + '熏听-英语/儿歌/语文：仅音频 mp3/wav/m4a/aac（磨耳朵用）\n'
+      + '语文-古诗/识字/拼音：音频 mp3/wav 或 PDF/图片\n'
+      + '语文-绘本：图片 jpg/png（一页一图）或 PDF 或视频 mp4（讲读视频）\n'
+      + '英语-绘本/26字母/自然拼读/单词：音频 mp3/wav 或 PDF/图片，绘本可传视频 mp4\n'
+      + '数学-算法/练习册：PDF 或图片，可带讲解视频 mp4\n'
+      + '提示：链接列填网盘分享链接；本地文件请用模式一上传文件夹（文件名带模块关键词可自动归类）\n';
     try {
       var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '资源导入模板.csv'; a.click();
@@ -22644,6 +22718,41 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（Excel/WPS 可直接编辑）');
     } catch (e) { if (window.showToast) window.showToast('模板下载失败：' + (e && e.message || e)); }
   }
+  /* [#379] 模块列别名表：兼容「熏听-英语」/「熏听英文」/「listen-en」等写法 → 标准 key */
+  var RES_MODULE_ALIAS = (function(){
+    var m = {};
+    function reg(names, key){ names.forEach(function(n){ m[n] = key; }); }
+    reg(['语文-古诗','古诗','poem'], 'poem');
+    reg(['语文-识字','识字','literacy'], 'literacy');
+    reg(['语文-拼音','拼音','pinyin'], 'pinyin');
+    reg(['语文-绘本','绘本','story'], 'story');
+    reg(['英语-绘本','英语绘本','estory'], 'estory');
+    reg(['英语-26字母','26字母','abc'], 'abc');
+    reg(['英语-自然拼读','自然拼读','phonics'], 'phonics');
+    reg(['英语-单词','英语单词','words'], 'words');
+    reg(['数学-算法','数学','数学算法','algo'], 'algo');
+    reg(['数学-练习册','练习册','workbook'], 'workbook');
+    reg(['熏听-英语','熏听英文','listen-en','listen'], 'listen-en');
+    reg(['熏听-儿歌','儿歌','listen-music'], 'listen-music');
+    reg(['熏听-语文','国学','熏听-国学','lchinese'], 'lchinese');
+    return m;
+  })();
+  /* [#379] 各模块允许的文件类型白名单（mediaType 级）：熏听仅音频；绘本放行视频口子 */
+  var RES_MODULE_TYPES = {
+    'poem':        ['audio','pdf','image'],
+    'literacy':    ['audio','pdf','image'],
+    'pinyin':      ['audio','pdf','image'],
+    'story':       ['audio','image','pdf','video'],
+    'estory':      ['audio','image','pdf','video'],
+    'abc':         ['audio','pdf','image'],
+    'phonics':     ['audio','pdf','image'],
+    'words':       ['audio','pdf','image'],
+    'algo':        ['pdf','image','video'],
+    'workbook':    ['pdf','image','video'],
+    'listen-en':   ['audio'],
+    'listen-music':['audio'],
+    'lchinese':    ['audio']
+  };
 
   /* CSV 行导入：链接 → 跳转型资源；本地路径 → 引导用模式一 */
   async function resImportCsvRows(rows, onProgress){
@@ -25249,6 +25358,46 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* ================= 宝宝档案 ================= */
   function showBabyProfile(next) {
+    /* [#376 新设备选孩子] 先查本机已有孩子；VIP 登录场景先拉云端快照（带 3.5s 超时兜底），
+       有孩子 → 弹「选择进入」列表（可新建），没有 → 才弹创建表单。 */
+    var started = false;
+    function start() {
+      if (started) return; started = true;
+      var getP = (window.DB && window.DB.getAll) ? window.DB.getAll('children') : Promise.resolve([]);
+      getP.then(function (kids) { paint(kids || []); }).catch(function () { paint([]); });
+    }
+    function choose(id) {
+      try {
+        if (window.setActiveChildId) window.setActiveChildId(id).catch(function () {});
+        else if (window.DB && window.DB.setSetting) window.DB.setSetting('activeChildId', id);
+      } catch (e) {}
+      next();
+    }
+    function paint(kids) {
+      if (kids && kids.length) {
+        var m = modal(
+          '<div style="font-size:42px">👶</div>' +
+          '<div style="font-size:19px;font-weight:800;color:#1f3a5f;margin:8px 0 6px">选择进入哪个宝宝的园地</div>' +
+          '<div style="font-size:13px;color:#7b8ba3;margin-bottom:14px">检测到本账号已有宝宝档案，点击头像即可进入</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;max-height:260px;overflow:auto">' +
+          kids.map(function (k) {
+            return '<button data-kid="' + String(k.id || '').replace(/"/g, '') + '" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:2px solid #d5e3f7;border-radius:12px;background:#fff;cursor:pointer;text-align:left;font-size:15px">'
+              + '<span style="font-size:24px">' + (k.avatar || '👶') + '</span><span style="flex:1;font-weight:700;color:#1f3a5f">' + String(k.name || '宝宝').replace(/</g, '&lt;') + '</span><span style="color:#3f7ef5;font-size:13px">进入 →</span></button>';
+          }).join('') +
+          '</div>' +
+          '<div style="display:flex;gap:10px">' +
+          '<button id="mx-baby-later" style="flex:1;padding:12px;border:1px solid #d5e3f7;border-radius:12px;background:#f3f6fb;color:#5b6b80;font-size:14px;cursor:pointer">稍后再说</button>' +
+          '<button id="mx-baby-new" style="flex:1.4;padding:12px;border:2px dashed #4facfe;border-radius:12px;background:#f0f7ff;color:#3f7ef5;font-size:14px;font-weight:700;cursor:pointer">＋ 新建宝宝</button>' +
+          '</div>'
+        );
+        m.querySelectorAll('[data-kid]').forEach(function (b) {
+          b.onclick = function () { m.close(); choose(b.getAttribute('data-kid')); };
+        });
+        m.querySelector('#mx-baby-later').onclick = function () { m.close(); try { if (window.setActiveChildId) window.setActiveChildId('default').catch(function () {}); } catch (e) {} next(); };
+        m.querySelector('#mx-baby-new').onclick = function () { m.close(); createForm(); };
+      } else createForm();
+    }
+    function createForm() {
     var m = modal(
       '<div style="font-size:42px">👶</div>' +
       '<div style="font-size:19px;font-weight:800;color:#1f3a5f;margin:8px 0 6px">建立宝宝档案</div>' +
@@ -25281,6 +25430,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     m.querySelector('#mx-baby-ok').onclick = function () { var n = (m.querySelector('#mx-baby-name').value || '').trim(); done(n || '宝宝1'); };
     m.querySelector('#mx-baby-later').onclick = function () { done(null); };
+    }
+    /* 入口：VIP 先拉云端（超时 3.5s 兜底），非 VIP 直接查本机 */
+    if (lsGet(STORAGE.vip) === '1' && typeof pullCloud === 'function') {
+      var _t = setTimeout(start, 3500);
+      try { pullCloud().then(function () { clearTimeout(_t); start(); }).catch(function () { clearTimeout(_t); start(); }); }
+      catch (e) { clearTimeout(_t); start(); }
+    } else start();
   }
 
   /* ================= VIP 到期横幅 + 强制撤销 ================= */
@@ -25318,7 +25474,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ================= VIP 多端同步(服务端云函数，断网降级) ================= */
-  var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log'];
+  var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule'];
   /* VIP 家长密码轻量加密上云：以 uid 派生密钥做 XOR 混淆（非强加密，仅避免明文落云） */
   function pinEncKey(uid) {
     var s = String(uid || '') + '::mx_parent_pin_v1';
@@ -25354,6 +25510,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         return ensureUid().then(function (uid) {
           var p = ''; try { p = localStorage.getItem('mx_parent_pin') || ''; } catch (e) {}
           if (p) { try { out.__parentPinEnc = encPin(p, uid); } catch (e) {} }
+          /* [#384 跨设备同步] 手势图案 + 安全问题/答案 同款加密上云（VIP），新设备免重设 */
+          try {
+            var _pat = ''; try { _pat = localStorage.getItem('mx_parent_pattern') || ''; } catch (e) {}
+            if (_pat) { try { out.__parentPatternEnc = encPin(_pat, uid); } catch (e) {} }
+            var _qa = ''; try { _qa = localStorage.getItem('mx_parent_questions') || ''; } catch (e) {}
+            if (_qa) { try { out.__parentSecQaEnc = encPin(_qa, uid); } catch (e) {} }
+          } catch (e) {}
+          /* [#383 PVZ 跨设备] VIP 把 PVZ 各孩子存档（localStorage mxg_pvz_state_*）打包上云，体积小（KB 级） */
+          try {
+            var _pvz = {};
+            for (var _i = 0; _i < localStorage.length; _i++) {
+              var _k = localStorage.key(_i);
+              if (_k && _k.indexOf('mxg_pvz_state_') === 0) {
+                try { _pvz[_k] = JSON.parse(localStorage.getItem(_k) || 'null'); } catch (e) {}
+              }
+            }
+            if (Object.keys(_pvz).length) out.__pvzStates = _pvz;
+          } catch (e) {}
           /* [资源中心#358] VIP 仅同步资源元数据清单（文件本体永不上云）；累计超 20MB 配额则不同步，引导本地使用 */
           return (window.DB && window.DB.getAll ? window.DB.getAll('resources') : Promise.resolve([])).then(function (rrows) {
             var _sum = 0; (rrows || []).forEach(function (r) { _sum += (r && r.size) || 0; });
@@ -25381,6 +25555,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       pinTask = ensureUid().then(function (uid) {
         var p = decPin(snap.__parentPinEnc, uid);
         if (p) { try { localStorage.setItem('mx_parent_pin', p); localStorage.setItem('mx_parent_has_pin', '1'); } catch (e) {} }
+        /* [#384] 手势图案 + 安全问题恢复：仅当本机没有时才写入（不覆盖本机更新的设置） */
+        try {
+          if (snap.__parentPatternEnc && !localStorage.getItem('mx_parent_pattern')) {
+            var gp = decPin(snap.__parentPatternEnc, uid);
+            if (gp) localStorage.setItem('mx_parent_pattern', gp);
+          }
+          if (snap.__parentSecQaEnc && !localStorage.getItem('mx_parent_questions')) {
+            var qs = decPin(snap.__parentSecQaEnc, uid);
+            if (qs) localStorage.setItem('mx_parent_questions', qs);
+          }
+        } catch (e) {}
+        /* [#383] PVZ 存档恢复：仅回填本机缺失的孩子存档（本机已有的一律不动，防旧云档覆盖新进度） */
+        try {
+          var _ps = snap.__pvzStates;
+          if (_ps && typeof _ps === 'object') {
+            Object.keys(_ps).forEach(function (_k) {
+              if (_k.indexOf('mxg_pvz_state_') !== 0) return;
+              if (!localStorage.getItem(_k)) {
+                try { localStorage.setItem(_k, JSON.stringify(_ps[_k])); } catch (e) {}
+              }
+            });
+          }
+        } catch (e) {}
       }).catch(function () {});
     }
     return Promise.all(dbTasks.concat([pinTask])).then(function () {});
