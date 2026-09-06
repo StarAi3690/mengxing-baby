@@ -16400,7 +16400,12 @@ window.MX_SEED = data;
     MG_KEYS: MG_KEYS,
     todayDone: todayDone
   };
-  window.MX_COMPLETE_ROUND = completeRound;
+  /* [修复#359] completeRound 定义在下方 games IIFE（本块执行时尚未定义），直接赋值会在 load 期抛
+     ReferenceError 导致 MX_COMPLETE_ROUND 永远为 undefined（节奏盒子公演结算被静默跳过）。
+     改为惰性 getter：运行时再从 window.completeRound 取（games 块已导出）。 */
+  try {
+    Object.defineProperty(window, 'MX_COMPLETE_ROUND', { get: function(){ return window.completeRound; }, configurable: true });
+  } catch (eMCR) { window.MX_COMPLETE_ROUND = null; }
 })();
 
 </script>
@@ -22702,7 +22707,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '<div class="mx-card"><div class="mx-card-t">📚 已导入资源 <span id="res-total-badge" style="font-size:12px;color:#9aa;font-weight:400"></span></div>'
       + '<div id="res-stat-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>'
       + '<div id="res-list" style="max-height:340px;overflow:auto"><div class="empty-tip" style="font-size:13px">加载中…</div></div>'
-      + '<div style="font-size:12px;color:#9aa;margin-top:8px">💡 免费用户与 VIP 均可无限本地导入；数据仅存本机 IndexedDB，不产生任何云端费用。播放由各学习模块自动读取（逐步开放中）。</div>'
+      + '<div style="font-size:12px;color:#9aa;margin-top:8px">💡 免费用户与 VIP 均可无限本地导入；数据仅存本机 IndexedDB，不产生任何云端费用。导入后进入对应学习模块（古诗/识字/拼音/绘本/英语/数学/熏听），页内即可直接播放。</div>'
       + '</div>';
 
     var input = page.querySelector('#res-folder-input');
@@ -22857,7 +22862,160 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).catch(function(){ listBox.innerHTML = '<div class="empty-tip">资源列表加载失败</div>'; });
   }
 
-  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup, parseCsv: resParseCsv, importCsvRows: resImportCsvRows, detectNetdisk: resDetectNetdisk, addCloudLink: resAddCloudLink, csvTypeToModule: resCsvTypeToModule, downloadCsvTemplate: resDownloadCsvTemplate, cloudUsedBytes: resCloudUsedBytes, isVip: resIsVip };
+  /* ============================================================
+     [资源中心#358-阶段三] 模块内资源接入：各学习模块页内直接展示/播放已导入资源
+     - PAGE_RES_MAP：页面 → 资源模块 key（与 RES_MODULES 对应）
+     - renderModuleRes(pageId)：在模块页尾部挂「📥 我的导入资源」卡片
+     - MutationObserver 兜底：模块自身重渲染(setSectionContent)冲掉后自动补挂
+     - 播放复用 resPreview（本地 blob，零云端流量）；链接类直接跳网盘；音频支持连播
+     ============================================================ */
+  var PAGE_RES_MAP = {
+    'page-poem':            ['poem'],
+    'page-literacy':        ['literacy'],
+    'page-words':           ['literacy'],
+    'page-pinyin':          ['pinyin'],
+    'page-story':           ['story'],
+    'page-estory':          ['estory'],
+    'page-abc':             ['abc'],
+    'page-phonics':         ['phonics', 'words'],
+    'page-algo':            ['algo', 'workbook'],
+    'page-listen-chinese':  ['lchinese'],
+    'page-listen-english':  ['listen-en', 'listen-music']
+  };
+  var _modResBusy = {}, _modResDeb = {}, _modResObs = {};
+  function resMediaIcon(r){
+    if (r.mediaType === 'link') return '🔗';
+    if (r.mediaType === 'video') return '🎬';
+    if (r.mediaType === 'image') return '🖼️';
+    if (r.mediaType === 'pdf') return '📄';
+    if (r.mediaType === 'ppt') return '📊';
+    return '🎵';
+  }
+  function modResPlay(r){
+    if (!r) return;
+    if (r.mediaType === 'link') {
+      var u = r.externalLink || r.linkUrl || '';
+      if (u) { try { window.open(u, '_blank'); } catch (e) { location.href = u; } }
+      return;
+    }
+    resPreview(r.id);
+  }
+  /* 音频连播小播放器（熏听场景：儿歌/分级播完自动下一首） */
+  var _qOv = null, _qUrl = null;
+  function modResPlayQueue(items){
+    if (!items || !items.length) return;
+    if (_qOv && _qOv.parentNode) { try { _qOv.parentNode.removeChild(_qOv); } catch (e) {} }
+    if (_qUrl) { try { URL.revokeObjectURL(_qUrl); } catch (e) {} _qUrl = null; }
+    var idx = 0;
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:16px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center"><b id="mq-title" style="font-size:14px;color:#1f3a5f"></b><span id="mq-close" style="cursor:pointer;color:#888;font-size:18px;padding:0 4px">✕</span></div>'
+      + '<div id="mq-idx" style="font-size:12px;color:#9aa;margin:2px 0 8px"></div>'
+      + '<audio id="mq-audio" controls style="width:100%"></audio>'
+      + '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="mq-prev">⏮ 上一个</button><button class="btn" id="mq-next">下一个 ⏭</button></div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    _qOv = ov;
+    var audio = ov.querySelector('#mq-audio');
+    function load(i){
+      idx = (i + items.length) % items.length;
+      var it = items[idx];
+      var t = ov.querySelector('#mq-title'), ix = ov.querySelector('#mq-idx');
+      if (t) t.textContent = it.title || '';
+      if (ix) ix.textContent = '第 ' + (idx + 1) + ' / ' + items.length + ' 个（播完自动下一个）';
+      window.DB.getResourceBlob(it.id).then(function(r){
+        if (!r || !r.blob) { if (window.showToast) window.showToast('⚠️ 本地文件缺失：' + (it.title || '')); return; }
+        if (typeof URL === 'undefined' || !URL.createObjectURL) return;
+        if (_qUrl) { try { URL.revokeObjectURL(_qUrl); } catch (e) {} }
+        _qUrl = URL.createObjectURL(r.blob);
+        audio.src = _qUrl;
+        try { var p = audio.play(); if (p && p.catch) p.catch(function(){}); } catch (e) {}
+      }).catch(function(){});
+    }
+    audio.addEventListener('ended', function(){ if (items.length > 1) load(idx + 1); });
+    var pv = ov.querySelector('#mq-prev'), nx = ov.querySelector('#mq-next');
+    if (pv) pv.onclick = function(){ load(idx - 1); };
+    if (nx) nx.onclick = function(){ load(idx + 1); };
+    ov.addEventListener('click', function(ev){
+      if (ev.target === ov || (ev.target && ev.target.id === 'mq-close')) {
+        try { audio.pause(); } catch (e) {}
+        if (ov.parentNode) ov.parentNode.removeChild(ov);
+        if (_qOv === ov) _qOv = null;
+        if (_qUrl) { try { URL.revokeObjectURL(_qUrl); } catch (e) {} _qUrl = null; }
+      }
+    });
+    load(0);
+  }
+  function renderModuleRes(pageId){
+    var keys = PAGE_RES_MAP[pageId];
+    if (!keys || _modResBusy[pageId]) return;
+    _modResBusy[pageId] = true;
+    Promise.all(keys.map(function(k){ return window.DB.getResourcesByModule(k); })).then(function(arrs){
+      _modResBusy[pageId] = false;
+      var rows = [];
+      arrs.forEach(function(a){ (a || []).forEach(function(r){ if (r) rows.push(r); }); });
+      rows.sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+      var sec = document.getElementById(pageId);
+      if (!sec) return;
+      var old = sec.querySelector('.mx-modres');
+      var sig = rows.map(function(r){ return r.id; }).join(',');
+      if (old && old.getAttribute('data-sig') === sig) return; /* 已是最新（防 observer 回环） */
+      if (!rows.length) { if (old && old.parentNode) old.parentNode.removeChild(old); return; }
+      var audioRows = rows.filter(function(r){ return r.mediaType !== 'link' && (r.mediaType === 'audio' || !r.mediaType); });
+      var html = '';
+      rows.forEach(function(r){
+        var isLink = r.mediaType === 'link' && (r.externalLink || r.linkUrl);
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
+          + '<span data-mrp="' + resEsc(r.id) + '" style="flex:1;font-size:13px;cursor:pointer;color:#1f3a5f">' + resMediaIcon(r) + ' ' + resEsc(r.title || r.original_filename || '未命名资源') + '</span>'
+          + '<span style="font-size:11.5px;color:#9aa;white-space:nowrap">' + (isLink ? resEsc((r.tags && r.tags[0]) || '网盘') : resFmtSize(r.size)) + '</span>'
+          + '</div>';
+      });
+      var box = document.createElement('div');
+      box.className = 'mx-card mx-modres';
+      box.setAttribute('data-sig', sig);
+      box.innerHTML = '<div class="mx-card-t"><span>📥 我的导入资源（' + rows.length + '）</span>'
+        + (audioRows.length > 1 ? '<button class="btn mx-btn-main" id="mx-mr-queue" style="font-size:12px;padding:4px 12px;white-space:nowrap">▶️ 连播 ' + audioRows.length + ' 条音频</button>' : '')
+        + '</div>'
+        + html
+        + '<div style="font-size:11.5px;color:#9aa;margin-top:8px">点击名称即可播放（本地直读，不耗流量）· 管理请到 家长工作台 → 📥 资源中心</div>';
+      if (old && old.parentNode) old.parentNode.replaceChild(box, old);
+      else sec.appendChild(box);
+      box.querySelectorAll('[data-mrp]').forEach(function(el){
+        el.onclick = function(){
+          var id = el.getAttribute('data-mrp');
+          var rec = null;
+          for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { rec = rows[i]; break; }
+          modResPlay(rec);
+        };
+      });
+      var qb = box.querySelector('#mx-mr-queue');
+      if (qb) qb.onclick = function(){ modResPlayQueue(audioRows); };
+    }).catch(function(){ _modResBusy[pageId] = false; });
+  }
+  function _schedModRes(pageId){
+    clearTimeout(_modResDeb[pageId]);
+    _modResDeb[pageId] = setTimeout(function(){ renderModuleRes(pageId); }, 350);
+  }
+  function watchModulePage(pageId){
+    if (_modResObs[pageId]) return;
+    var sec = document.getElementById(pageId);
+    if (!sec || typeof MutationObserver === 'undefined') return;
+    _modResObs[pageId] = new MutationObserver(function(){ _schedModRes(pageId); });
+    _modResObs[pageId].observe(sec, { childList: true, subtree: true });
+  }
+  /* 导航钩子：进入模块页后主动挂载一次，并兜底观察后续重渲染（含 section 延迟创建） */
+  document.addEventListener('navigation', function(e){
+    var pg = e && e.detail && e.detail.page;
+    if (!PAGE_RES_MAP[pg]) return;
+    setTimeout(function(){
+      watchModulePage(pg);
+      renderModuleRes(pg);
+      if (!_modResObs[pg]) watchModulePage(pg); /* section 可能刚被 ensurePageSection 创建 */
+    }, 650);
+  });
+
+  window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup, parseCsv: resParseCsv, importCsvRows: resImportCsvRows, detectNetdisk: resDetectNetdisk, addCloudLink: resAddCloudLink, csvTypeToModule: resCsvTypeToModule, downloadCsvTemplate: resDownloadCsvTemplate, cloudUsedBytes: resCloudUsedBytes, isVip: resIsVip, modRes: renderModuleRes, modResMap: PAGE_RES_MAP, playQueue: modResPlayQueue };
 
   /* [资源中心#358-阶段二] 设置页「前往资源中心」按钮（静态 HTML，事件委托） */
   document.addEventListener('click', function (e) {
