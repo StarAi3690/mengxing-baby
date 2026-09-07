@@ -1445,10 +1445,12 @@ html, body {
   overflow-x: hidden;
 
   /* [#382 iOS] 侧栏滚动到底不再连带整页橡皮筋回弹（否则底部「系统设置」点不到）：
-     overscroll-behavior 隔离滚动链 + 平滑触摸滚动 + 底部安全区留白 */
+     overscroll-behavior 隔离滚动链 + 平滑触摸滚动；
+     [#393] 底部预留 96px 滚动余量：「系统设置」之后还能继续下滑，确保任何 iOS 机型
+     都能把它滚到屏幕中部可点区域（24px 余量实测不够，用户复测仍点不到） */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 
   transition: transform var(--transition-normal), background var(--transition-normal);
 
@@ -7523,7 +7525,7 @@ html, body {
 
           <div class="placeholder-title" data-page-node-id="a3wYv7dotGTDQVpffCGRAA">系统设置</div>
 
-          <div class="placeholder-desc" data-page-node-id="XWLjutHKKhfoSj2XF6Yleo">多孩切换 · 主题切换（V1/V2/V3 共38套） · 模块自定义开关 · 家长自主导入 · 家长后台</div>
+          <div class="placeholder-desc" data-page-node-id="XWLjutHKKhfoSj2XF6Yleo">模块顺序自定义 · 主题切换（V1/V2/V3 共38套） · 账号/数据/公告等已归口家长工作台与管理后台</div>
 
           <span class="placeholder-tag" data-page-node-id="H7Iljw5PbD5T7w4Lv2EoKT">阶段四实现</span>
 
@@ -7531,32 +7533,13 @@ html, body {
 
 
 
-        <!-- 横向标签栏（#225·归整：左侧已有二级菜单，设置页用顶部横向标签收短；账号/数据/安全统一归口账号中心） -->
-        <div class="mx-set-tabs" id="mx-set-tabs" style="display:flex;gap:8px;max-width:420px;margin:10px auto 0;padding:0 4px" data-page-node-id="iosHGnG7EIeokcvBgC4mok">
-          <button type="button" class="mx-set-tab on" data-tab="general" style="flex:1;padding:10px 8px;border:1px solid #d5e3f7;border-radius:12px;background:#1f3a5f;color:#fff;font-size:14px;font-weight:700;cursor:pointer" data-page-node-id="WHMN6VhzcOvqLznCchh9r7">⚙️ 通用</button>
-          <button type="button" class="mx-set-tab" data-tab="content" style="flex:1;padding:10px 8px;border:1px solid #d5e3f7;border-radius:12px;background:#f3f6fb;color:#5b6b80;font-size:14px;cursor:pointer" data-page-node-id="VBZVQsK2WiYkQMozSZ0fNz">📚 内容</button>
-        </div>
+        <!-- [#391] 设置页精简：旧「横向标签栏 / 公告栏 / 家长后台 / 资源导入」入口清理
+             （公告归管理后台·腾讯文档云端配置；家长后台归家长工作台；导入归资源中心），仅保留模块顺序 -->
 
-        <!-- Tab 通用：家长后台 + 模块顺序 -->
+        <!-- 通用：模块顺序 -->
         <div class="mx-set-pane" data-pane="general" data-page-node-id="ESvGL0KkS6PQ8b0GLMVNf4">
 
-        <!-- 家长后台入口（排期系统预留） -->
-
-        <div class="card parent-backend-card" id="parent-backend-entry" style="max-width: 420px; margin: 20px auto;" data-page-node-id="cfvpS8ETSOI8eCGmpCTZQz">
-
-          <div class="card-title" data-page-node-id="QBF0NfL5M0lOop6lKz3j7b">👨‍👩‍👧 家长后台</div>
-
-          <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6;" data-page-node-id="Z0ezqLwaazkqkSLRbXMT0d">
-
-            一周幼小衔接排期管理 · 每日任务分配与打卡 · 成长数据总览
-
-          </p>
-
-          <button class="btn" id="btn-parent-backend" data-page-node-id="YNdJk4F6ReRCk9GgvpCsCX">进入家长后台</button>
-
-          <span class="placeholder-tag" style="margin-left: 10px;" data-page-node-id="LNbbnudweAZj9LOfmzMBPO">排期系统已就绪</span>
-
-        </div>
+        <!-- [#391] 旧「家长后台」入口已清理：排期/打卡/成长数据统一在「家长工作台」（左侧栏 👨‍👩‍👧） -->
 
 
 
@@ -7582,21 +7565,8 @@ html, body {
 
         </div>
 
-        <!-- Tab 内容：家长自主导入 -->
-        <div class="mx-set-pane" data-pane="content" style="display:none" data-page-node-id="F0T5YpdJxwXP5woEw7Zrol">
-
-        <!-- [资源中心#358] 旧「家长自主导入」（JSON/CSV 手工格式）已下线，统一走家长工作台 → 📥 资源中心 -->
-        <div class="card" style="max-width: 420px; margin: 20px auto;">
-          <div class="card-title">📥 资源导入已升级</div>
-          <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:10px">导入功能已全面升级为「<b>资源中心</b>」：上传本地文件夹自动归类、CSV 表格、网盘链接三种傻瓜式方式，不再需要手动编写 JSON。</div>
-          <button class="btn" id="goto-rescenter-btn" style="width:100%">📥 前往资源中心（家长工作台）</button>
-        </div>
-
-
-
-        <!-- 数据备份 / 清除本机数据 / 重新输入兑换码 已统一归口「账号中心」，避免重复入口 -->
-
-        </div>
+        <!-- [#391] 旧「资源导入已升级」跳转卡与内容标签页已整体清理：导入统一走 家长工作台 → 资源中心；
+             数据备份/清除本机数据/重新输入兑换码 统一归口「账号中心」（原内容pane data-page-node-id=F0T5YpdJxwXP5woEw7Zrol） -->
 
       </section>
 
@@ -10554,7 +10524,7 @@ window.DB = {
     'page-parent':   { title: '家长工作台', desc: '多孩切换 · 周学习时长统计 · 各学科掌握进度 · 错题分布，支持打印周报。', icon: '👨', tag: '家长后台' },
     'page-feedback': { title: '建议与反馈', desc: '提交使用建议与联系方式，本地留存并可同步云端 Feedback 表。', icon: '💌', tag: '智能工具' },
     'page-account':  { title: '账号中心', desc: '本地/云端账号、5设备限制、卡密VIP。', icon: '👤', tag: '阶段五实现' },
-        'page-settings': { title: '系统设置', desc: '多孩切换 · 主题切换（V1/V2/V3 共38套） · 模块自定义开关 · 数据导出/导入 · VIP卡密 · 顶部公告', icon: '⚙️', tag: '阶段四实现' }
+        'page-settings': { title: '系统设置', desc: '模块顺序自定义 · 主题切换（V1/V2/V3 共38套） · 账号/数据/公告等已归口家长工作台与管理后台', icon: '⚙️', tag: '阶段四实现' }
 
   };
 
@@ -11774,43 +11744,7 @@ window.DB = {
 
 
 
-      // 绑定"进入家长后台"入口（排期系统预留）
-
-      const parentBtn = document.getElementById('btn-parent-backend');
-
-      if (parentBtn) {
-
-        parentBtn.addEventListener('click', async () => {
-
-          try {
-
-            const childId = (await getCurrentChild())?.id || 'default';
-
-            const today = DB.formatDateKey(new Date());
-
-            const schedule = await DB.getDailySchedule(childId, today);
-
-            const templateDays = Object.keys(DB.WEEKLY_SCHEDULE_TEMPLATE || {}).length;
-
-            if (schedule) {
-
-              window.dispatchEvent(new CustomEvent('navigation',{detail:{page:'page-parent'}}));
-
-            } else {
-
-              window.dispatchEvent(new CustomEvent('navigation',{detail:{page:'page-parent'}}));
-
-            }
-
-          } catch (e) {
-
-            window.dispatchEvent(new CustomEvent('navigation',{detail:{page:'page-parent'}}));
-
-          }
-
-        });
-
-      }
+      // [#391] 旧「进入家长后台」按钮已随设置页清理下线（统一走家长工作台），绑定代码移除
 
 
 
@@ -13526,8 +13460,9 @@ window.MX_SEED = data;
 
       // 需求三：首次打开今日打卡，自动生成本周全部任务排期（全科均衡套组，7 天）
       // 若已存在排期则不重复生成；改动计划可前往「学习任务套组 / 家长工作台」调整。
-      // [#377 多端一致] 旧版生成的排期行没有 setId 标记（各设备模板不同导致 3 vs 6 不一致）→ 一并用当前模板重生成（已完成项自动保留）
-      if (!sched || !sched.items || !sched.items.length || !sched.setId) {
+      // [#377 多端一致] 旧版生成的排期行没有 setId 标记 → 用当前模板重生成；
+      // [#394 多端一致2] genVer≠2 的行（旧模板版本/旧合并逻辑）也一并重生成，保证两端条数恒一致
+      if (!sched || !sched.items || !sched.items.length || !sched.setId || (sched.genVer | 0) !== 2) {
         try {
           if (window.MX_TASKSETS && typeof window.MX_TASKSETS.apply === 'function') {
             await window.MX_TASKSETS.apply('set_all', 7);
@@ -13670,7 +13605,7 @@ window.MX_SEED = data;
         <ul class="today-task-list" id="today-task-list">${taskHTML}</ul>
 
         ${tasks.length && doneCount === tasks.length ? '<div class="empty-tip">🎉 今日任务全部完成！</div>' : ''}
-        <div style="margin-top:8px;text-align:right"><a href="javascript:void(0)" onclick="if(window.navigateTo)window.navigateTo('page-tasksets')" style="font-size:12px;color:var(--accent-primary);text-decoration:none">⚙️ 调整本周学习计划</a></div>
+        <div style="margin-top:8px;text-align:right"><a href="javascript:void(0)" onclick="if(window.navigateTo)window.navigateTo('page-parent')" style="font-size:12px;color:var(--accent-primary);text-decoration:none">⚙️ 调整本周学习计划</a></div>
 
       </div>
 
@@ -16115,46 +16050,8 @@ window.MX_SEED = data;
   /* ==================================================
      系统设置：公告管理（家长添加/修改公告文字与链接）
      ================================================== */
-  /* 公告栏：已从「本机本地」升级为「云端统一广播」（CFG::linkage_config.announcement）。
-     编辑入口在腾讯文档配置表（owner-only，不会被终端用户篡改）；本机输入框仅作「本机预览」。 */
-  function ensureAnnouncementPanel() {
-    var page = document.getElementById('page-settings');
-    if (!page) return;
-    if (page.querySelector('.gx-ann-panel')) return;
-    DB.getSetting('announcement', null).then(function (lc) {
-      lc = lc || { text: '', url: '', enabled: false };
-      var cloud = (window.MX_LINKAGE && window.MX_LINKAGE.announcement) || null;
-      var cloudOn = !!(cloud && cloud.enabled && cloud.text);
-      var panel = document.createElement('div');
-      panel.className = 'dash-block gx-ann-panel';
-      panel.innerHTML =
-        '<div class="dash-block-title">📢 公告栏（全站广播） <span class="sub">所有用户（含未登录）同一条</span></div>' +
-        '<div style="font-size:12.5px;color:#5b6b80;line-height:1.7;margin-bottom:10px">公告已改为<b>云端统一配置</b>：在腾讯文档配置表 <code>CFG::linkage_config</code> 增加 <code>announcement</code> 字段（{text,url,enabled}）并运行同步脚本后，<b>全站用户</b>都会看到同一条。下方本机输入框仅作「本机预览」，不影响其他用户。</div>' +
-        (cloudOn ? '<div style="font-size:12.5px;color:#2e7d32;margin-bottom:10px">✅ 当前全站广播：' + esc(cloud.text) + (cloud.url ? '（点击跳转已开启）' : '') + '</div>'
-                 : '<div style="font-size:12.5px;color:#e0533d;margin-bottom:10px">⚠️ 当前云端未设置公告，仅本机预览生效。</div>') +
-        '<label>公告文字（本机预览）</label>' +
-        '<input type="text" id="gx-ann-text" value="' + esc(lc.text || '') + '" placeholder="例：暑期拼音专题活动开启啦！" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--border-color,rgba(0,0,0,.15));margin-bottom:10px;">' +
-        '<label>点击跳转链接（可选）</label>' +
-        '<input type="text" id="gx-ann-url" value="' + esc(lc.url || '') + '" placeholder="https://..." style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--border-color,rgba(0,0,0,.15));margin-bottom:10px;">' +
-        '<div class="flex gap-sm" style="gap:8px;align-items:center;">' +
-          '<input type="checkbox" id="gx-ann-enabled"' + (lc.enabled ? ' checked' : '') + '> <label for="gx-ann-enabled" style="margin:0">本机预览启用</label>' +
-          '<button type="button" class="btn gx-ann-save" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;margin-left:auto;">💾 保存本机预览</button>' +
-        '</div>' +
-        '<div style="margin-top:10px"><a href="https://docs.qq.com/aio/DVEJpVHBhWVh0R2Fj" target="_blank" rel="noopener" class="btn" style="display:inline-block;background:#1f3a5f;color:#fff;border:none;padding:9px 12px;border-radius:8px;text-decoration:none;font-size:13px">📝 在腾讯文档编辑全站公告</a></div>';
-      page.appendChild(panel);
-      var save = panel.querySelector('.gx-ann-save');
-      save.onclick = function () {
-        DB.setSetting('announcement', {
-          text: panel.querySelector('#gx-ann-text').value,
-          url: panel.querySelector('#gx-ann-url').value,
-          enabled: panel.querySelector('#gx-ann-enabled').checked
-        }).then(function () {
-          if (window.showToast) window.showToast('📢 本机预览已保存（仅本设备）');
-          renderAnnouncement();
-        });
-      };
-    });
-  }
+  /* [#391] 旧「公告栏（全站广播）」设置面板已清理：公告统一在管理后台/腾讯文档配置表
+     （CFG::linkage_config.announcement）编辑，云端 3 分钟/回前台自动刷新，本机面板已无存在必要。 */
 
   /* ==================================================
      初始化 + 导航分发
@@ -16168,7 +16065,6 @@ window.MX_SEED = data;
       var page = e.detail && e.detail.page;
       if (page === 'page-games') setTimeout(function () { (window.MX_GAMES2 && window.MX_GAMES2.open) ? window.MX_GAMES2.open() : ((window.MX_MINIGAMES && window.MX_MINIGAMES.open) ? window.MX_MINIGAMES.open() : renderGames()); }, 60);
       else if (page === 'page-gacha') setTimeout(renderGacha, 60);
-      else if (page === 'page-settings') setTimeout(ensureAnnouncementPanel, 60);
     });
 
     // 读取已收集角色（用于盲盒统计）
@@ -23396,11 +23292,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   window.MX_RESOURCE_CENTER = { render: renderResourceCenter, list: renderResList, importFolder: resImportFolder, classify: resClassify, summaryPopup: resSummaryPopup, parseCsv: resParseCsv, importCsvRows: resImportCsvRows, detectNetdisk: resDetectNetdisk, addCloudLink: resAddCloudLink, csvTypeToModule: resCsvTypeToModule, downloadCsvTemplate: resDownloadCsvTemplate, cloudUsedBytes: resCloudUsedBytes, isVip: resIsVip, modRes: renderModuleRes, modResMap: PAGE_RES_MAP, playQueue: modResPlayQueue };
 
-  /* [资源中心#358-阶段二] 设置页「前往资源中心」按钮（静态 HTML，事件委托） */
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    if (t && t.id === 'goto-rescenter-btn' && window.navigateTo) { try { window.navigateTo('page-parent'); } catch (err) {} }
-  });
+  /* [#391] 设置页「前往资源中心」按钮已清理下线，事件委托移除 */
 })();
 
 </script>
@@ -26497,12 +26389,21 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       plan.forEach(function (d) {
         chain = chain.then(function () {
           return DB.getDailySchedule(cid, d.date).catch(function () { return null; }).then(function (old) {
-            // 保留当天已完成的任务，避免覆盖掉孩子的成果
-            var keep = ((old && old.items) || []).filter(function (t) { return t && t.done; });
-            var items = keep.concat(d.items.map(function (t, i) { return Object.assign({}, t, { seq: keep.length + i }); }));
+            /* [#394 打卡一致] 旧逻辑把历史已完成项整块拼在新计划后面：同一任务会出现两次，
+               且各设备旧排期条数不同 → 重生成后 8/9 不一致。改为按 模块+标题 合并：
+               匹配到的旧完成状态并入新项；未匹配的旧项丢弃（积分在完成时已入账，不重复计）。 */
+            var _doneOld = ((old && old.items) || []).filter(function (t) { return t && t.done; });
+            var items = d.items.map(function (t, i) {
+              var nt = Object.assign({}, t, { seq: i });
+              for (var _j = 0; _j < _doneOld.length; _j++) {
+                var _o = _doneOld[_j];
+                if (_o && _o.module === nt.module && (_o.task === nt.task || _o.title === nt.title)) { nt.done = true; nt.doneAt = _o.doneAt || null; break; }
+              }
+              return nt;
+            });
             return DB.putDailySchedule(cid, d.date, {
               id: cid + ':' + d.date, childId: cid, date: d.date,
-              items: items, setId: setId, updatedAt: Date.now()
+              items: items, setId: setId, genVer: 2, updatedAt: Date.now()
             });
           });
         });
