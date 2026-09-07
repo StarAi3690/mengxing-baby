@@ -25489,6 +25489,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).then(function (rows) { out[s] = rows || []; })
       .catch(function () { out[s] = []; });
     })).then(function () {
+      /* [#409 主题不同步] settings 表里的 theme 行属于「本机外观偏好」，
+         各设备互不干扰更好（孩子手机选粉色、家长电脑选蓝色）。
+         它跟着 settings 整表上云，既拖慢同步又会在换设备时互相覆盖主题，这里剔除。 */
+      try {
+        if (out.settings && out.settings.length) {
+          out.settings = out.settings.filter(function (r) { return !(r && r.key === 'theme'); });
+        }
+      } catch (e) {}
       /* VIP 才把家长密码加密进快照；普通/游客不上云 PIN */
       if (lsGet(STORAGE.vip) === '1') {
         return ensureUid().then(function (uid) {
@@ -25529,6 +25537,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* 以 __ 开头的字段为元数据（如加密 PIN），不走 DB 存储循环 */
     var dbTasks = Object.keys(snap).filter(function (s) { return s.indexOf('__') !== 0; }).map(function (s) {
       var rows = snap[s] || [];
+      /* [#409] 云端历史快照里若仍带 theme 行，落地时跳过，避免覆盖本机主题 */
+      if (s === 'settings') rows = rows.filter(function (r) { return !(r && r.key === 'theme'); });
       return Promise.all(rows.map(function (r) {
         return (window.DB && window.DB.put) ? window.DB.put(s, r) : Promise.resolve();
       }));
