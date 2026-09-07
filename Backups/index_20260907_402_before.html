@@ -8405,15 +8405,13 @@ async function getDailySchedule(childId, date) {
 
 /** 保存某天排期（items 为排期条目数组） */
 
-async function saveDailySchedule(childId, date, items, extra) {
+async function saveDailySchedule(childId, date, items) {
 
   const now = Date.now();
 
   const totalMinutes = items.reduce((sum, it) => sum + (Number(it.duration) || 0), 0);
 
   const weekday = new Date(date + 'T00:00:00').getDay() || 7; // JS 0=周日 → 7
-
-  const _oldRow = await get('dailySchedule', `${childId}:${date}`);
 
   const row = {
 
@@ -8429,20 +8427,11 @@ async function saveDailySchedule(childId, date, items, extra) {
 
     totalMinutes,
 
-    createdAt: _oldRow?.createdAt || now,
+    createdAt: (await get('dailySchedule', `${childId}:${date}`))?.createdAt || now,
 
     updatedAt: now
 
   };
-
-  /* [#402 打卡漂移] 排期行的生成期元信息（setId / genVer）此前在存盘时被整块丢弃，
-     导致首页每次渲染都判定「genVer≠2 → 旧版本」而重新生成一套随机任务：
-     已打钩状态被覆盖、任务条目整批换掉。这里改为显式透传 + 缺省继承旧值。 */
-  if (extra && typeof extra === 'object') { Object.assign(row, extra); }
-  if (_oldRow) {
-    if (row.setId == null && _oldRow.setId != null) row.setId = _oldRow.setId;
-    if (row.genVer == null && _oldRow.genVer != null) row.genVer = _oldRow.genVer;
-  }
 
   await put('dailySchedule', row);
 
@@ -8454,15 +8443,7 @@ async function saveDailySchedule(childId, date, items, extra) {
   async function putDailySchedule(childId, date, schedule) {
     const items = (schedule && Array.isArray(schedule.items)) ? schedule.items
       : (Array.isArray(schedule) ? schedule : []);
-    /* [#402] 仅透传生成期元信息，不整体覆盖（避免把 id/weekday 等结构字段带歪） */
-    const extra = {};
-    if (schedule && typeof schedule === 'object' && !Array.isArray(schedule)) {
-      if (schedule.setId !== undefined) extra.setId = schedule.setId;
-      if (schedule.genVer !== undefined) extra.genVer = schedule.genVer;
-      if (schedule.planId !== undefined) extra.planId = schedule.planId;
-      if (schedule.weekStart !== undefined) extra.weekStart = schedule.weekStart;
-    }
-    return saveDailySchedule(childId, date, items, extra);
+    return saveDailySchedule(childId, date, items);
   }
 
 
@@ -13489,15 +13470,7 @@ window.MX_SEED = data;
       if (!sched || !sched.items || !sched.items.length || !sched.setId || (sched.genVer | 0) !== 2) {
         try {
           if (window.MX_TASKSETS && typeof window.MX_TASKSETS.apply === 'function') {
-            /* [#402] 并发锁：同一时刻只允许一次重生成。
-               否则两次渲染会各生成一套（随机游标前进），任务条目再次漂移。 */
-            if (!window.__mxSchedRegen) {
-              window.__mxSchedRegen = Promise.resolve()
-                .then(function () { return window.MX_TASKSETS.apply('set_all', 7); })
-                .catch(function (err) { console.warn('[dashboard] 自动生成本周排期失败', err); })
-                .then(function (r) { window.__mxSchedRegen = null; return r; });
-            }
-            await window.__mxSchedRegen;
+            await window.MX_TASKSETS.apply('set_all', 7);
           }
           sched = await DB.getDailySchedule(childId, todayKey);
         } catch (e) { console.warn('[dashboard] 自动生成本周排期失败', e); }
