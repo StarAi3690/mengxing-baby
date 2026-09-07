@@ -1446,11 +1446,11 @@ html, body {
 
   /* [#382 iOS] 侧栏滚动到底不再连带整页橡皮筋回弹（否则底部「系统设置」点不到）：
      overscroll-behavior 隔离滚动链 + 平滑触摸滚动；
-     [#393] 底部预留 96px 滚动余量：「系统设置」之后还能继续下滑，确保任何 iOS 机型
-     都能把它滚到屏幕中部可点区域（24px 余量实测不够，用户复测仍点不到） */
+     [#393/#397] ⚠️血泪教训：此前 padding-bottom 写在这里，被下方 `padding: 12px 0` 简写
+     整体覆盖回 0 —— 24px/96px 两版「修复」实际从未生效！底部滚动余量必须合并进
+     padding 简写本身（见下方 padding 行），且简写之后不得再出现任何 padding 声明 */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 
   transition: transform var(--transition-normal), background var(--transition-normal);
 
@@ -1458,7 +1458,8 @@ html, body {
 
   flex-direction: column;
 
-  padding: 12px 0;
+  /* [#393/#397] 第三段 = 底部 96px + 安全区滚动余量：「系统设置」后还能继续下滑到可点区域 */
+  padding: 12px 0 calc(96px + env(safe-area-inset-bottom, 0px));
 
 }
 
@@ -25546,7 +25547,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'vipfail' ? '⚠️ VIP校验待确认·点击重试' : s === 'error' ? '⚠️ 同步失败·点击重试' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
       el.onclick = function () {
         if (s === 'expired') mxForceRelogin();
-        else if (s === 'vipfail' || s === 'error') { try { if (window.pushCloud) window.pushCloud(); } catch (e) {} }
+        /* [#396 点击有反应] 失败态点击 = 弹诊断（展示最近失败的真实原因）+ 立即重试；
+           旧版只静默重试，再失败界面毫无变化 → 用户看到的就是「点了没反应」 */
+        else if (s === 'vipfail' || s === 'error') { try { mxSyncDiag(); } catch (e) {} try { if (window.pushCloud) window.pushCloud(); } catch (e) {} }
         else mxSyncDiag();
       };
     }
@@ -25587,9 +25590,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '当前状态：<b>' + (window.__MX_SYNC_STATUS || '-') + '</b><br>' +
       '最近同步问题：' + lastErr + '</div>' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button id="mx-diag-retry" style="flex:1;padding:11px;border:none;border-radius:12px;background:#2e9e5b;color:#fff;font-weight:800;cursor:pointer">🔄 立即重试同步</button>' +
       '<button id="mx-diag-ok" style="flex:1;padding:11px;border:none;border-radius:12px;background:#4facfe;color:#fff;font-weight:800;cursor:pointer">知道了</button></div></div>';
     document.body.appendChild(m);
     m.querySelector('#mx-diag-ok').onclick = function () { if (m.parentNode) m.remove(); };
+    m.querySelector('#mx-diag-retry').onclick = function () { if (m.parentNode) m.remove(); try { if (window.pushCloud) window.pushCloud(); } catch (e) {} };
     m.onclick = function (e) { if (e.target === m && m.parentNode) m.remove(); };
   }
   window.mxSyncDiag = mxSyncDiag;
