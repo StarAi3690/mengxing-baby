@@ -11335,7 +11335,13 @@ window.DB = {
 
 
 
-    window.navSystem = { navigateTo, renderNav, closeMobileDrawer, openMobileDrawer, getNavOrderMap, setNavOrderWeight, swapNavOrder, resetNavOrder, orderItems };
+    /* [#406] 侧栏模块显示/隐藏状态：暴露给「系统设置 → 模块顺序」面板，
+       让面板与左侧栏读同一份数据，避免「列表里有 / 侧栏里没有」的错位认知 */
+    function getModuleVisibility() {
+      try { return JSON.parse(localStorage.getItem(NAV_STORAGE_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+
+    window.navSystem = { navigateTo, renderNav, closeMobileDrawer, openMobileDrawer, getNavOrderMap, setNavOrderWeight, swapNavOrder, resetNavOrder, orderItems, getModuleVisibility };
 
   }
 
@@ -11880,87 +11886,107 @@ window.DB = {
 
 
 
-    const orderMap = navSystem.getNavOrderMap ? navSystem.getNavOrderMap() : {};
+    /* [#406 与侧栏同源] 顺序直接复用 navSystem.orderItems
+       （用户权重 > 云端初始顺序 > 代码下标）。旧版面板自己按「代码下标」算权重，
+       忽略了管理后台下发的云端初始顺序 → 面板顺序和左侧栏实际顺序对不上。 */
+    const items = navSystem.orderItems
+      ? navSystem.orderItems((window.NAV_STRUCTURE || []).slice(), true)
+      : (window.NAV_STRUCTURE || []).slice();
 
-    // 权重访问辅助：未赋值则按其在数组中的默认下标
-
-    function weightOf(list, id) {
-
-      if (orderMap[id] != null) return orderMap[id];
-
-      const idx = list.findIndex(x => x.id === id);
-
-      return idx < 0 ? 9999 : idx;
-
+    // 侧栏显示/隐藏状态（与左侧栏读同一份）
+    let visibility = {};
+    try {
+      visibility = (navSystem.getModuleVisibility && navSystem.getModuleVisibility()) || {};
+    } catch (e) {
+      try { visibility = JSON.parse(localStorage.getItem('mengxing_nav_visible_modules') || '{}') || {}; } catch (e2) { visibility = {}; }
     }
-
-
 
     // 一级菜单排序列表（#360：不再递归渲染二级子菜单）
+    const BTN_BASE = 'border:none;background:#f0f0f0;border-radius:6px;width:36px;height:36px;font-size:16px;cursor:pointer;touch-action:manipulation;flex:0 0 36px;';
 
-    function listHTML(items, depth) {
-
-      const sorted = items.slice().sort((a, b) => weightOf(items, a.id) - weightOf(items, b.id));
-
+    function listHTML(sorted) {
       return sorted.map((it, i) => {
-
         const isFirst = i === 0;
-
         const isLast = i === sorted.length - 1;
-
         const hasChildren = it.children && it.children.length;
-
-        const idForSwap = (x) => `${x.id}`;
-
-        const upDisabled = isFirst ? 'disabled' : '';
-
-        const downDisabled = isLast ? 'disabled' : '';
-
-        const prevId = sorted[i - 1] ? idForSwap(sorted[i - 1]) : '';
-
-        const nextId = sorted[i + 1] ? idForSwap(sorted[i + 1]) : '';
-
+        const hidden = (it.id in visibility) && !visibility[it.id];
+        const upAttr = isFirst ? 'disabled style="' + BTN_BASE + 'opacity:.4;cursor:default;"' : 'style="' + BTN_BASE + '"';
+        const downAttr = isLast ? 'disabled style="' + BTN_BASE + 'opacity:.4;cursor:default;"' : 'style="' + BTN_BASE + '"';
+        const prevId = sorted[i - 1] ? sorted[i - 1].id : '';
+        const nextId = sorted[i + 1] ? sorted[i + 1].id : '';
         const row = `
-
-          <div class="navorder-row" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;margin-bottom:6px;background:#fff;">
-
-            <span style="min-width:22px;">${it.icon}</span>
-
-            <span style="flex:1;font-size:14px;font-weight:700;color:#333;">${it.label}${hasChildren ? ' <span style="font-size:11px;color:#9aa;font-weight:400">（含子菜单，顺序由管理后台设定）</span>' : ''}</span>
-
-            <button data-up="${idForSwap(sorted[i])}" data-prev="${prevId}" ${upDisabled} style="border:none;background:#f0f0f0;border-radius:6px;width:28px;height:28px;cursor:pointer;">↑</button>
-
-            <button data-down="${idForSwap(sorted[i])}" data-next="${nextId}" ${downDisabled} style="border:none;background:#f0f0f0;border-radius:6px;width:28px;height:28px;cursor:pointer;">↓</button>
-
+          <div class="navorder-row" data-navid="${it.id}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;margin-bottom:6px;background:${hidden ? '#f7f7f9' : '#fff'};touch-action:manipulation;">
+            <span class="navorder-handle" data-handle="1" title="按住上下拖动" style="flex:0 0 30px;height:36px;line-height:36px;text-align:center;color:#aab;font-size:15px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;">⋮⋮</span>
+            <span style="min-width:22px;">${it.icon || ''}</span>
+            <span style="flex:1;font-size:14px;font-weight:700;color:${hidden ? '#9aa' : '#333'};">${it.label || it.id}${hasChildren ? ' <span style="font-size:11px;color:#9aa;font-weight:400">（含子菜单，顺序由管理后台设定）</span>' : ''}${hidden ? ' <span style="font-size:11px;color:#c0392b;font-weight:400">· 侧栏已隐藏</span>' : ''}</span>
+            <button type="button" data-up="${it.id}" data-prev="${prevId}" ${upAttr}>↑</button>
+            <button type="button" data-down="${it.id}" data-next="${nextId}" ${downAttr}>↓</button>
           </div>`;
-
         return row;
-
       }).join('');
-
     }
 
+    panel.innerHTML = listHTML(items);
 
-
-    panel.innerHTML = listHTML(window.NAV_STRUCTURE, 0);
+    /* [#406 点击没反应 根因] 旧版每次渲染都 addEventListener，进入设置页 N 次后
+       一次点击会执行 N 次 swap —— 偶数次等于原地换回，表现为「点了没反应」。
+       这里用 dataset.hooked 去重，保证只绑一次。 */
+    if (panel.dataset.hooked === '1') return;
+    panel.dataset.hooked = '1';
 
 
 
     // 事件委托：上下移动
 
+    // 事件委托：上下移动（移动后立即重排本列表 + 刷新左侧栏）
     panel.addEventListener('click', (e) => {
-
       const btn = e.target.closest('button[data-up], button[data-down]');
-
-      if (!btn) return;
-
+      if (!btn || btn.disabled) return;
       const cur = btn.dataset.up || btn.dataset.down;
-
       const other = btn.dataset.prev || btn.dataset.next;
-
-      if (other) navSystem.swapNavOrder(cur, other);
-
+      if (!other) return;
+      navSystem.swapNavOrder(cur, other);
+      renderNavOrderPanel();   // 旧版不刷新 → 列表纹丝不动，用户以为没生效
+      if (window.showToast) window.showToast(btn.dataset.up ? '↑ 已上移' : '↓ 已下移');
     });
+
+    // 拖动排序（按住左侧手柄上下拖）：pointer 事件，桌面 / iOS / 安卓通用
+    let dragId = null, dragStartY = 0, dragRow = null;
+    panel.addEventListener('pointerdown', (e) => {
+      const h = e.target.closest ? e.target.closest('[data-handle]') : null;
+      if (!h) return;
+      const row = h.closest('.navorder-row');
+      if (!row) return;
+      dragId = row.dataset.navid; dragStartY = e.clientY; dragRow = row;
+      row.style.opacity = '0.55';
+      try { h.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
+    });
+    panel.addEventListener('pointermove', (e) => {
+      if (!dragId) return;
+      const dy = e.clientY - dragStartY;
+      if (Math.abs(dy) < 20) return;
+      const rows = Array.prototype.slice.call(panel.querySelectorAll('.navorder-row'));
+      const from = rows.findIndex(r => r.dataset.navid === dragId);
+      const to = from + (dy > 0 ? 1 : -1);
+      if (from < 0 || to < 0 || to >= rows.length) return;
+      dragStartY = e.clientY;
+      navSystem.swapNavOrder(dragId, rows[to].dataset.navid);
+      renderNavOrderPanel();
+      dragRow = panel.querySelector('.navorder-row[data-navid="' + dragId + '"]');
+      if (dragRow) {
+        dragRow.style.opacity = '0.55';
+        const nh = dragRow.querySelector('[data-handle]');
+        if (nh) { try { nh.setPointerCapture(e.pointerId); } catch (err) {} }
+      }
+    });
+    function endDrag() {
+      if (dragRow) dragRow.style.opacity = '';
+      dragId = null; dragRow = null;
+    }
+    panel.addEventListener('pointerup', endDrag);
+    panel.addEventListener('pointercancel', endDrag);
+    panel.addEventListener('pointerleave', endDrag);
 
 
 
