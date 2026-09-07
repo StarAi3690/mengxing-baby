@@ -6822,7 +6822,10 @@ html, body {
 .mxg-help-bd li:before { content: '•'; position: absolute; left: -14px; color: #6b8ad6; }
 /* #207·反馈云/本地：右上角同步状态徽章 */
 .mx-sync-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #eef1f6; color: #6b7a90; border: 1px solid #dfe5ee; white-space: nowrap; }
-.mx-sync-badge.expired { background: #fff3e0; color: #d98200; border-color: #ffd699; animation: mxg-glow 1.6s ease infinite; cursor: pointer; }
+.mx-sync-badge.expired { background: #fff3e0; color: #d98200; border-color: #ffd699; animation: mxg-glow 1.6s ease infinite; }
+/* [rootfix 2026-09-07] 新增两档失败态：可点击重试，与「仅本地」明确区分 */
+.mx-sync-badge.vipfail { background: #fff8e1; color: #b26a00; border-color: #ffe082; cursor: pointer; }
+.mx-sync-badge.error { background: #fdecea; color: #c0392b; border-color: #f5c6c2; cursor: pointer; }
 .mx-sync-badge.cloud { background: #e8f7ee; color: #2e9e5b; border-color: #bfe8cd; }
 .mx-sync-badge.syncing { background: #eaf1ff; color: #3f7ef5; border-color: #c5d8ff; }
 .mx-sync-badge.offline { background: #fdecec; color: #e0533d; border-color: #f6c9c9; }
@@ -9771,6 +9774,8 @@ function mxWriteVipInfo(res) {
     }
   } catch (e) {}
 }
+/* [rootfix 2026-09-07] 跨 IIFE 导出：VIP 自愈闸门在另一个 script 块调用 */
+window.mxWriteVipInfo = mxWriteVipInfo;
 function mxVipAuthTs() { var t = parseInt(localStorage.getItem('mengxing_auth_ts') || '0', 10); return isNaN(t) ? 0 : t; }
 /* 是否需要云端复核 VIP：从未鉴权 / 鉴权超 24h / 临近到期(<=7天) 时为真。
    为 false 时前端可跳过 getVipStatus 验证 ping，直接同步（省云函数调用）。 */
@@ -9790,13 +9795,38 @@ function mxVipRecheckNeeded() {
 function syncCloudGuarded(action, extra) {
   if (!mxVipRecheckNeeded()) return window.mxApiSync(action, extra);
   return mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code) }).then(function (vr) {
-    if (!vr || !vr.ok || !vr.vip) { setVip(false); try { setSyncStatus('local'); } catch (e) {} return { ok: false, msg: 'VIP 复核未通过，已降级为本地模式' }; }
-    mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' });
-    /* [syncfix] 自愈：本地丢失卡密号（密码登录不落 code）时从云端 VIP 记录恢复 */
-    try { if (vr.code && !localStorage.getItem(STORAGE.code)) localStorage.setItem(STORAGE.code, vr.code); } catch (e) {}
+    if (vr && vr.ok && vr.vip) {
+      mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' });
+      /* [syncfix] 自愈：本地丢失卡密号（密码登录不落 code）时从云端 VIP 记录恢复 */
+      try { if (vr.code && !localStorage.getItem(STORAGE.code)) localStorage.setItem(STORAGE.code, vr.code); } catch (e) {}
+      return window.mxApiSync(action, extra);
+    }
+    /* [rootfix 2026-09-07 · VIP 恒显「仅本地」根因]
+       旧逻辑：一次复核不通过就 setVip(false) 抹掉本地 VIP 并钉死 local。
+       而 isVip() 变 false 后 mxVipRecheckNeeded() 恒 false → **永不复核**
+       → 一次网络/数据抖动 = 永久降级且无自愈入口（这正是「修了 N 次还不行」的机制）。
+       新逻辑：只有服务端给出的**确定性终态**（已过期/已冻结）才降级；
+       其余（网络异常、ok:false 未说明原因、数据暂时查不到）一律**不抹本地 VIP**，
+       标记软失败并继续尝试同步，最终由服务端云函数强校验仲裁。 */
+    var hardFail = !!(vr && vr.ok && (vr.expired || vr.frozen));
+    if (hardFail) {
+      try { setVip(false); } catch (e) {}
+      try { if (window.mxSyncErr) window.mxSyncErr(vr.frozen ? '卡密已被冻结' : 'VIP 已过期'); } catch (e) {}
+      try { if (window.setSyncStatus) window.setSyncStatus('local'); } catch (e) {}
+      return { ok: false, msg: vr.frozen ? '卡密已被冻结' : 'VIP 已过期' };
+    }
+    try { if (window.mxSyncErr) window.mxSyncErr('VIP 复核未确认：' + ((vr && vr.msg) || '无响应')); } catch (e) {}
+    try { window.__mx_vip_softfail = (window.__mx_vip_softfail || 0) + 1; } catch (e) {}
+    try { if (window.setSyncStatus) window.setSyncStatus('vipfail'); } catch (e) {}
+    /* 软失败不阻断：继续同步，服务端会做最终 VIP 强校验 */
     return window.mxApiSync(action, extra);
   }).catch(function () { return window.mxApiSync(action, extra); });
 }
+/* [rootfix 2026-09-07] 跨 IIFE 导出（第 4 次跨块事故）：
+   pushCloud / pullCloud 位于另一个 <script> 块，此前裸调用 syncCloudGuarded
+   必抛 ReferenceError → 被 catch 吞掉 → 直接 setSyncStatus('local')，
+   这就是 VIP 账号右上角恒显「仅本地」的前端直接原因。 */
+window.syncCloudGuarded = syncCloudGuarded;
 
 
 
@@ -24961,7 +24991,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (uid) { window.__mx_uid__ = uid; return Promise.resolve(uid); }
     /* token 缺失/过期 → 清除 stale 状态 */
     window.__mx_uid__ = null;
-    var _hadTok = false; try { _hadTok = !!localStorage.getItem('mx_token'); } catch (e) {}
+    /* [rootfix 2026-09-07] 旧逻辑只看 mx_token，但本函数下一行就会 removeItem('mx_token')，
+       于是「登录过期」只能被判定一次：第二次起 _hadTok=false → __mx_uid_none__='missing'
+       → 角标从「🔑 登录过期·点击重登」退化成「💾 仅本地」，用户彻底失去恢复入口。
+       改用持久化标记 mx_had_login 记录「本机曾经登录过」。 */
+    var _hadTok = false; try { _hadTok = !!localStorage.getItem('mx_token') || localStorage.getItem('mx_had_login') === '1'; } catch (e) {}
     window.__mx_uid_none__ = _hadTok ? 'expired' : 'missing';   /* [badgefix] 记录原因供角标区分展示 */
     try { localStorage.removeItem('mx_token'); localStorage.removeItem('mx_user'); } catch (e) {}
     return Promise.resolve(null);
@@ -24988,7 +25022,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
      浏览器只跟 Netlify 通信，彻底规避白名单限制。 */
   function mxStoreToken(j) {
     try {
-      if (j && j.token) { localStorage.setItem('mx_token', j.token); localStorage.setItem('mx_user', j.account || ''); }
+      if (j && j.token) { localStorage.setItem('mx_token', j.token); localStorage.setItem('mx_user', j.account || ''); try { localStorage.setItem('mx_had_login', '1'); } catch (e) {} }
       if (j && j.uid) window.__mx_uid__ = j.uid;
       /* 登录/注册/邮箱验证成功后，由服务端回传 VIP 状态，写入鉴权时间戳（用于阶梯式复核） */
       if (j && j.vip) mxWriteVipInfo({ vip: 1, vip_level: j.vip_level || '1', expire_at: j.expire_at || '' });
@@ -25434,7 +25468,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* 入口：VIP 先拉云端（超时 3.5s 兜底），非 VIP 直接查本机 */
     if (lsGet(STORAGE.vip) === '1' && typeof pullCloud === 'function') {
       var _t = setTimeout(start, 3500);
-      try { pullCloud().then(function () { clearTimeout(_t); start(); }).catch(function () { clearTimeout(_t); start(); }); }
+      try { pullCloud(true).then(function () { clearTimeout(_t); start(); }).catch(function () { clearTimeout(_t); start(); }); }
       catch (e) { clearTimeout(_t); start(); }
     } else start();
   }
@@ -25615,11 +25649,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var el = document.getElementById('mx-sync-badge');
     if (el) {
       el.className = 'mx-sync-badge ' + s;
-      el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
-      /* [badgefix] 角标可点击：登录过期 → 一键去重登；其他状态 → 同步诊断弹窗 */
-      el.onclick = function () { if (s === 'expired') mxForceRelogin(); else mxSyncDiag(); };
+      /* [rootfix 2026-09-07] 补全状态机：新增 vipfail（VIP 校验待确认）与 error（同步失败）两档，
+         不再把所有失败都塌缩成「仅本地」——用户因此才能区分「没登录 / 过期 / 失败 / 离线」并自助重试。 */
+      el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'vipfail' ? '⚠️ VIP校验待确认·点击重试' : s === 'error' ? '⚠️ 同步失败·点击重试' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
+      el.onclick = function () {
+        if (s === 'expired') mxForceRelogin();
+        else if (s === 'vipfail' || s === 'error') { try { if (window.pushCloud) window.pushCloud(); } catch (e) {} }
+        else mxSyncDiag();
+      };
     }
   }
+  window.setSyncStatus = setSyncStatus;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
   /* [badgefix] 登录过期恢复：清激活标记刷新出登录门，重新登录即续 30 天令牌并自动恢复同步 */
   function mxForceRelogin() {
     if (!window.confirm('云端同步的登录凭证已过期（约 30 天需重新登录一次，数据不会丢失）。\n\n点击「确定」前往重新登录；登录成功后右上角会变回「☁️ 云端已同步」。')) return;
@@ -25663,6 +25703,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.mxSyncDiag = mxSyncDiag;
   /* [badgefix] 记录最近一次同步失败原因（诊断弹窗读取） */
   function mxSyncErr(msg) { try { localStorage.setItem('mx_sync_last_err', new Date().toLocaleString() + ' ' + String(msg || '').slice(0, 120)); } catch (e) {} }
+  window.mxSyncErr = mxSyncErr;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
   /* [syncfix#360] 同步成功后把「最近同步问题」标注为已恢复，避免诊断弹窗长期显示旧网络错误误导用户 */
   function mxSyncMarkRecovered() {
     try {
@@ -25671,10 +25712,39 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     } catch (e) {}
   }
   window.mxSyncMarkRecovered = mxSyncMarkRecovered;
+  /* [rootfix 2026-09-07] VIP 标记自愈闸门：
+     历史上被误抹过 VIP 的老设备（一次复核抖动就 setVip(false)），本地 mengxing_vip 已为空，
+     旧逻辑会直接放弃同步 → 永久「仅本地」。现在只要本机曾登录过（mx_had_login），
+     就先向云端复核一次；云端说是 VIP 就恢复本地标记，然后正常同步。 */
+  function mxVipSelfHeal() {
+    if (lsGet(STORAGE.vip) === '1') return Promise.resolve(true);
+    var had = false; try { had = localStorage.getItem('mx_had_login') === '1'; } catch (e) {}
+    if (!had) return Promise.resolve(false);
+    if (window.__mx_vip_healing) return Promise.resolve(false);
+    window.__mx_vip_healing = true;
+    return ensureUid().then(function (uid) {
+      if (!uid) return false;
+      if (typeof window.mxApiProxy !== 'function') return false;
+      return window.mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code) || '', uid: uid }).then(function (vr) {
+        if (vr && vr.ok && vr.vip) {
+          try { if (window.mxWriteVipInfo) window.mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' }); } catch (e) {}
+          try { if (vr.code) localStorage.setItem(STORAGE.code, vr.code); } catch (e) {}
+          return true;
+        }
+        return false;
+      }).catch(function () { return false; });
+    }).then(function (r) { window.__mx_vip_healing = false; return r; });
+  }
+  window.mxVipSelfHeal = mxVipSelfHeal;
   function pushCloud() {
     /* [资源中心#358] 导出供资源中心导入完成后手动触发元数据同步（跨 IIFE 红线；置于首行保证任何路径都完成导出） */
     window.pushCloud = pushCloud;
-    if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
+    if (lsGet(STORAGE.vip) !== '1') {
+      return mxVipSelfHeal().then(function () {
+        if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
+        return pushCloud();   /* 自愈成功后重入一次（此时 vip=1，不会递归） */
+      });
+    }
     /* [syncfix] 密码登录用户本地可能无卡密 code：服务端只认 uid（verifyVipOwner），
        code 缺失不应阻断同步（空 code 由服务端保留历史值） */
     var code = lsGet(STORAGE.code) || '';
@@ -25683,30 +25753,44 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); setSyncStatus(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
       return buildSnapshot().then(function (snap) {
         /* token 由后端 sync.js 取出 uid；此处只传 code + snapshot */
-        return syncCloudGuarded('push', { code: code, snapshot: snap });
+        /* [rootfix] syncCloudGuarded 定义在另一个 <script> 块，必须走 window 导出（跨 IIFE 红线） */
+        var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
+        return _scg('push', { code: code, snapshot: snap });
       }).then(function (res) {
         if (res && res.ok) return 'OK';
         mxSyncErr(res && res.msg ? res.msg : '推送未成功');
         if (res && res.msg && /未登录/.test(res.msg)) { setSyncStatus('expired'); return 'BAILED'; }
+        setSyncStatus(navigator.onLine === false ? 'offline' : 'error');   /* [rootfix] 失败不再塌缩成 local */
         return 'BAILED';
       });
-    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
+    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus(navigator.onLine === false ? 'offline' : 'error'); });
   }
-  function pullCloud() {
-    if (lsGet(STORAGE.vip) !== '1') { setSyncStatus('local'); return Promise.resolve(); }
+  /* silent=true：用于「新设备登录后先拉云端再选孩子」等预热场景，失败不改写右上角角标 */
+  function pullCloud(silent) {
+    window.pullCloud = pullCloud;
+    var _ss = function (s) { if (!silent) setSyncStatus(s); };
+    if (lsGet(STORAGE.vip) !== '1') {
+      return mxVipSelfHeal().then(function () {
+        if (lsGet(STORAGE.vip) !== '1') { _ss('local'); return Promise.resolve(); }
+        return pullCloud(silent);
+      });
+    }
     var code = lsGet(STORAGE.code) || '';
-    setSyncStatus(navigator.onLine === false ? 'offline' : 'syncing');
+    _ss(navigator.onLine === false ? 'offline' : 'syncing');
     return ensureUid().then(function (uid) {
-      if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); setSyncStatus(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
-      return syncCloudGuarded('pull', { code: code }).then(function (res) {
+      if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); _ss(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
+      var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
+      return _scg('pull', { code: code }).then(function (res) {
         if (res && res.ok) {
           if (res.snapshot) return applySnapshot(res.snapshot).then(function () { return 'OK'; });
           return 'OK';
         }
         mxSyncErr(res && res.msg ? res.msg : '拉取未成功');
+        if (res && res.msg && /未登录/.test(res.msg)) _ss('expired');
+        else _ss(navigator.onLine === false ? 'offline' : 'error');   /* [rootfix] 失败不再塌缩成 local */
         return 'BAILED';
       });
-    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); setSyncStatus(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); setSyncStatus('local'); });
+    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); _ss(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); _ss(navigator.onLine === false ? 'offline' : 'error'); });
   }
   function startVipSync() {
     if (window.__mx_sync_started__) return;
