@@ -82,7 +82,18 @@
         <button class="btn ghost" onclick="loadAnnounce()">↺ 重新读取</button>
         <span id="annMsg" class="msg"></span>
       </div>
-      <div class="sub" style="margin-top:12px">提示：公告数据存储于云端 <code>CFG::linkage_config.announcement</code>，孩子端首页顶部自动展示。</div>
+      <div class="sub" style="margin-top:12px">提示：公告数据存储于云端 <code>CFG::linkage_config.announcement</code>，孩子端首页顶部自动展示（悬浮公告条）。孩子端每 3 分钟 + 回前台自动刷新，无需等每天 24 点。</div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 4px">📜 公告明细（#407）</h3>
+      <div class="sub">每次发布自动归档：ID / 发布时间 / 内容 / 状态。只有最新一条对全站生效。</div>
+      <div class="row"><button class="btn ghost" onclick="loadAnnLog()">↺ 刷新明细</button><span id="annLogMsg" class="msg"></span></div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+        <thead><tr style="text-align:left;color:#5b6478;border-bottom:2px solid #e3e8f0">
+          <th style="padding:6px 8px">ID</th><th style="padding:6px 8px">发布时间</th><th style="padding:6px 8px">内容</th><th style="padding:6px 8px">状态</th>
+        </tr></thead>
+        <tbody id="annLogBody"><tr><td colspan="4" style="padding:8px;color:#9aa">加载中…</td></tr></tbody>
+      </table>
     </div>
   </div>
 
@@ -263,7 +274,7 @@ function unlock(){
 }
 function enterApp(){
   $('loginBox').hidden = true; $('appBox').hidden = false;
-  loadAnnounce(); loadStats();
+  loadAnnounce(); loadAnnLog(); loadStats();
 }
 function logout(){
   proxy('mxAdmin', { action:'logout', adminKey: ADMIN_KEY }).catch(function(){});
@@ -295,8 +306,26 @@ async function saveAnnounce(){
   setMsg('annMsg','发布中…','sub');
   const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY, action2:'set',
     announcement: { text: text, url: $('annUrl').value.trim(), enabled: $('annEnabled').checked } });
-  if (r && r.ok) setMsg('annMsg','✅ 已发布，全站用户即将看到','ok');
+  if (r && r.ok) { setMsg('annMsg','✅ 已发布，全站用户即将看到','ok'); loadAnnLog(); }
   else setMsg('annMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
+}
+/* [#407 公告明细] 拉取最近 50 条发布归档 */
+async function loadAnnLog(){
+  try {
+    const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY, action2:'log' });
+    const log = (r && r.log) || [];
+    const tb = $('annLogBody');
+    if (!log.length) { tb.innerHTML = '<tr><td colspan="4" style="padding:8px;color:#9aa">暂无归档（首次发布后自动生成）</td></tr>'; return; }
+    tb.innerHTML = log.map(function(x){
+      const t = (x.publishedAt||'').replace('T',' ').replace(/.[0-9]+Z/,'');
+      return '<tr style="border-bottom:1px solid #eef1f6">' +
+        '<td style="padding:6px 8px;font-family:monospace">' + (x.id||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + (t||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + String(x.text||'').replace(/</g,'&lt;').slice(0,80) + '</td>' +
+        '<td style="padding:6px 8px">' + (x.enabled?'<span style="color:#2e9e5b;font-weight:700">生效中</span>':'<span style="color:#9aa">已停用</span>') + '</td></tr>';
+    }).join('');
+    setMsg('annLogMsg','共 ' + log.length + ' 条','sub');
+  } catch(e){ setMsg('annLogMsg','读取失败：'+String(e.message||e),'bad'); }
 }
 
 /* ============ 🧭 初始菜单顺序（#360）============

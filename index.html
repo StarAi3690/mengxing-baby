@@ -7078,6 +7078,58 @@ html, body {
   .mxg-gem, .mxg-orb, .mxg-pvz-cell { font-size: 18px; min-height: 34px; }
 }
 
+   [#397/#398 移动端头部] 手机窄屏：公告改悬浮条 + 保住右上角三件套
+   实测(390px)：宠物 x=540、同步徽标 x=448 全被挤出屏幕外（DOM 有但不可见），
+   公告栏被挤成 0 宽。这里做三件事：
+   ① 公告从 header-center 改为悬浮条（吸顶下方横贯全宽，毛玻璃）
+   ② 隐藏 家长按钮(≤720)/模式徽章(≤560)——侧栏里都有同名入口，不丢功能
+   ③ 收紧右排（积分+宠物+同步状态）尺寸与间距，保证三个都进屏
+   ============================================================ */
+@media (max-width: 720px) {
+  /* 悬浮公告条 */
+  .app-header .header-center {
+    position: fixed;
+    top: calc(var(--header-height, 56px) + 5px);
+    left: 8px; right: 8px;
+    margin: 0; flex: 0 0 auto;
+    overflow: visible; z-index: 870;
+    pointer-events: none;                 /* 容器不挡下方内容点击 */
+    text-align: left;
+  }
+  .app-header .header-center .gx-announce {
+    pointer-events: auto;
+    display: flex; width: 100%; max-width: 100%;
+    height: 30px; line-height: 30px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.92);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+    border-radius: 999px; padding: 0 12px;
+    overflow: hidden; box-sizing: border-box;
+  }
+  /* 页面内容让出悬浮公告高度（仅移动端） */
+  #main-content { padding-top: 38px; box-sizing: border-box; }
+  /* 家长按钮移动端隐藏（侧栏有「家长工作台」入口） */
+  .header-parent-btn { display: none; }
+  .header-right { gap: 8px; }
+  .app-header .header-title { min-width: 0; flex: 0 1 auto; }
+}
+@media (max-width: 560px) {
+  .mode-badge { display: none; }
+  .app-header { padding: 0 10px; }
+  .app-header .header-title { max-width: 34vw; }
+  .gx-coin { padding: 3px 8px; font-size: 12px; gap: 4px; }
+  .gx-pet { padding: 2px 8px 2px 4px; font-size: 12px; gap: 5px; }
+  .gx-pet-avatar { width: 24px; height: 24px; font-size: 15px; }
+  .gx-pet-status { font-size: 10px; }
+  .mx-sync-badge { padding: 3px 7px; font-size: 11px; }
+}
+@media (max-width: 380px) {
+  .app-header .header-title { max-width: 26vw; }
+}
+
+
 </style>
 
 
@@ -17011,6 +17063,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try {
       if (!pvz.cid) return;
       localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
+        ts: Date.now(),
         lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
         sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), lastDay: pvz._lastDay || pvzToday(), battleStarted: !!pvz.battleStarted
       }));
@@ -25563,7 +25616,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       /* [#409] 云端历史快照里若仍带 theme 行，落地时跳过，避免覆盖本机主题 */
       if (s === 'settings') rows = rows.filter(function (r) { return !(r && r.key === 'theme'); });
       return Promise.all(rows.map(function (r) {
-        return (window.DB && window.DB.put) ? window.DB.put(s, r) : Promise.resolve();
+        if (!window.DB || !window.DB.put) return Promise.resolve();
+        /* [syncfix #400 行级新者胜] 手机+电脑同时开着时，旧快照整行覆盖会把本地较新的修改
+           倒灌回退（打卡勾选几秒后被刷回未完成的根因）。改为：双方都带数字 updatedAt 的行，
+           谁新听谁的；无 updatedAt 的行维持旧行为（整行覆盖）。 */
+        var key = r && r.id;
+        if (!key || typeof r.updatedAt !== 'number' || !window.DB.get) return window.DB.put(s, r);
+        return window.DB.get(s, key).then(function (local) {
+          if (local && typeof local.updatedAt === 'number' && local.updatedAt > r.updatedAt) return null;
+          return window.DB.put(s, r);
+        }).catch(function () { return window.DB.put(s, r); });
       }));
     });
     var pinTask = Promise.resolve();
@@ -25583,22 +25645,32 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             if (qs) localStorage.setItem('mx_parent_questions', qs);
           }
         } catch (e) {}
-        /* [#383] PVZ 存档恢复：仅回填本机缺失的孩子存档（本机已有的一律不动，防旧云档覆盖新进度） */
-        try {
-          var _ps = snap.__pvzStates;
-          if (_ps && typeof _ps === 'object') {
-            Object.keys(_ps).forEach(function (_k) {
-              if (_k.indexOf('mxg_pvz_state_') !== 0) return;
-              if (!localStorage.getItem(_k)) {
-                try { localStorage.setItem(_k, JSON.stringify(_ps[_k])); } catch (e) {}
-              }
-            });
-          }
-        } catch (e) {}
+        /* [#399] PVZ 合并已提为独立函数 mxMergePvzStates，见 applySnapshot 尾部（不再依赖 ensureUid 成功） */
       }).catch(function () {});
     }
-    return Promise.all(dbTasks.concat([pinTask])).then(function () {});
+    return Promise.all(dbTasks.concat([pinTask])).then(function () {
+      /* [#399 PVZ 多端同步] 提到主链路：只要云端快照带了 PVZ 存档就合并，
+         不再依赖 ensureUid/VIP 分支成功（否则 uid 获取失败时同步整体失效） */
+      try { if (snap.__pvzStates && typeof snap.__pvzStates === 'object') mxMergePvzStates(snap.__pvzStates); } catch (e) {}
+    });
   }
+  /* [#399 PVZ 多端同步] 旧逻辑只「本机缺失才回填」→ 两台设备各玩各的永不合并。
+     升级为 ts 新者胜：本机缺失→回填；云端存档更新（ts 更大）→覆盖本机（旧档无 ts 视为 0）。
+     本机较新→保留，等下一次 pushCloud 把新档推上云。 */
+  function mxMergePvzStates(_ps) {
+    if (!_ps || typeof _ps !== 'object') return;
+    Object.keys(_ps).forEach(function (_k) {
+      if (String(_k).indexOf('mxg_pvz_state_') !== 0) return;
+      var _cloudTs = (_ps[_k] && typeof _ps[_k].ts === 'number') ? _ps[_k].ts : 0;
+      var _localTs = 0;
+      var _raw = null; try { _raw = localStorage.getItem(_k); } catch (e) {}
+      if (_raw) { try { var _lo = JSON.parse(_raw); if (_lo && typeof _lo.ts === 'number') _localTs = _lo.ts; } catch (e) {} }
+      if (!_raw || _cloudTs > _localTs) {
+        try { localStorage.setItem(_k, JSON.stringify(_ps[_k])); } catch (e) {}
+      }
+    });
+  }
+  window.mxMergePvzStates = mxMergePvzStates;   /* [syncfix #400] 跨块导出 */
   /* [v2.4.2 忘记密码·VIP云端填回] 恢复云端加密家长密码：优先离线缓存，否则重新拉取云端快照。
      仅返回密码字符串（或空），绝不触碰孩子/学习/任务/积分等数据。 */
   function mxRecoverParentPin() {
@@ -25645,6 +25717,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
   }
   window.setSyncStatus = setSyncStatus;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
+  window.applySnapshot = applySnapshot;     /* [syncfix #400] 跨块导出：回归测试与诊断可直接驱动合并逻辑 */
   /* [badgefix] 登录过期恢复：清激活标记刷新出登录门，重新登录即续 30 天令牌并自动恢复同步 */
   function mxForceRelogin() {
     if (!window.confirm('云端同步的登录凭证已过期（约 30 天需重新登录一次，数据不会丢失）。\n\n点击「确定」前往重新登录；登录成功后右上角会变回「☁️ 云端已同步」。')) return;
@@ -25783,9 +25856,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (window.__mx_sync_started__) return;
     window.__mx_sync_started__ = true;
     window.addEventListener('online', function () { pushCloud(); checkVipExpiry(); });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) pushCloud(); });
+    /* [syncfix #400] 回到前台/每分钟：先 pull(静默,行级新者胜合并) 再 push。
+       旧版只单向 push：手机+电脑同时开着 → 各自拿本地旧快照轮流覆盖云端，
+       打卡/PVZ 互相冲掉。先拉后推让每台设备先吸收对方的新数据再上送，双向收敛。 */
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) pullCloud(true).then(pushCloud).catch(function () {}); });
     pullCloud().then(function () { pushCloud(); });
-    setInterval(function () { if (navigator.onLine !== false) pushCloud(); }, 60000);
+    setInterval(function () { if (navigator.onLine !== false) pullCloud(true).then(pushCloud).catch(function () {}); }, 60000);
   }
 
   /* ================= 普通用户轻量快照（L3-1：每周自动存云，供管理员紧急恢复） ================= */
