@@ -1,0 +1,16 @@
+{
+  "name": "萌星宝宝·幼小衔接",
+  "short_name": "萌星宝宝",
+  "description": "游戏化儿童学习工作台：拼音、识字、古诗、英语、数学、熏听磨耳朵一站式启蒙",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#7ec850",
+  "theme_color": "#7ec850",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

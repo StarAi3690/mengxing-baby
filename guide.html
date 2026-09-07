@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#7ec850">
+<title>把「萌星宝宝」装到手机桌面 · 图文攻略</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #eef7e6 0%, #f6faf2 320px, #f6faf2 100%);
+    color: #2c3a2e; line-height: 1.75; padding-bottom: 60px;
+  }
+  .hero {
+    max-width: 720px; margin: 0 auto; padding: 34px 20px 22px; text-align: center;
+  }
+  .hero img.icon {
+    width: 84px; height: 84px; border-radius: 20px;
+    box-shadow: 0 10px 26px rgba(76,175,80,.35); display: inline-block;
+  }
+  .hero h1 { font-size: 25px; margin-top: 16px; letter-spacing: 1px; }
+  .hero h1 .gd { color: #3e9e42; }
+  .hero p.sub { color: #6b7f6d; font-size: 14.5px; margin-top: 8px; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+  .card {
+    background: #fff; border-radius: 18px; padding: 22px 20px;
+    margin-top: 18px; box-shadow: 0 3px 14px rgba(60,90,60,.07);
+    border: 1px solid #e6efdf;
+  }
+  .card h2 { font-size: 19px; display: flex; align-items: center; gap: 9px; }
+  .card h2 .badge {
+    flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #fff; background: #7ec850;
+    border-radius: 20px; padding: 2px 10px;
+  }
+  .card h2 .badge.gray { background: #93a89a; }
+  .tip {
+    background: #fff8e8; border: 1px solid #f3e3b8; color: #7a5d1e;
+    border-radius: 12px; padding: 10px 14px; font-size: 13.5px; margin-top: 12px;
+  }
+  .tip.red { background: #fdeeee; border-color: #f2caca; color: #a33a3a; }
+  .steps { margin-top: 14px; }
+  .step { display: flex; gap: 12px; padding: 9px 0; align-items: flex-start; }
+  .step .no {
+    flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
+    background: #7ec850; color: #fff; font-weight: 800; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; margin-top: 3px;
+  }
+  .step p { font-size: 15px; }
+  .step b.hl { background: linear-gradient(transparent 62%, #d9f2c8 62%); padding: 0 2px; }
+  .figs { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+  .fig { text-align: center; }
+  .fig .cap { font-size: 12.5px; color: #6b7f6d; margin-top: 4px; }
+  .fig svg { width: 150px; height: auto; }
+
+  .urlbox {
+    display: flex; gap: 8px; align-items: center; background: #f2f9ec;
+    border: 1.5px dashed #9ccb7c; border-radius: 12px; padding: 12px 14px; margin-top: 14px;
+  }
+  .urlbox code { flex: 1; font-size: 13.5px; color: #2f6b33; word-break: break-all; font-weight: 600; }
+  .urlbox button {
+    flex: 0 0 auto; border: none; background: #7ec850; color: #fff; font-weight: 700;
+    border-radius: 9px; padding: 8px 14px; font-size: 13.5px; cursor: pointer;
+  }
+  .faq dt { font-weight: 700; font-size: 15px; margin-top: 14px; color: #37503a; }
+  .faq dd { font-size: 14px; color: #5d7260; margin-top: 4px; padding-left: 2px; }
+  footer { text-align: center; color: #93a89a; font-size: 12.5px; margin-top: 30px; }
+  a.go { color: #3e9e42; font-weight: 700; text-decoration: none; border-bottom: 2px solid #cdeab8; }
+  @media (min-width: 560px) { .fig svg { width: 170px; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="icon" src="assets/icons/icon-192.png" alt="萌星宝宝图标">
+  <h1>把「<span class="gd">萌星宝宝</span>」装到手机桌面</h1>
+  <p class="sub">不用下载 App · 不占内存 · 加到桌面后一点就开，和正常 App 一样用</p>
+</div>
+
+<div class="wrap">
+
+  <!-- 第 0 步 -->
+  <div class="card">
+    <h2><span class="badge">第 0 步</span>先复制网址</h2>
+    <div class="urlbox">
+      <code id="u">https://StarAi3690.github.io/mengxing-baby/</code>
+      <button onclick="copyU()">复制</button>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><p>长按上面网址 → <b class="hl">复制</b>（或点右边「复制」按钮）</p></div>
+      <div class="step"><span class="no">2</span><p>打开手机自带的<b class="hl">浏览器</b>（iPhone 用 Safari，安卓用自带浏览器），粘贴到地址栏并打开</p></div>
+    </div>
+    <div class="tip red">⚠️ 微信里打开的不行！微信内置浏览器加不了桌面，请看下一节的转出方法。</div>
+  </div>
+
+  <!-- 微信转出 -->
+  <div class="card">
+    <h2><span class="badge gray">微信用户必读</span>先从微信里「跳」出来</h2>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><p>点微信右上角的 <b class="hl">「···」</b>（三个点）</p></div>
+      <div class="step"><span class="no">2</span><p>在弹出菜单里选 <b class="hl">「在浏览器打开」</b>（有的手机显示「在默认浏览器打开」）</p></div>
+      <div class="step"><span class="no">3</span><p>跳到浏览器后，再按下面对应手机品牌的步骤操作</p></div>
+    </div>
+    <div class="figs">
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <rect x="10" y="8" width="170" height="26" rx="13" fill="#ededed"/>
+          <text x="95" y="26" text-anchor="middle" font-size="12" fill="#555">网页标题 · 萌星宝宝</text>
+          <circle cx="163" cy="21" r="13" fill="#e0533d" opacity=".18"/>
+          <circle cx="163" cy="21" r="13" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="163" y="26" text-anchor="middle" font-size="13" font-weight="bold" fill="#e0533d">···</text>
+          <path d="M163 38 L163 62" stroke="#e0533d" stroke-width="2.5" stroke-dasharray="5 4"/>
+          <path d="M157 56 L163 64 L169 56" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <rect x="35" y="76" width="120" height="150" rx="12" fill="#fafafa" stroke="#ddd"/>
+          <line x1="50" y1="100" x2="140" y2="100" stroke="#eee" stroke-width="8"/>
+          <line x1="50" y1="122" x2="140" y2="122" stroke="#eee" stroke-width="8"/>
+          <rect x="44" y="140" width="102" height="30" rx="8" fill="#e0533d" opacity=".15"/>
+          <rect x="44" y="140" width="102" height="30" rx="8" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="95" y="160" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">在浏览器打开</text>
+          <line x1="50" y1="188" x2="140" y2="188" stroke="#eee" stroke-width="8"/>
+        </svg>
+        <div class="cap">微信「···」→ 在浏览器打开</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS -->
+  <div class="card">
+    <h2>🍎 iPhone / iPad（苹果）<span class="badge">Safari</span></h2>
+    <div class="tip">必须用系统自带的 <b>Safari 浏览器</b>操作，Chrome 等其他浏览器没有这个功能。</div>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><p>在 Safari 打开萌星宝宝，点屏幕<b class="hl">底部中间的「分享」按钮</b>（一个方框加向上箭头 ↑）</p></div>
+      <div class="step"><span class="no">2</span><p>向上滑动菜单，找到 <b class="hl">「添加到主屏幕」</b>，点它</p></div>
+      <div class="step"><span class="no">3</span><p>确认名称显示「萌星宝宝」，点右上角 <b class="hl">「添加」</b></p></div>
+      <div class="step"><span class="no">4</span><p>回到桌面，看到绿色星星图标 ✅ 点开即用，全屏无地址栏，和 App 一模一样</p></div>
+    </div>
+    <div class="figs">
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <rect x="75" y="12" width="40" height="8" rx="4" fill="#e8e8e8"/>
+          <rect x="24" y="34" width="142" height="150" rx="10" fill="#f2f8ee"/>
+          <text x="95" y="100" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text>
+          <text x="95" y="120" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text>
+          <rect x="10" y="190" width="170" height="40" fill="#f5f5f5"/>
+          <line x1="10" y1="190" x2="180" y2="190" stroke="#ddd"/>
+          <path d="M45 198 h20 v14 h-20 z M55 192 l-7 7 h4 v10 h6 v-10 h4 z" fill="#888"/>
+          <circle cx="55" cy="205" r="17" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="95" y="210" text-anchor="middle" font-size="11" fill="#888">↗</text>
+          <text x="130" y="210" text-anchor="middle" font-size="11" fill="#888">＋</text>
+          <text x="55" y="240" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">① 点分享按钮</text>
+        </svg>
+        <div class="cap">Safari 底部工具栏 · 分享按钮</div>
+      </div>
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <rect x="28" y="26" width="134" height="30" rx="9" fill="#f0f0f0"/>
+          <text x="95" y="46" text-anchor="middle" font-size="11.5" fill="#555">拷贝　　打印</text>
+          <rect x="28" y="62" width="134" height="30" rx="9" fill="#f0f0f0"/>
+          <text x="95" y="82" text-anchor="middle" font-size="11.5" fill="#555">存储到「文件」</text>
+          <rect x="26" y="99" width="138" height="32" rx="9" fill="#e0533d" opacity=".15"/>
+          <rect x="26" y="99" width="138" height="32" rx="9" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="95" y="120" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">添加到主屏幕</text>
+          <rect x="28" y="138" width="134" height="30" rx="9" fill="#f0f0f0"/>
+          <text x="95" y="158" text-anchor="middle" font-size="11.5" fill="#555">添加到阅读列表</text>
+          <path d="M95 180 L95 202" stroke="#3e9e42" stroke-width="2.5" stroke-dasharray="5 4"/>
+          <path d="M89 196 L95 204 L101 196" fill="none" stroke="#3e9e42" stroke-width="2.5"/>
+          <text x="95" y="226" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">② 上滑找到这一项</text>
+        </svg>
+        <div class="cap">分享菜单 · 点「添加到主屏幕」</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 鸿蒙 -->
+  <div class="card">
+    <h2>🌸 鸿蒙 / 华为手机（HarmonyOS）</h2>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><p>用<b class="hl">华为浏览器</b>（或系统浏览器）打开萌星宝宝</p></div>
+      <div class="step"><span class="no">2</span><p>点屏幕<b class="hl">底部工具栏的「菜单」</b>（三条横线 ≡ 或四个点）</p></div>
+      <div class="step"><span class="no">3</span><p>在弹出面板里找到 <b class="hl">「添加到桌面」</b>（部分版本叫「添加到主屏幕」），点它</p></div>
+      <div class="step"><span class="no">4</span><p>如提示「将添加快捷方式」，点确认 → 回到桌面看到绿色星星图标 ✅</p></div>
+    </div>
+    <div class="tip">找不到入口时：长按浏览器地址栏网址 → 有的版本会直接出现「添加到桌面」。</div>
+    <div class="figs">
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <circle cx="95" cy="22" r="4" fill="#e8e8e8"/>
+          <rect x="24" y="40" width="142" height="130" rx="10" fill="#f2f8ee"/>
+          <text x="95" y="98" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text>
+          <text x="95" y="118" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text>
+          <rect x="10" y="196" width="170" height="34" fill="#f5f5f5"/>
+          <line x1="10" y1="196" x2="180" y2="196" stroke="#ddd"/>
+          <circle cx="45" cy="213" r="10" fill="none" stroke="#888" stroke-width="2"/>
+          <line x1="45" y1="223" x2="45" y2="227" stroke="#888" stroke-width="2"/>
+          <rect x="82" y="204" width="26" height="18" rx="3" fill="none" stroke="#888" stroke-width="2"/>
+          <circle cx="122" cy="213" r="11" fill="none" stroke="#888" stroke-width="2"/>
+          <text x="122" y="218" text-anchor="middle" font-size="12" fill="#888">⇪</text>
+          <circle cx="158" cy="213" r="14" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="158" y="218" text-anchor="middle" font-size="13" font-weight="bold" fill="#e0533d">≡</text>
+          <text x="95" y="243" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">① 点右下角「菜单」</text>
+        </svg>
+        <div class="cap">华为浏览器底部工具栏</div>
+      </div>
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <rect x="24" y="28" width="142" height="34" rx="10" fill="#f2f8ee"/>
+          <text x="95" y="50" text-anchor="middle" font-size="11" fill="#7ec850" font-weight="bold">萌星宝宝·幼小衔接</text>
+          <rect x="24" y="74" width="142" height="150" rx="14" fill="#fafafa" stroke="#ddd"/>
+          <text x="52" y="102" text-anchor="middle" font-size="12" fill="#555">🔍 搜索</text>
+          <text x="138" y="102" text-anchor="middle" font-size="12" fill="#555">⭐ 收藏</text>
+          <rect x="34" y="120" width="122" height="30" rx="8" fill="#e0533d" opacity=".15"/>
+          <rect x="34" y="120" width="122" height="30" rx="8" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="95" y="140" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">添加到桌面</text>
+          <text x="52" y="176" text-anchor="middle" font-size="12" fill="#555">📖 书签</text>
+          <text x="138" y="176" text-anchor="middle" font-size="12" fill="#555">⚙️ 设置</text>
+          <text x="95" y="243" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">② 点「添加到桌面」</text>
+        </svg>
+        <div class="cap">菜单面板</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 安卓 -->
+  <div class="card">
+    <h2>🤖 安卓其他品牌（小米 / OPPO / vivo / 三星…）</h2>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><p>用手机自带浏览器或 Chrome 打开萌星宝宝</p></div>
+      <div class="step"><span class="no">2</span><p>点<b class="hl">右上角的「⋮」或「≡」菜单</b></p></div>
+      <div class="step"><span class="no">3</span><p>找 <b class="hl">「添加到主屏幕」</b>／「添加到桌面」／「添加快捷方式」（名字略有差异，认准这几个词）</p></div>
+      <div class="step"><span class="no">4</span><p>弹窗点「添加」→ 桌面出现绿色星星图标 ✅。部分手机会先显示「安装应用？」确认框，点安装即可（秒装，不下载任何东西）</p></div>
+    </div>
+    <div class="figs">
+      <div class="fig">
+        <svg viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/>
+          <circle cx="95" cy="22" r="4" fill="#e8e8e8"/>
+          <rect x="24" y="36" width="122" height="26" rx="13" fill="#f0f0f0"/>
+          <text x="85" y="53" text-anchor="middle" font-size="10" fill="#777">🔍 mengxing-baby</text>
+          <circle cx="160" cy="49" r="14" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="160" y="55" text-anchor="middle" font-size="15" font-weight="bold" fill="#e0533d">⋮</text>
+          <rect x="24" y="78" width="142" height="120" rx="10" fill="#f2f8ee"/>
+          <text x="95" y="132" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text>
+          <text x="95" y="152" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text>
+          <rect x="46" y="208" width="98" height="26" rx="13" fill="#e0533d" opacity=".15"/>
+          <rect x="46" y="208" width="98" height="26" rx="13" fill="none" stroke="#e0533d" stroke-width="2.5"/>
+          <text x="95" y="226" text-anchor="middle" font-size="12" font-weight="bold" fill="#e0533d">添加到主屏幕</text>
+        </svg>
+        <div class="cap">Chrome 右上角 ⋮ → 添加到主屏幕</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="card">
+    <h2>❓ 常见问题</h2>
+    <dl class="faq">
+      <dt>桌面上没有出现图标？</dt>
+      <dd>部分安卓手机会拦截桌面快捷方式：去「系统设置 → 应用管理 → 权限」，给浏览器开启「创建桌面快捷方式」权限后重试。</dd>
+      <dt>图标变成了一张网页截图，不是绿色星星？</dt>
+      <dd>说明页面是旧版本缓存：先删除桌面图标，用浏览器重新打开网址（下拉刷新一次），再重新「添加到主屏幕」。</dd>
+      <dt>加到桌面后打开是白屏？</dt>
+      <dd>第一次打开需要联网加载，等几秒即可；之后学习记录存在手机本地，断网也能看已加载的内容。</dd>
+      <dt>换了手机 / 清了浏览器数据，孩子的学习记录还在吗？</dt>
+      <dd>VIP 账号的数据存在云端，换设备登录同一账号会自动找回；未登录的数据只在本机，删除图标前建议先在「账号中心」备份。</dd>
+      <dt>和真的 App 有什么区别？</dt>
+      <dd>没有区别：全屏运行、有自己的图标、点开即用，还不用下载几十 MB 的安装包、不用应用商店审核更新——打开永远是最新版。</dd>
+    </dl>
+  </div>
+
+  <footer>萌星宝宝 · 家长使用攻略 ｜ 网址：https://StarAi3690.github.io/mengxing-baby/</footer>
+</div>
+
+<script>
+function copyU() {
+  var t = document.getElementById('u').textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function(){ ok(); }, function(){ fallback(t); });
+  } else { fallback(t); }
+}
+function fallback(t) {
+  var ta = document.createElement('textarea');
+  ta.value = t; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); ok(); } catch (e) {}
+  document.body.removeChild(ta);
+}
+function ok() {
+  var b = document.querySelector('.urlbox button');
+  b.textContent = '✓ 已复制'; b.style.background = '#3e9e42';
+  setTimeout(function(){ b.textContent = '复制'; b.style.background = '#7ec850'; }, 1600);
+}
+</script>
+</body>
+</html>
