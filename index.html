@@ -22677,29 +22677,52 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).filter(function(r){ return r.title && !/^（?示例/.test(r.title); });
   }
 
+  /* [#403] 模板示例行：13 个模块各一行，与 RES_MODULES 顺序一致。
+     模块名取「模块列可选值」里的标准写法，家长直接用示例行改文件名即可，不会被误判。 */
+  var RES_TPL_ROWS = [
+    ['poem',         '语文-古诗',     '静夜思·跟读'],
+    ['literacy',     '语文-识字',     '日月水火·生字卡'],
+    ['pinyin',       '语文-拼音',     'a o e·拼音跟读'],
+    ['story',        '语文-绘本',     '小熊过桥·绘本'],
+    ['estory',       '英语-绘本',     'Brown Bear·英文绘本'],
+    ['abc',          '英语-26字母',   'ABC字母歌'],
+    ['phonics',      '英语-自然拼读', 'cat·自然拼读'],
+    ['words',        '英语-单词',     'apple·单词卡'],
+    ['algo',         '数学-算法',     '十以内加法·口算'],
+    ['workbook',     '数学-练习册',   '幼小衔接·练习册'],
+    ['listen-en',    '熏听-英语',     '英文儿歌·磨耳朵'],
+    ['listen-music', '熏听-儿歌',     '中文儿歌·磨耳朵'],
+    ['lchinese',     '熏听-国学',     '三字经·国学熏听']
+  ];
+  /* mediaType → 家长看得懂的中文格式说明 */
+  var RES_TYPE_LABEL = { audio: '音频 mp3/wav/m4a/aac', pdf: 'PDF', image: '图片 jpg/png/webp', video: '视频 mp4' };
+
   /* CSV 模板下载（UTF-8 BOM，Excel/WPS 双击可编辑） */
   function resDownloadCsvTemplate(){
-    /* [#379] 模板带「模块」标准列（13 类全名可选）+ 各模块允许文件类型说明 */
-    var content = '\uFEFF资源名称,模块,文件路径/网盘链接\n'
-      + '（示例）静夜思跟读,语文-古诗,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + '（示例）ABC字母歌,英语-26字母,https://www.alipan.com/s/1xxxxxxxx\n'
-      + '（示例）十以内加法,数学-算法,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + '（示例）睡前国学故事,熏听-语文,https://pan.baidu.com/s/1xxxxxxxx\n'
-      + ',,\n'
-      + '【模块列可选值（13 类）】\n'
-      + '语文-古诗｜语文-识字｜语文-拼音｜语文-绘本｜英语-绘本｜英语-26字母｜英语-自然拼读｜英语-单词｜数学-算法｜数学-练习册｜熏听-英语｜熏听-儿歌｜熏听-语文\n'
-      + '【各模块建议文件类型】\n'
-      + '熏听-英语/儿歌/语文：仅音频 mp3/wav/m4a/aac（磨耳朵用）\n'
-      + '语文-古诗/识字/拼音：音频 mp3/wav 或 PDF/图片\n'
-      + '语文-绘本：图片 jpg/png（一页一图）或 PDF 或视频 mp4（讲读视频）\n'
-      + '英语-绘本/26字母/自然拼读/单词：音频 mp3/wav 或 PDF/图片，绘本可传视频 mp4\n'
-      + '数学-算法/练习册：PDF 或图片，可带讲解视频 mp4\n'
-      + '提示：链接列填网盘分享链接；本地文件请用模式一上传文件夹（文件名带模块关键词可自动归类）\n';
+    /* [#403] 表头按家长最直观的三列：资源名称 / 模块 / 文件路径及文件名；
+       1 行标题 + 13 行（每个模块一行，并在资源名称里注明该模块支持的文件格式）。 */
+    function typesOf(key){
+      var t = RES_MODULE_TYPES[key] || [];
+      return t.map(function (x) { return RES_TYPE_LABEL[x] || x; }).join(' / ') || '不限';
+    }
+    var lines = ['资源名称,模块,文件路径及文件名'];
+    RES_TPL_ROWS.forEach(function (r) {
+      lines.push('（示例）' + r[2] + '【支持：' + typesOf(r[0]) + '】,' + r[1] + ',https://pan.baidu.com/s/请替换为你的分享链接');
+    });
+    lines.push('');
+    lines.push('【模块列可选值（13 类）】');
+    lines.push(RES_TPL_ROWS.map(function (r) { return r[1]; }).join('｜'));
+    lines.push('【填写说明】');
+    lines.push('1. 第 1 行表头请勿修改；第 2～14 行是示例，直接改成你自己的内容即可（整行覆盖，别只改半行）。');
+    lines.push('2. 「模块」列必须填上面 13 个标准值之一，写错会归入「其他」，导入后可用「手动归类」改回来。');
+    lines.push('3. 「文件路径及文件名」列填网盘分享链接（https 开头）；电脑里的本地文件请回到「模式一·上传文件夹」。');
+    lines.push('4. 每行「【支持：…】」是该模块能收的文件格式，熏听类只收音频，绘本类可收视频。');
+    var content = '\uFEFF' + lines.join('\n') + '\n';
     try {
       var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '资源导入模板.csv'; a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（Excel/WPS 可直接编辑）');
+      if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（14 行，13 个模块各一行，Excel/WPS 可直接编辑）');
     } catch (e) { if (window.showToast) window.showToast('模板下载失败：' + (e && e.message || e)); }
   }
   /* [#379] 模块列别名表：兼容「熏听-英语」/「熏听英文」/「listen-en」等写法 → 标准 key */
