@@ -40,7 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
-  <script>window.MX_BUILD_TS = 202609090230; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
+  <script>window.MX_BUILD_TS = 202609090240; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -23056,11 +23056,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* 导入完成后的云端动作：VIP → 未超限则触发元数据同步；免费用户零云端消耗 */
   function resAfterImport(){
     if (!resIsVip()) return;
-    resCloudUsedBytes().then(function (used) {
-      if (used > RES_CLOUD_QUOTA_MB * 1048576) {
-        if (window.showToast) window.showToast('☁️ 云端空间已满（' + RES_CLOUD_QUOTA_MB + 'MB 上限），请移步本地使用');
-      } else if (window.pushCloud) { try { window.pushCloud(); } catch (e) {} }
-    });
+    /* [#414] 旧版「累计文件体积超 20MB 就不触发同步」已废弃：文件本体永不上云，
+       上云的只是轻量清单（自带字节限额），导入后一律触发一次同步，保证手机端能看到。 */
+    try { if (window.pushCloud) window.pushCloud(); } catch (e) {}
   }
 
   /* 通用提示弹窗（非导入统计场景） */
