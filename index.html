@@ -9854,6 +9854,13 @@ function mxVipRecheckNeeded() {
   };
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  /* [#406 全量同步] 游戏进度键写入时登记时间戳（供 __lsStates 新者胜合并） */
+  window.mxLsTouch = function (k) {
+    try {
+      var m = {}; try { m = JSON.parse(localStorage.getItem('__mx_ls_ts') || '{}') || {}; } catch (e) {}
+      m[k] = Date.now(); localStorage.setItem('__mx_ls_ts', JSON.stringify(m));
+    } catch (e) {}
+  };
 function syncCloudGuarded(action, extra) {
   if (!mxVipRecheckNeeded()) return window.mxApiSync(action, extra);
   return mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code), uid: window.__mx_uid__ || '' }).then(function (vr) {
@@ -17702,10 +17709,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pony.photos.push({ emoji: cur.emoji + sc.emoji, cap: sc.name });
         if (pony.photos.length > 7) pony.photos = pony.photos.slice(-7);
         localStorage.setItem('mxg_pony_photos', JSON.stringify(pony.photos));
+        try { if (window.mxLsTouch) window.mxLsTouch('mxg_pony_photos'); } catch (e) {}   /* [#406] */
         addPts(pony.cid, sc.pts, '照片故事·' + sc.name);
         pony.progress = Math.min(7, pony.progress + 1);
         mxStatAdd('pony', 1); /* [v2.4.1] 成就墙·累计照片故事卡 */
         try { localStorage.setItem('mxg_pony_progress', String(pony.progress)); } catch (e) {}
+        try { if (window.mxLsTouch) window.mxLsTouch('mxg_pony_progress'); } catch (e) {}   /* [#406] */
         beep(990); toast('📸 命中场景：' + sc.name + ' +' + sc.pts + '🌸');
         publishHome('pony', pony.progress);
         if (pony.progress >= 7) completeRound('pony');
@@ -18594,6 +18603,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       shanhai.cards.push(card);
       shanhai.owned[ch.id] = true;
       try { localStorage.setItem('mxg_shanhai_cards', JSON.stringify(shanhai.cards)); } catch (e) {}
+      try { if (window.mxLsTouch) window.mxLsTouch('mxg_shanhai_cards'); } catch (e) {}   /* [#406] */
       // ★ 同步进 IndexedDB cards 表（盲盒卡册 / 图鉴读的就是这张表）
       try {
         if (window.DB && DB.put) {
@@ -25592,7 +25602,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* ================= VIP 多端同步(服务端云函数，断网降级) ================= */
-  var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule'];
+  var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders'];
   /* VIP 家长密码轻量加密上云：以 uid 派生密钥做 XOR 混淆（非强加密，仅避免明文落云） */
   function pinEncKey(uid) {
     var s = String(uid || '') + '::mx_parent_pin_v1';
@@ -25654,6 +25664,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             }
             if (Object.keys(_pvz).length) out.__pvzStates = _pvz;
           } catch (e) {}
+          /* [#406 全量同步 2026-09-08] 三大游戏本地进度上云（小马宝莉照片/进度、山海经卡牌）。
+             值本身无内嵌 ts，借 __mx_ls_ts 登记各键最后写入时间做新者胜合并；
+             皮肤 mx_skin 按需求明确【不同步】（各设备外观独立）。 */
+          try {
+            var _ls = {}, _lsKeys = ['mxg_pony_progress', 'mxg_pony_photos', 'mxg_shanhai_cards'];
+            var _tsMap = {}; try { _tsMap = JSON.parse(localStorage.getItem('__mx_ls_ts') || '{}') || {}; } catch (eTS) {}
+            for (var _j = 0; _j < _lsKeys.length; _j++) {
+              var _lk = _lsKeys[_j], _lv = null;
+              try { _lv = localStorage.getItem(_lk); } catch (eL) {}
+              if (_lv !== null) _ls[_lk] = { v: _lv, ts: (typeof _tsMap[_lk] === 'number') ? _tsMap[_lk] : 0 };
+            }
+            if (Object.keys(_ls).length) out.__lsStates = _ls;
+          } catch (e) {}
           /* [资源中心#358] VIP 仅同步资源元数据清单（文件本体永不上云）；累计超 20MB 配额则不同步，引导本地使用 */
           return (window.DB && window.DB.getAll ? window.DB.getAll('resources') : Promise.resolve([])).then(function (rrows) {
             var _sum = 0; (rrows || []).forEach(function (r) { _sum += (r && r.size) || 0; });
@@ -25710,6 +25733,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       /* [#399 PVZ 多端同步] 提到主链路：只要云端快照带了 PVZ 存档就合并，
          不再依赖 ensureUid/VIP 分支成功（否则 uid 获取失败时同步整体失效） */
       try { if (snap.__pvzStates && typeof snap.__pvzStates === 'object') mxMergePvzStates(snap.__pvzStates); } catch (e) {}
+      try { if (snap.__lsStates && typeof snap.__lsStates === 'object') mxMergeLsStates(snap.__lsStates); } catch (e) {}   /* [#406] */
     });
   }
   /* [#399 PVZ 多端同步] 旧逻辑只「本机缺失才回填」→ 两台设备各玩各的永不合并。
@@ -25729,6 +25753,25 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
   }
   window.mxMergePvzStates = mxMergePvzStates;   /* [syncfix #400] 跨块导出 */
+  /* [#406 全量同步 2026-09-08] 游戏本地进度（小马宝莉照片/进度、山海经卡牌）多端合并：
+     值无内嵌 ts，借 __mx_ls_ts 登记写入时间；云端 ts 更新→覆盖本机，本机较新→保留待推送。 */
+  function mxMergeLsStates(_ls) {
+    if (!_ls || typeof _ls !== 'object') return;
+    var _tsMap = {}; try { _tsMap = JSON.parse(localStorage.getItem('__mx_ls_ts') || '{}') || {}; } catch (e) {}
+    Object.keys(_ls).forEach(function (_k) {
+      var _ent = _ls[_k];
+      if (!_ent || typeof _ent !== 'object' || typeof _ent.v !== 'string') return;
+      var _cloudTs = (typeof _ent.ts === 'number') ? _ent.ts : 0;
+      var _localTs = (typeof _tsMap[_k] === 'number') ? _tsMap[_k] : 0;
+      var _raw = null; try { _raw = localStorage.getItem(_k); } catch (e2) {}
+      if (!_raw || _cloudTs > _localTs) {
+        try { localStorage.setItem(_k, _ent.v); } catch (e3) {}
+        _tsMap[_k] = _cloudTs;
+        try { localStorage.setItem('__mx_ls_ts', JSON.stringify(_tsMap)); } catch (e4) {}
+      }
+    });
+  }
+  window.mxMergeLsStates = mxMergeLsStates;   /* [跨 IIFE 红线] 供回归测试驱动 */
   /* [v2.4.2 忘记密码·VIP云端填回] 恢复云端加密家长密码：优先离线缓存，否则重新拉取云端快照。
      仅返回密码字符串（或空），绝不触碰孩子/学习/任务/积分等数据。 */
   function mxRecoverParentPin() {
