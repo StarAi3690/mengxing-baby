@@ -7133,6 +7133,35 @@ html, body {
 }
 
 
+
+/* [#409-5/7/8 手机端体验修正 2026-09-08b] */
+/* ⑤ 悬浮公告文字可读化：高级灰正文 + 暖黄强调（原继承 header 白字，白底上不可见） */
+@media (max-width: 720px) and (orientation: portrait) {
+  .app-header .header-center .gx-announce {
+    color: #5f6b7a;
+    background: rgba(255, 252, 243, 0.95);
+    border-color: rgba(184, 134, 11, 0.18);
+  }
+  .app-header .header-center .gx-announce .gx-announce-label { color: #b8860b; }
+  .app-header .header-center .gx-announce a, .app-header .header-center .gx-announce b { color: #b8860b; }
+}
+/* ⑦ 三端模式合一框：旧「儿童/家长模式」徽标退役（信息并入家长按钮一个框） */
+.app-header .mode-badge { display: none !important; }
+/* ⑦ 竖屏右上角再收紧一档：给「XX的学习园地」让宽度 */
+@media (max-width: 720px) and (orientation: portrait) {
+  .header-right { gap: 3px; }
+  .gx-coin { padding: 2px 5px; font-size: 11px; }
+  .gx-pet { padding: 2px 4px 2px 3px; }
+  .gx-pet-avatar { width: 18px; height: 18px; font-size: 12px; }
+  .gx-pet-status { font-size: 10px; }
+  .mx-sync-badge { padding: 2px 5px; font-size: 10px; }
+  #header-parent-btn { padding: 2px 6px; font-size: 11px; }
+}
+/* ⑧ 手机横屏整体缩放 10%（等效 Ctrl+滚轮缩小，缓解按压困难和视觉遮挡） */
+@media (orientation: landscape) and (max-height: 500px) {
+  body { zoom: 0.9; }
+}
+
 </style>
 
 
@@ -8054,6 +8083,7 @@ async function addPoints(childId, amount, reason = '') {
 
   });
 
+  row.updatedAt = Date.now();   /* [#409-6 积分版本化] 行级合并新者胜依据 */
   await put('points', row);
 
   return row.total;
@@ -11206,14 +11236,15 @@ window.DB = {
   window.mxIsPortrait = function () {
     try { return !!(window.matchMedia && window.matchMedia('(max-width: 720px) and (orientation: portrait)').matches); } catch (e) { return false; }
   };
-  /* 模式合一框：竖屏下家长按钮即模式指示——儿童态「🧒 儿童」点击先询问（confirm 自带取消）；
-     家长态「👨 家长」点击直达工作台。桌面/横屏保持原「👨‍👩‍👧 家长」不变。 */
+  /* [#409-7 三端模式合一框] 全平台儿童/家长共用一个框：儿童态「🧒 儿童模式」（手机竖屏「🧒 儿童」）
+     点击先询问再走家长验证；家长态「👨‍👩‍👧 家长模式」点击直达工作台。旧 mode-badge 已隐藏。 */
   window.mxSyncModeBox = function () {
     var b = document.getElementById('header-parent-btn');
     if (!b) return;
-    b.textContent = (window.mxIsPortrait && window.mxIsPortrait())
-      ? (window.__parentUnlocked ? '👨 家长' : '🧒 儿童')
-      : '👨‍👩‍👧 家长';
+    var p = window.mxIsPortrait && window.mxIsPortrait();
+    b.textContent = window.__parentUnlocked
+      ? (p ? '👨 家长' : '👨‍👩‍👧 家长模式')
+      : (p ? '🧒 儿童' : '🧒 儿童模式');
   };
   /* [跨块修复 2026-09-08] 本块遥测/PV 上报裸引用 lsGet/lsSet（定义在别的 IIFE），
      ReferenceError 被 try/catch 吞掉 → 遥测静默全丢。块内补本地定义。 */
@@ -11222,9 +11253,9 @@ window.DB = {
   (function () {
     var b = document.getElementById('header-parent-btn');
     if (b) b.onclick = function () {
-      /* [用户确认交互] 竖屏儿童态进家长工作台先询问，防误触；「取消」即关闭 */
-      if (window.mxIsPortrait && window.mxIsPortrait() && !window.__parentUnlocked) {
-        if (!window.confirm('是否进入家长工作台？\n进入前需要验证家长密码（手势/数字密码）。')) return;
+      /* [#409-7 三端统一] 儿童态点击先询问（confirm 自带取消，防误触），家长态直达工作台 */
+      if (!window.__parentUnlocked) {
+        if (!window.confirm('是否切换到家长模式？\n切换前需要验证家长密码（手势/数字密码）。')) return;
       }
       if (window.navigateTo) window.navigateTo('page-parent');
     };
@@ -15827,6 +15858,7 @@ window.MX_SEED = data;
     if (r.total < amount) return -1;   // 积分不足
     r.total -= amount;
     r.history.push({ time: Date.now(), amount: -amount, reason: reason || '消耗' });
+    r.updatedAt = Date.now();   /* [#409-6 积分版本化] */
     await DB.put('points', r);
     return r.total;
   }
@@ -16907,6 +16939,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   function mxSetEnabledGames(arr) { try { lsSet('mx_enabled_games', JSON.stringify(arr.slice(0, 3))); } catch (e) {} }
   function mxGameLocked(id) { return !mxIsVip() && mxEnabledGames().indexOf(id) < 0; }
+  /* [#409-2 跨块导出] 首页看板/家长工作台跨 IIFE 调用（红线：跨块必须 window 导出） */
+  window.mxEnabledGames = mxEnabledGames;
+  window.mxManageGames = mxManageGames;   /* 函数声明提升，安全引用 */
+  window.mxGameMeta = GAME_META;
   function mxModal(html) {
     var mask = document.createElement('div');
     mask.className = 'mx-modal-mask';
@@ -16921,7 +16957,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var box = mxModal(
       '<div style="font-size:44px">🔒</div>' +
       '<div style="font-size:18px;font-weight:800;color:#1f3a5f;margin:6px 0 8px">「' + esc(m.name) + '」需会员解锁</div>' +
-      '<div style="font-size:13px;color:#5b6b80;line-height:1.7;margin-bottom:14px">普通用户可从 6 大模块中<b>任选 3 个</b>免费畅玩；升级 VIP 即可解锁全部 6 大模块（含多端云同步）。</div>' +
+      '<div style="font-size:13px;color:#5b6b80;line-height:1.7;margin-bottom:14px">试玩机会（每款 1 次）用完后，请从 6 大模块中<b>选定 3 个</b>保留畅玩；升级 VIP 即可解锁全部 6 大模块（含多端云同步）。</div>' +
       '<button id="mx-up-buy" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#ffd45e,#f0a500);color:#5a3d00;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px">升级 VIP 解锁全部</button>' +
       '<button id="mx-up-manage" style="width:100%;padding:11px;border:1px solid #d5e3f7;border-radius:12px;background:#f3f6fb;color:#5b6b80;font-size:14px;cursor:pointer;margin-bottom:8px">管理我的 3 个模块</button>' +
       '<button id="mx-up-close" style="width:100%;padding:9px;border:none;background:transparent;color:#9aa9bd;font-size:13px;cursor:pointer">关闭</button>'
@@ -17038,7 +17074,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     Array.prototype.forEach.call(container.querySelectorAll('.mxg-hall-card'), function (card) {
       card.onclick = function () {
         var id = card.dataset.game;
-        if (mxGameLocked(id)) { mxUpsellGame(id); return; }
+        if (mxGameLocked(id)) {
+          /* [#409-2 试玩1次] 非VIP点未选中的游戏：先允许试玩 1 次（每款限一次，本机记录）；
+             试玩机会用完后再点 → 弹「选定 3 个保留」流程（mxUpsellGame） */
+          var _tr = null; try { _tr = JSON.parse(lsGet('mx_game_trials') || '{}') || {}; } catch (e) {}
+          if (!_tr[id]) {
+            _tr[id] = Date.now();
+            try { lsSet('mx_game_trials', JSON.stringify(_tr)); } catch (e) {}
+            if (window.showToast) window.showToast('🎁 试玩模式：' + ((GAME_META[id] && GAME_META[id].name) || '该游戏') + ' 可免费试玩 1 次');
+          } else {
+            mxUpsellGame(id); return;
+          }
+          openGame(id, container); return;
+        }
         openGame(id, container);
       };
     });
@@ -20768,6 +20816,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     '</div></div>';
 
     /* 家长工作台页签控制台：主页 + 个人日历·日程 + 学习任务·套组（同一页内切换，免重复验证） */
+    /* [#409-2 游戏模块选择入口（非VIP 6选3，VIP 全解锁无需设置）] */
+    h += '<div class="no-print" style="background:#fff;border:1px solid #eef2f8;border-radius:14px;padding:14px 16px;margin:12px 0">' +
+      '<div class="mx-sub-t" style="margin:0 0 6px">🎮 游戏模块选择 <span style="font-weight:400;color:#8a93a6">非 VIP：6 选 3 保留畅玩 · VIP 无需设置</span></div>' +
+      '<div id="pt-game-sel-tip" style="font-size:12.5px;color:#5b6b80;margin:6px 0 10px"></div>' +
+      '<button type="button" class="mx-btn mx-btn-ghost" id="pt-game-sel">🎛 设置孩子的 3 个免费游戏</button></div>';
     var _tabL = (window.PARENT_AUTH && window.PARENT_AUTH.tabLabels) || { home: '工作台主页', calendar: '个人日历·日程', tasks: '学习任务·套组' };
     var _tabBar = '<div class="mx-tabs no-print" id="mx-parent-tabs">' +
       '<button type="button" class="mx-tab on" data-ptab="home">' + (_tabL.home || '工作台主页') + '</button>' +
@@ -20781,6 +20834,23 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     s.querySelectorAll('[data-go]').forEach(function (b) {
       b.onclick = function () { if (window.navigateTo) window.navigateTo(b.getAttribute('data-go')); };
     });
+    /* [#409-2 游戏模块选择：绑定与当前保留提示] */
+    var _gsBtn = s.querySelector('#pt-game-sel');
+    if (_gsBtn) _gsBtn.onclick = function () {
+      var _isV = false;
+      try { _isV = !!(window.isVip && window.isVip()) || localStorage.getItem('mengxing_activated_vip') === '1'; } catch (e) {}
+      if (_isV) { if (window.showToast) window.showToast('👑 VIP 已解锁全部 6 个游戏，无需选择'); return; }
+      if (window.mxManageGames) window.mxManageGames();
+      else if (window.showToast) window.showToast('⚠️ 选择组件未就绪，请稍后再试');
+    };
+    var _gsTip = s.querySelector('#pt-game-sel-tip');
+    if (_gsTip) {
+      try {
+        var _enG = (window.mxEnabledGames ? window.mxEnabledGames() : []) || [];
+        var _gm = window.mxGameMeta || {};
+        _gsTip.textContent = '当前保留：' + (_enG.map(function (k) { return (_gm[k] && _gm[k].name) || k; }).join('、') || '默认前 3 个');
+      } catch (eT) {}
+    }
     s.querySelectorAll('[data-ptab]').forEach(function (b) {
       b.onclick = function () { switchParentTab(b.getAttribute('data-ptab')); };
     });
@@ -22274,7 +22344,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
     page.querySelector('#mx-vip-reset').onclick = function () {
       (DB.getActiveChildId ? DB.getActiveChildId() : Promise.resolve('default')).then(function (cid) {
-        try { DB.put('points', { id: (cid || 'default'), total: 0, history: [] }); } catch (e) {}
+        try { DB.put('points', { id: (cid || 'default'), total: 0, history: [], updatedAt: Date.now() }); } catch (e) {}
         if (window.__refreshCoinBanner) window.__refreshCoinBanner();
         if (window.showToast) window.showToast('当前孩子积分已归零');
       });
@@ -22303,7 +22373,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return DB.get('points',cid).then(function(r){
       r=r||{id:cid,total:0,history:[]};
       if(r.total<amt) return -1;
-      r.total-=amt; r.history.push({time:Date.now(),amount:-amt,reason:reason||'消耗'});
+      r.total-=amt; r.updatedAt=Date.now(); r.history.push({time:Date.now(),amount:-amt,reason:reason||'消耗'});
       return DB.put('points',r).then(function(){return r.total;});
     }).catch(function(){return -1;});
   }
@@ -25739,9 +25809,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
            倒灌回退（打卡勾选几秒后被刷回未完成的根因）。改为：双方都带数字 updatedAt 的行，
            谁新听谁的；无 updatedAt 的行维持旧行为（整行覆盖）。 */
         var key = r && r.id;
-        if (!key || typeof r.updatedAt !== 'number' || !window.DB.get) return window.DB.put(s, r);
+        if (!key || !window.DB.get) return window.DB.put(s, r);
+        /* [#409-6 积分防回退] 旧版 points 行无 updatedAt → 用最后一条流水 time 作版本兜底；
+           双方都取不到版本号时维持旧行为（整行覆盖，兼容 settings 等无版本行）。 */
+        function _rowVer(x) {
+          if (!x) return 0;
+          if (typeof x.updatedAt === 'number') return x.updatedAt;
+          try { var h = x.history; if (Array.isArray(h) && h.length && typeof h[h.length - 1].time === 'number') return h[h.length - 1].time; } catch (e) {}
+          return 0;
+        }
+        var rv = _rowVer(r);
         return window.DB.get(s, key).then(function (local) {
-          if (local && typeof local.updatedAt === 'number' && local.updatedAt > r.updatedAt) return null;
+          if (_rowVer(local) > rv) return null;
           return window.DB.put(s, r);
         }).catch(function () { return window.DB.put(s, r); });
       }));
@@ -28436,6 +28515,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var max = isV ? VIP_MAX : FREE_MAX;
     stats().then(function (map) {
       var arr = pick(map);
+      /* [#409-2 非VIP首页「游戏互动进展」优先展示选定的 3 个] */
+      if (!isV && window.mxEnabledGames) {
+        try {
+          var _en = window.mxEnabledGames() || [];
+          arr = arr.slice().sort(function (a, b) {
+            var ia = _en.indexOf(a.g.id), ib = _en.indexOf(b.g.id);
+            return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || (b.s.last - a.s.last);
+          });
+        } catch (eEn) {}
+      }
       var show = arr.slice(0, max);
       var html = show.map(rowHTML).join('');
       if (!isV && arr.length > FREE_MAX) {
