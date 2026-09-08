@@ -40,7 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
-  <script>window.MX_BUILD_TS = 202609081700; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
+  <script>window.MX_BUILD_TS = 202609090130; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -25308,14 +25308,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var token = null; try { token = localStorage.getItem('mx_token'); } catch (e) {}
     if (!token) return Promise.resolve({ ok: false, msg: '未登录，请先注册/登录 VIP' });
     var body = Object.assign({ action: action, token: token }, extra || {});
-    return fetch(MX_GATEWAY + '/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (j) { return j || { ok: false, msg: '空响应' }; })
-      .catch(function (e) { return { ok: false, msg: '网络错误：' + safeErr(e) }; });
+    /* [syncfix#413] iOS 主屏 PWA 从后台恢复瞬间 WebKit 常抛 Load failed（网络栈未就绪），
+       蜂窝网络下大快照也偶发传输失败：网络层错误自动重试 2 次（1.5s/4s 退避）。
+       服务端已响应的业务失败不带 retryable 标记，不重试，避免重复推送。 */
+    function once() {
+      return fetch(MX_GATEWAY + '/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { return j || { ok: false, msg: '空响应' }; })
+        .catch(function (e) { return { ok: false, retryable: true, msg: '网络错误：' + safeErr(e) }; });
+    }
+    function attempt(n, delay) {
+      return once().then(function (res) {
+        if (res && res.ok) return res;
+        if (res && res.retryable && n > 0) {
+          return new Promise(function (r2) { setTimeout(r2, delay); }).then(function () { return attempt(n - 1, delay * 2.5); });
+        }
+        return res || { ok: false, msg: '空响应' };
+      });
+    }
+    return attempt(2, 1500);
   }
   window.mxApiSync = mxApiSync;
   /* 兼容旧调用签名：mxSignUp(account, isEmail, pwd) / mxSignIn(account, isEmail, pwd) */
@@ -26143,7 +26158,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* [syncfix #400] 回到前台/每分钟：先 pull(静默,行级新者胜合并) 再 push。
        旧版只单向 push：手机+电脑同时开着 → 各自拿本地旧快照轮流覆盖云端，
        打卡/PVZ 互相冲掉。先拉后推让每台设备先吸收对方的新数据再上送，双向收敛。 */
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) pullCloud(true).then(pushCloud).catch(function () {}); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { setTimeout(function () { if (!document.hidden) pullCloud(true).then(pushCloud).catch(function () {}); }, 1200); } });   /* [syncfix#413] 前台恢复延迟1.2s再同步，避开 iOS WebKit 恢复期 fetch 必败窗口 */
     pullCloud().then(function () { pushCloud(); });
     setInterval(function () { if (navigator.onLine !== false) pullCloud(true).then(pushCloud).catch(function () {}); }, 60000);
   }
@@ -26955,7 +26970,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="ts-qty-nm">' + esc(SLOT_NAME[k] || k) + '</span>' +
         '<button type="button" class="ts-qty-btn" data-act="qminus" data-k="' + k + '">−</button>' +
         '<span class="ts-qty-n" id="ts-qn-' + k + '">' + en + '</span>' +
-        '<button type="button" class="ts-qty-btn" data-act="qplus" data-k="' + key + '">+</button>' +
+        '<button type="button" class="ts-qty-btn" data-act="qplus" data-k="' + k + '">+</button>' +
         '<span class="ts-qty-hint">项/天</span></div>';
     }).join('');
     return '<div class="ts-parent open">' + head +
