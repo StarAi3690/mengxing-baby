@@ -7078,15 +7078,23 @@ html, body {
   .mxg-gem, .mxg-orb, .mxg-pvz-cell { font-size: 18px; min-height: 34px; }
 }
 
+/* ============================================================
    [#397/#398 移动端头部] 手机窄屏：公告改悬浮条 + 保住右上角三件套
    实测(390px)：宠物 x=540、同步徽标 x=448 全被挤出屏幕外（DOM 有但不可见），
-   公告栏被挤成 0 宽。这里做三件事：
-   ① 公告从 header-center 改为悬浮条（吸顶下方横贯全宽，毛玻璃）
-   ② 隐藏 家长按钮(≤720)/模式徽章(≤560)——侧栏里都有同名入口，不丢功能
-   ③ 收紧右排（积分+宠物+同步状态）尺寸与间距，保证三个都进屏
+   公告栏被挤成 0 宽。v2(2026-09-08) 按用户确认方案重做，且仅手机竖屏命中
+   （(max-width:720px) and (orientation:portrait)；横屏/iPad/PC 宽度>720 或横屏，全不受影响）：
+   ① 公告 = header 下方悬浮毛玻璃条，跟手滚动常驻可见
+   ② 儿童模式徽章隐藏；家长按钮改「模式合一框」：儿童态显示"🧒 儿童"（点击先询问，可取消），
+     家长态显示"👨 家长"（点击直达工作台）——JS 侧 mxSyncModeBox
+   ③ 同步徽标竖屏纯文字「云端/本地/失败…」+状态色，去 ✓/! 符号——JS 侧 setSyncStatus 分支
+   ④ 宠物徽标竖屏纯文字「开心/点我喂」——JS 侧 renderPet 分支
+   ⑤ 标题隐藏「·萌星宝宝」后缀（.title-suffix-brand），把宽度还给宝宝名
    ============================================================ */
-@media (max-width: 720px) {
-  /* 悬浮公告条 */
+@media (max-width: 720px) and (orientation: portrait) {
+  .app-header { padding: 0 10px; }
+  .app-header .header-title { min-width: 0; flex: 0 1 auto; max-width: 42vw; }
+  .title-suffix-brand { display: none !important; }
+  /* ① 悬浮公告条 */
   .app-header .header-center {
     position: fixed;
     top: calc(var(--header-height, 56px) + 5px);
@@ -7108,25 +7116,20 @@ html, body {
     border-radius: 999px; padding: 0 12px;
     overflow: hidden; box-sizing: border-box;
   }
-  /* 页面内容让出悬浮公告高度（仅移动端） */
+  /* 页面内容让出悬浮公告高度（仅竖屏） */
   #main-content { padding-top: 38px; box-sizing: border-box; }
-  /* 家长按钮移动端隐藏（侧栏有「家长工作台」入口） */
-  .header-parent-btn { display: none; }
-  .header-right { gap: 8px; }
-  .app-header .header-title { min-width: 0; flex: 0 1 auto; }
-}
-@media (max-width: 560px) {
+  /* ② 模式合一框（替代 mode-badge；原「仅隐藏家长按钮」作废） */
   .mode-badge { display: none; }
-  .app-header { padding: 0 10px; }
-  .app-header .header-title { max-width: 34vw; }
-  .gx-coin { padding: 3px 8px; font-size: 12px; gap: 4px; }
-  .gx-pet { padding: 2px 8px 2px 4px; font-size: 12px; gap: 5px; }
-  .gx-pet-avatar { width: 24px; height: 24px; font-size: 15px; }
-  .gx-pet-status { font-size: 10px; }
-  .mx-sync-badge { padding: 3px 7px; font-size: 11px; }
-}
-@media (max-width: 380px) {
-  .app-header .header-title { max-width: 26vw; }
+  .header-parent-btn { display: inline-flex; align-items: center; font-size: 11px; padding: 3px 8px; }
+  .header-right { gap: 4px; }
+  /* ③ 同步徽标：小号纯文字（颜色由状态类 cloud绿/local灰/error红 等给出） */
+  .mx-sync-badge { padding: 3px 7px; font-size: 10px; gap: 0; letter-spacing: 0; }
+  /* ④ 金币 + 宠物紧凑，宠物竖屏只留头像+状态字 */
+  .gx-coin { padding: 3px 6px; font-size: 12px; gap: 3px; white-space: nowrap; }
+  .gx-pet { padding: 2px 4px 2px 3px; font-size: 11px; gap: 3px; white-space: nowrap; }
+  .gx-pet-avatar { width: 20px; height: 20px; font-size: 13px; }
+  .gx-pet-status { font-size: 11px; }
+  .gx-pet b, .gx-pet br { display: none; }   /* 兜底：即使渲染了全量结构也藏名字 */
 }
 
 
@@ -7204,7 +7207,7 @@ html, body {
                   } catch (e2) {}
                 }
                 if (name) {
-                  el.innerHTML = escName(name) + '的学习园地<span style="font-size:.6em;opacity:.72;font-weight:700;margin-left:2px;letter-spacing:.5px">·萌星宝宝</span>';
+                  el.innerHTML = escName(name) + '的学习园地<span class="title-suffix-brand" style="font-size:.6em;opacity:.72;font-weight:700;margin-left:2px;letter-spacing:.5px">·萌星宝宝</span>';
                 } else {
                   el.innerHTML = '🌱 萌星宝宝';
                 }
@@ -9838,9 +9841,22 @@ function mxVipRecheckNeeded() {
 }
 /* 阶梯式同步闸门：本地鉴权新鲜则跳过复核直接同步；否则先 getVipStatus 复核，
    不通过则撤销本地 VIP。注意：实际数据同步始终走 CloudBase 网关 /sync，最终由服务端 sync 云函数强校验。 */
+  /* [跨块修复 2026-09-08] 本块（db.js）此前裸引用 lsGet/lsSet/STORAGE——它们仅定义在
+     MX_GATE 与账号中心两个 IIFE 内，跨作用域不可见；iOS Safari 在 syncCloudGuarded 里
+     抛 ReferenceError: Can't find variable: lsGet → 云同步直接中断（同步诊断可见）。
+     按跨 IIFE 红线在本块内补本地定义，键名与 MX_GATE 的 STORAGE 逐字一致。 */
+  var STORAGE = {
+    activated: 'mengxing_device_activated',
+    code:      'mengxing_activated_code',
+    vip:       'mengxing_activated_vip',
+    devices:   'mengxing_vip_devices',
+    devId:     'mengxing_device_id'
+  };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function syncCloudGuarded(action, extra) {
   if (!mxVipRecheckNeeded()) return window.mxApiSync(action, extra);
-  return mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code) }).then(function (vr) {
+  return mxApiProxy('getVipStatus', { code: lsGet(STORAGE.code), uid: window.__mx_uid__ || '' }).then(function (vr) {
     if (vr && vr.ok && vr.vip) {
       mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' });
       /* [syncfix] 自愈：本地丢失卡密号（密码登录不落 code）时从云端 VIP 记录恢复 */
@@ -10768,7 +10784,7 @@ window.DB = {
       }
     }
     function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
-    function ok() { window.__parentUnlocked = true; var mb = document.getElementById('mode-badge'); if (mb) mb.textContent = '👨‍👩‍👧 家长模式'; close(); try { onOk(); } catch (e) {} }
+    function ok() { window.__parentUnlocked = true; var mb = document.getElementById('mode-badge'); if (mb) mb.textContent = '👨‍👩‍👧 家长模式'; try { if (window.mxSyncModeBox) window.mxSyncModeBox(); } catch (eM) {} close(); try { onOk(); } catch (e) {} }
     function fail(msg) {
       var e = overlay.querySelector('#mx-lock-err'); if (e) e.textContent = msg;
       var box = overlay.querySelector('.mx-lock'); if (box) { box.classList.add('shake'); setTimeout(function () { box.classList.remove('shake'); }, 500); }
@@ -11179,9 +11195,43 @@ window.DB = {
     render(); // [修复v2.4.3] 必须在 appendChild 之后 render，否则 getElementById 取不到按钮导致确认/取消无反应
   }
 
+  /* [手机竖屏适配 2026-09-08] 仅手机竖屏精简 UI：横屏/iPad/PC 宽度>720 或非 portrait，不命中 */
+  window.mxIsPortrait = function () {
+    try { return !!(window.matchMedia && window.matchMedia('(max-width: 720px) and (orientation: portrait)').matches); } catch (e) { return false; }
+  };
+  /* 模式合一框：竖屏下家长按钮即模式指示——儿童态「🧒 儿童」点击先询问（confirm 自带取消）；
+     家长态「👨 家长」点击直达工作台。桌面/横屏保持原「👨‍👩‍👧 家长」不变。 */
+  window.mxSyncModeBox = function () {
+    var b = document.getElementById('header-parent-btn');
+    if (!b) return;
+    b.textContent = (window.mxIsPortrait && window.mxIsPortrait())
+      ? (window.__parentUnlocked ? '👨 家长' : '🧒 儿童')
+      : '👨‍👩‍👧 家长';
+  };
+  /* [跨块修复 2026-09-08] 本块遥测/PV 上报裸引用 lsGet/lsSet（定义在别的 IIFE），
+     ReferenceError 被 try/catch 吞掉 → 遥测静默全丢。块内补本地定义。 */
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   (function () {
     var b = document.getElementById('header-parent-btn');
-    if (b) b.onclick = function () { if (window.navigateTo) window.navigateTo('page-parent'); };
+    if (b) b.onclick = function () {
+      /* [用户确认交互] 竖屏儿童态进家长工作台先询问，防误触；「取消」即关闭 */
+      if (window.mxIsPortrait && window.mxIsPortrait() && !window.__parentUnlocked) {
+        if (!window.confirm('是否进入家长工作台？\n进入前需要验证家长密码（手势/数字密码）。')) return;
+      }
+      if (window.navigateTo) window.navigateTo('page-parent');
+    };
+    window.mxSyncModeBox();
+    /* 跨断点（旋转屏幕/调窗口）刷新竖屏专用 UI；断点内连续 resize 不重复渲染 */
+    window.__mxLastPortrait = window.mxIsPortrait();
+    window.addEventListener('resize', function () {
+      var p = window.mxIsPortrait();
+      if (p === window.__mxLastPortrait) return;
+      window.__mxLastPortrait = p;
+      try { if (window.mxSyncModeBox) window.mxSyncModeBox(); } catch (e0) {}
+      try { if (window.setSyncStatus) window.setSyncStatus(window.__MX_SYNC_STATUS || 'local'); } catch (e1) {}
+      try { if (window.renderCoinAndPet) window.renderCoinAndPet(); } catch (e2) {}
+    });
   })();
 
   function navigateTo(pageId, navId) {
@@ -11192,6 +11242,7 @@ window.DB = {
     } else if (pageId !== 'page-parent') {
       window.__parentUnlocked = false;
       var mb = document.getElementById('mode-badge'); if (mb) mb.textContent = '🧒 儿童模式';
+      try { if (window.mxSyncModeBox) window.mxSyncModeBox(); } catch (eM) {}
     }
 
     ensurePageSection(pageId);
@@ -15843,6 +15894,7 @@ window.MX_SEED = data;
       renderPet(box, cid);
     });
   }
+  window.renderCoinAndPet = renderCoinAndPet;   /* [跨 IIFE 红线] 供导航块跨断点 resize 刷新调用 */
   function renderCoin(box, cid) {
     getPoints(cid).then(function (pts) {
       var el = box.querySelector('.gx-coin');
@@ -15883,8 +15935,14 @@ window.MX_SEED = data;
         var statusText = happy ? '开心' : '饿了';
         var statusCls = happy ? 'happy' : 'hungry';
         var statusEmoji = happy ? '😄' : '🍖';
-        el.innerHTML = '<span class="gx-pet-avatar">' + avatar + '</span>' +
-          '<span><b>' + name + '</b><br><span class="gx-pet-status ' + statusCls + '">' + statusEmoji + ' ' + statusText + (happy ? '' : '·点我喂') + '<span class="gx-pet-status-t"></span></span></span>';
+        if (window.mxIsPortrait && window.mxIsPortrait()) {
+          /* [手机竖屏适配 2026-09-08] 竖屏宠物徽标：头像+纯文字（开心/点我喂），点击仍可喂食 */
+          el.innerHTML = '<span class="gx-pet-avatar">' + avatar + '</span>' +
+            '<span class="gx-pet-status ' + statusCls + '">' + (happy ? '开心' : '点我喂') + '</span>';
+        } else {
+          el.innerHTML = '<span class="gx-pet-avatar">' + avatar + '</span>' +
+            '<span><b>' + name + '</b><br><span class="gx-pet-status ' + statusCls + '">' + statusEmoji + ' ' + statusText + (happy ? '' : '·点我喂') + '<span class="gx-pet-status-t"></span></span></span>';
+        }
         el.onclick = function () { feedPet(cid, pet, tc); };
       });
     });
@@ -25706,7 +25764,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       el.className = 'mx-sync-badge ' + s;
       /* [rootfix 2026-09-07] 补全状态机：新增 vipfail（VIP 校验待确认）与 error（同步失败）两档，
          不再把所有失败都塌缩成「仅本地」——用户因此才能区分「没登录 / 过期 / 失败 / 离线」并自助重试。 */
-      el.textContent = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'vipfail' ? '⚠️ VIP校验待确认·点击重试' : s === 'error' ? '⚠️ 同步失败·点击重试' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
+      var _full = s === 'cloud' ? '☁️ 云端已同步' : s === 'syncing' ? '🔄 同步中…' : s === 'expired' ? '🔑 登录过期·点击重登' : s === 'vipfail' ? '⚠️ VIP校验待确认·点击重试' : s === 'error' ? '⚠️ 同步失败·点击重试' : s === 'offline' ? '📴 离线·仅本地' : '💾 仅本地';
+      el.title = _full;   /* 竖屏短文案时悬停/长按仍可看完整含义 */
+      /* [手机竖屏适配 2026-09-08] 竖屏徽标纯文字+颜色（云端绿/本地灰/失败红），去 ✓/! 符号 */
+      el.textContent = (window.mxIsPortrait && window.mxIsPortrait())
+        ? (s === 'cloud' ? '云端' : s === 'syncing' ? '同步中' : s === 'expired' ? '重登' : s === 'vipfail' ? '待确认' : s === 'error' ? '失败' : s === 'offline' ? '离线' : '本地')
+        : _full;
       el.onclick = function () {
         if (s === 'expired') mxForceRelogin();
         /* [#396 点击有反应] 失败态点击 = 弹诊断（展示最近失败的真实原因）+ 立即重试；
