@@ -40,7 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
-  <script>window.MX_BUILD_TS = 202609090130; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
+  <script>window.MX_BUILD_TS = 202609090230; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -23117,7 +23117,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* 预览：音视频/图片就地弹窗播放，PDF 新标签打开（全部走本地 blob URL，零云端流量） */
   function resPreview(resourceId){
     window.DB.getResourceBlob(resourceId).then(function(r){
-      if (!r || !r.blob) { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); return; }
+      if (!r || !r.blob) {
+        /* [#414] 云清单条目（其他设备导入、本设备无文件）：有外链直接打开，否则说明来源 */
+        try {
+          window.DB.get('resources', resourceId).then(function (row) {
+            if (row && row.fromCloud && row.externalLink) { try { window.open(row.externalLink, '_blank'); return; } catch (e) {} }
+            if (window.showToast) window.showToast(row && row.fromCloud ? '☁️ 这是其他设备导入的资源（文件本体不上云），请在导入的那台设备播放' : '⚠️ 本地文件缺失，请重新导入');
+          }).catch(function () { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); });
+        } catch (e) { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); }
+        return;
+      }
       var type = r.type || '';
       if (/^pdf/.test(type) || /\.(pdf)$/i.test(resourceId)) {
         try { var u0 = URL.createObjectURL(r.blob); window.open(u0, '_blank'); return; } catch(e){}
@@ -23339,7 +23348,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             ? '<button class="btn" data-res-link="' + resEsc(r.id) + '" style="font-size:11px;padding:2px 10px;border:1px solid #7ec850;color:#2e7d32;background:#f2faf0;border-radius:6px;white-space:nowrap">🔗 去网盘下载</button>'
             : '<span style="font-size:11.5px;color:#9aa;white-space:nowrap" title="点击左侧名称预览">▶</span>';
           html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
-            + '<span style="flex:1;font-size:13px;' + (isLink ? 'color:#5b6b80' : 'cursor:pointer;color:#1f3a5f') + '"' + (isLink ? '' : ' data-res-pv="' + resEsc(r.id) + '" title="点击预览"') + '>' + (isLink ? '🔗 ' : '▶ ') + resEsc(r.title||r.original_filename) + '</span>'
+            + '<span style="flex:1;font-size:13px;' + (isLink ? 'color:#5b6b80' : 'cursor:pointer;color:#1f3a5f') + '"' + (isLink ? '' : ' data-res-pv="' + resEsc(r.id) + '" title="点击预览"') + '>' + (isLink ? '🔗 ' : (r.fromCloud ? '☁️ ' : '▶ ')) + resEsc(r.title||r.original_filename) + '</span>'
             + '<span style="font-size:11.5px;color:#9aa;white-space:nowrap">' + (isLink ? resEsc((r.tags && r.tags[0]) || '网盘') : resFmtSize(r.size)) + '</span>'
             + actionHtml
             /* [#364] 手动归类：导入时没识别到，可手动调整归属模块 */
@@ -25807,6 +25816,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     } catch (e) { return ''; }
   }
   window.decPin = decPin;
+  /* [资源中心#414] 资源指纹：module|原始文件名|体积 的确定性哈希（同一文件在电脑/手机导入得到同一 fp），
+     用于跨设备去重与云端清单合并（文件本体永不上云）。 */
+  function mxResFp(r) {
+    var s = String((r && r.module) || '') + '|' + String((r && (r.original_filename || r.title)) || '') + '|' + String((r && r.size) || 0);
+    var h1 = 5381, h2 = 52711;
+    for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); h1 = ((h1 << 5) + h1 + c) | 0; h2 = ((h2 << 5) + h2 + c) | 0; }
+    return 'fp' + ((h1 >>> 0).toString(16)) + ((h2 >>> 0).toString(16));
+  }
   function buildSnapshot() {
     var out = {};
     return Promise.all(SYNC_STORES.map(function (s) {
@@ -25861,11 +25878,26 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             }
             if (Object.keys(_ls).length) out.__lsStates = _ls;
           } catch (e) {}
-          /* [资源中心#358] VIP 仅同步资源元数据清单（文件本体永不上云）；累计超 20MB 配额则不同步，引导本地使用 */
+          /* [资源中心#414] VIP 同步「资源目录清单」（文件本体永不上云）。
+             旧版按【文件体积】20MB 硬顶：文件本就不上云，该配额毫无意义，且一旦超限就把整张清单整表跳过
+             ——手机端看不到电脑端导入资源的根因。改为按【清单自身字节数】限额（≤600KB / ≤3000 条）。 */
           return (window.DB && window.DB.getAll ? window.DB.getAll('resources') : Promise.resolve([])).then(function (rrows) {
-            var _sum = 0; (rrows || []).forEach(function (r) { _sum += (r && r.size) || 0; });
-            if (_sum <= 20 * 1048576) { out.resources = (rrows || []); }
-            else { try { window.__mxResCloudFull = true; } catch (e) {} }
+            try {
+              var _m = [];
+              (rrows || []).forEach(function (r) {
+                if (!r) return;
+                _m.push({ id: r.id || '', fp: mxResFp(r), module: r.module || 'community', category: r.category || '', title: r.title || '', original_filename: r.original_filename || '', size: r.size || 0, mediaType: r.mediaType || '', localPath: r.localPath || '', audioUrl: r.audioUrl || '', externalLink: r.externalLink || '', source: r.source || '', createdAt: r.createdAt || 0 });
+              });
+              _m.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+              if (_m.length > 3000) _m.length = 3000;
+              var _cap = 600 * 1024, _acc = 0, _pick = [];
+              for (var _mi = 0; _mi < _m.length; _mi++) {
+                var _s = JSON.stringify(_m[_mi]);
+                if (_acc + _s.length > _cap) break;
+                _pick.push(_m[_mi]); _acc += _s.length + 1;
+              }
+              if (_pick.length) out.__resManifest = _pick;
+            } catch (e) {}
             return out;
           }).catch(function () { return out; });
         }).catch(function () { return out; });
@@ -25922,7 +25954,28 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         /* [#399] PVZ 合并已提为独立函数 mxMergePvzStates，见 applySnapshot 尾部（不再依赖 ensureUid 成功） */
       }).catch(function () {});
     }
-    return Promise.all(dbTasks.concat([pinTask])).then(function () {
+    /* [资源中心#414] 云清单 → 本机资源表：按 fp 去重（本机已有同一文件不重复插入），
+       本机没有的行落地并标记 fromCloud/localMissing，资源中心列表可见（文件本体需在有文件那台设备使用）。 */
+    var resManTask = Promise.resolve();
+    try {
+      var _man = snap.__resManifest;
+      if (_man && _man.length && window.DB && window.DB.getAll && window.DB.put) {
+        resManTask = window.DB.getAll('resources').then(function (local) {
+          var byFp = {}, byId = {};
+          (local || []).forEach(function (r) { if (!r) return; if (r.fp) byFp[r.fp] = r; if (r.id) byId[r.id] = r; });
+          var tasks = [];
+          _man.forEach(function (m) {
+            if (!m) return;
+            if (m.fp && byFp[m.fp]) return;
+            if (m.id && byId[m.id]) return;
+            var row = { id: m.id || ('res_c_' + (m.fp || '')), module: m.module || 'community', category: m.category || '其他', title: m.title || m.original_filename || '', original_filename: m.original_filename || m.title || '', size: m.size || 0, mediaType: m.mediaType || 'audio', localPath: m.localPath || '', audioUrl: m.audioUrl || '', externalLink: m.externalLink || '', tags: [], source: m.source || 'folder-import', fp: m.fp || '', fromCloud: 1, localMissing: 1, createdAt: m.createdAt || Date.now() };
+            tasks.push(window.DB.put('resources', row).catch(function () {}));
+          });
+          return Promise.all(tasks);
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    return Promise.all(dbTasks.concat([pinTask, resManTask])).then(function () {
       /* [#399 PVZ 多端同步] 提到主链路：只要云端快照带了 PVZ 存档就合并，
          不再依赖 ensureUid/VIP 分支成功（否则 uid 获取失败时同步整体失效） */
       try { if (snap.__pvzStates && typeof snap.__pvzStates === 'object') mxMergePvzStates(snap.__pvzStates); } catch (e) {}
