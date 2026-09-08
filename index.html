@@ -40,6 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
+  <script>window.MX_BUILD_TS = 202609081700; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -16923,6 +16924,44 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCfg(); });
     window.addEventListener('focus', refreshCfg);
   })();
+  /* [#412 版本自愈哨兵] 长驻页面（手机/平板长期不刷新）自动检测线上新版：
+     仅在页面不可见时每 5 分钟抓自身 HTML 头部比对 MX_BUILD_TS（流式读前 20KB 即断，省流量），
+     发现新版后等用户回前台再静默 reload——绝不打断使用中的页面。
+     根治「旧版 HTML 导致公告/功能停留在旧版本」整类问题。file:// 本地双击打开跳过。 */
+  (function () {
+    var BUILD = window.MX_BUILD_TS || 0;
+    var _need = false, _probe = false;
+    function probe() {
+      if (_probe || location.protocol === 'file:') return;
+      _probe = true;
+      fetch(location.pathname + '?_vchk=' + BUILD, { cache: 'no-store' }).then(function (r) {
+        if (!r.body || !r.body.getReader) return r.text().then(function (t) { return t; });
+        var rd = r.body.getReader(), dec = new TextDecoder(), acc = '';
+        function step() {
+          return rd.read().then(function (d) {
+            if (d.done) return acc;
+            acc += dec.decode(d.value, { stream: true });
+            var m = acc.match(/MX_BUILD_TS\s*=\s*(\d+)/);
+            if (m) { try { rd.cancel(); } catch (e) {} return acc; }
+            if (acc.length > 20000) { try { rd.cancel(); } catch (e) {} return acc; }
+            return step();
+          });
+        }
+        return step();
+      }).then(function (t) {
+        var m = String(t).match(/MX_BUILD_TS\s*=\s*(\d+)/);
+        if (m && parseInt(m[1], 10) > BUILD) _need = true;
+      }).catch(function () {}).then(function () { setTimeout(function () { _probe = false; }, 60000); });
+    }
+    setInterval(function () { if (document.hidden && !_need) probe(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && _need) {
+        _need = false;
+        try { if (window.showToast) window.showToast('🔄 检测到新版本，正在更新…'); } catch (e) {}
+        setTimeout(function () { location.reload(); }, 800);
+      }
+    });
+  })();
   function mxIsVip() { try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
   function mxEnabledGames() {
     if (mxIsVip()) return MX_GAME_ORDER.slice();
@@ -18331,7 +18370,23 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     { in: '♻️', out: '🛥️', name: '灰灰→路马' }
   ];
   function renderPaw(container) {
-    activeCid().then(function (cid) { paw.cid = cid; getPts(cid).then(function (p) { paw.sun = p; buildPaw(container); }); });
+    activeCid().then(function (cid) {
+      paw.cid = cid;
+      /* [#412 汪汪队进度持久化] 恢复本机/云端合并后的救援进度（队列/阶段/地图轮换），替代纯内存态 */
+      try {
+        var _raw = localStorage.getItem('mxg_paw_state_' + cid);
+        if (_raw) {
+          var _st = JSON.parse(_raw);
+          if (_st && typeof _st === 'object') {
+            if (Array.isArray(_st.queue)) paw.queue = _st.queue.slice(0, 6);
+            if (typeof _st.stage === 'number' && _st.stage >= 0) paw.stage = _st.stage;
+            if (typeof _st.mazeIdx === 'number' && _st.mazeIdx >= 0) paw.mazeIdx = _st.mazeIdx % PAW_MAZES.length;
+            PAW_MAZE = PAW_MAZES[paw.mazeIdx];
+          }
+        }
+      } catch (ePS) {}
+      getPts(cid).then(function (p) { paw.sun = p; buildPaw(container); });
+    });
   }
   function buildPaw(container) {
     var cur = PAW_TEAM[paw.stage % PAW_TEAM.length];
@@ -18410,6 +18465,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* 每通关一次自动轮换到下一幅独立迷宫地图 */
     paw.mazeIdx = (paw.mazeIdx + 1) % PAW_MAZES.length;
     PAW_MAZE = PAW_MAZES[paw.mazeIdx];
+    /* [#412 汪汪队进度持久化] 救援进度立即落盘并登记同步时间戳（VIP 云同步 ts 新者胜） */
+    try {
+      localStorage.setItem('mxg_paw_state_' + paw.cid, JSON.stringify({ queue: paw.queue, stage: paw.stage, mazeIdx: paw.mazeIdx }));
+      if (window.mxLsTouch) window.mxLsTouch('mxg_paw_state_' + paw.cid);
+    } catch (ePW) {}
     beep(900);
     modal(container, '🎉 救援成功！', cur.in + ' 与 ' + cur.out + ' 安全汇合，加入救援队列！+5🐾', function () {
       var after = Promise.resolve();
@@ -25776,6 +25836,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
              皮肤 mx_skin 按需求明确【不同步】（各设备外观独立）。 */
           try {
             var _ls = {}, _lsKeys = ['mxg_pony_progress', 'mxg_pony_photos', 'mxg_shanhai_cards'];
+            /* [#412 汪汪队] 键带 childId 后缀，枚举归入同步（mxMergeLsStates 按键名通用合并） */
+            try { for (var _pi = 0; _pi < localStorage.length; _pi++) { var _pk2 = localStorage.key(_pi); if (_pk2 && _pk2.indexOf('mxg_paw_state_') === 0 && _lsKeys.indexOf(_pk2) < 0) _lsKeys.push(_pk2); } } catch (ePK) {}
             var _tsMap = {}; try { _tsMap = JSON.parse(localStorage.getItem('__mx_ls_ts') || '{}') || {}; } catch (eTS) {}
             for (var _j = 0; _j < _lsKeys.length; _j++) {
               var _lk = _lsKeys[_j], _lv = null;
