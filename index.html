@@ -24108,9 +24108,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   var _curWordsLevel = '初级';
   var _curWordDetail = null;
 
+  var _mxDbWords = [];
+  /* [#404 P1 2026-09-08] 词库 = 种子 + 本地自存（拼音生成器「存入拼音专区」写入 words 表） */
+  function refreshDbWords() {
+    if (!(window.DB && window.DB.getAll)) return Promise.resolve();
+    return window.DB.getAll('words').then(function (rows) {
+      var seeds = (window.MX_SEED && window.MX_SEED.words) || [];
+      var seen = {}; seeds.forEach(function (s) { if (s && s.word) seen[s.word] = 1; });
+      _mxDbWords = (rows || []).filter(function (r) { return r && r.word && !seen[r.word]; });
+    }).catch(function () {});
+  }
   function wordsList() {
     var seeds = (window.MX_SEED && window.MX_SEED.words) || [];
-    return seeds;
+    return seeds.concat(_mxDbWords);
   }
 
   function renderWords() {
@@ -24261,6 +24271,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<div class="mx22-py-btns">' +
           '<button type="button" class="btn mx22-py-btn" id="mx22-py-gen" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;">✨ 生成拼音</button>' +
           '<button type="button" class="btn mx22-py-btn ghost" id="mx22-py-speak" style="background:#42a5f5;color:#fff;border:none;">🔊 全文朗读</button>' +
+          '<button type="button" class="btn mx22-py-btn ghost" id="mx22-py-save" style="background:#ff9800;color:#fff;border:none;">📥 存入拼音专区</button>' +
         '</div>' +
       '</div>' +
       '<div class="mx22-py-result" id="mx22-py-result">' +
@@ -24269,10 +24280,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div class="mx22-py-tip">支持 3500+ 常用字与常见词组；不认识的字会提示，可点旁边喇叭听标准发音。</div>';
 
     var gen = document.getElementById('mx22-py-gen');
+    var lastParts = [];   /* [#404 P1] 最近一次生成结果，供「存入拼音专区」使用 */
     gen.onclick = function () {
       var val = document.getElementById('mx22-py-input').value.trim();
       if (!val) { if (window.showToast) window.showToast('⚠️ 先输入一些文字吧'); return; }
       var parts = splitWords(val);
+      lastParts = parts;
       var html = parts.map(function (p) {
         if (!p.py) {
           return '<div class="mx22-pychar miss" data-txt="' + p.txt + '">' +
@@ -24318,6 +24331,30 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       sp.style.transform = 'scale(0.95)';
       setTimeout(function () { sp.style.transform = ''; }, 150);
     };
+    /* [#404 P1 2026-09-08] 存入拼音专区：生成结果写入 words 表（生字独立页/识字闪卡可复习）。
+       已存在的字跳过不覆盖；保存后刷新生字页缓存。 */
+    var sv = document.getElementById('mx22-py-save');
+    sv.onclick = function () {
+      if (!lastParts.length) { if (window.showToast) window.showToast('先点「✨ 生成拼音」再保存'); return; }
+      var items = lastParts.filter(function (p) { return p.py; });
+      if (!items.length) { if (window.showToast) window.showToast('这些字暂未收录，无可保存内容'); return; }
+      if (!(window.DB && window.DB.get && window.DB.put)) { if (window.showToast) window.showToast('存储层未就绪，稍后再试'); return; }
+      var added = 0, skipped = 0;
+      var chain = Promise.resolve();
+      items.forEach(function (p) {
+        chain = chain.then(function () {
+          return window.DB.get('words', p.txt).then(function (ex) {
+            if (ex) { skipped++; return null; }
+            added++;
+            return window.DB.put('words', { word: p.txt, pinyin: p.py, group: '拼音拼读生成', level: '初级', is_mastered: false, def: '', createdAt: Date.now() });
+          });
+        });
+      });
+      chain.then(function () {
+        if (window.showToast) window.showToast('📥 已存入 ' + added + ' 个字' + (skipped ? '（跳过 ' + skipped + ' 个已有）' : '') + '，到「识字」页复习吧');
+        refreshDbWords().then(function () { try { renderWords(); } catch (e) {} });
+      }).catch(function () { if (window.showToast) window.showToast('保存失败，请重试'); });
+    };
   }
 
   function pinyinGuide(parts) {
@@ -24332,7 +24369,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   document.addEventListener('navigation', function (e) {
     var page = e.detail && e.detail.page;
     if (page === 'page-daily') { setTimeout(renderDaily, 40); setTimeout(renderDaily, 400); }
-    else if (page === 'page-words') setTimeout(renderWords, 40);
+    else if (page === 'page-words') setTimeout(function () { refreshDbWords().then(function () { renderWords(); }); }, 40);   /* [#404 P1] 先并入本地自存词库再渲染 */
     else if (page === 'page-tool-pinyin') setTimeout(renderPinyin, 40);
   });
 
