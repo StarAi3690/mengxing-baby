@@ -40,7 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
-  <script>window.MX_BUILD_TS = 202609090240; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
+  <script>window.MX_BUILD_TS = 202609091105; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -25318,15 +25318,34 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* [syncfix#413] iOS 主屏 PWA 从后台恢复瞬间 WebKit 常抛 Load failed（网络栈未就绪），
        蜂窝网络下大快照也偶发传输失败：网络层错误自动重试 2 次（1.5s/4s 退避）。
        服务端已响应的业务失败不带 retryable 标记，不重试，避免重复推送。 */
+    /* [#415] 请求带 gz:1 → 服务端 >2KB 响应返回 gzip(base64)，弱网/蜂窝传输体积降约 85%；
+       DecompressionStream（iOS 16.4+）解压；不支持或失败自动降级明文并本会话关闭 gzip。 */
+    if (!window.__mx_no_gz__) { try { body.gz = 1; } catch (e) {} }
     function once() {
       return fetch(MX_GATEWAY + '/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.text().then(function (t) {
+            var gzH = null; try { gzH = r.headers && (r.headers.get('X-Mx-Gz') || r.headers.get('x-mx-gz')); } catch (e) {}
+            if (gzH === '1') {
+              if (typeof DecompressionStream !== 'function') throw new Error('gzip-unsupported');
+              var bin = atob(t), bytes = new Uint8Array(bin.length);
+              for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
+            }
+            try { return JSON.parse(t); } catch (e) { throw new Error('响应解析失败'); }
+          });
+        })
         .then(function (j) { return j || { ok: false, msg: '空响应' }; })
-        .catch(function (e) { return { ok: false, retryable: true, msg: '网络错误：' + safeErr(e) }; });
+        .catch(function (e) {
+          var m = (e && e.message) || '';
+          if (/gzip/.test(m)) { try { window.__mx_no_gz__ = true; } catch (e2) {} return { ok: false, retryable: true, msg: 'gzip 响应处理失败，已自动降级，请重试' }; }
+          if (/响应解析/.test(m)) return { ok: false, retryable: true, msg: '响应解析失败' };
+          return { ok: false, retryable: true, msg: '网络错误：' + safeErr(e) };
+        });
     }
     function attempt(n, delay) {
       return once().then(function (res) {
@@ -26104,10 +26123,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '最近同步问题：' + lastErr + '</div>' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button id="mx-diag-retry" style="flex:1;padding:11px;border:none;border-radius:12px;background:#2e9e5b;color:#fff;font-weight:800;cursor:pointer">🔄 立即重试同步</button>' +
+      '<button id="mx-diag-ping" style="flex:1;padding:11px;border:none;border-radius:12px;background:#8a6ff0;color:#fff;font-weight:800;cursor:pointer">🌐 测网关连通</button>' +
       '<button id="mx-diag-ok" style="flex:1;padding:11px;border:none;border-radius:12px;background:#4facfe;color:#fff;font-weight:800;cursor:pointer">知道了</button></div></div>';
     document.body.appendChild(m);
     m.querySelector('#mx-diag-ok').onclick = function () { if (m.parentNode) m.remove(); };
     m.querySelector('#mx-diag-retry').onclick = function () { if (m.parentNode) m.remove(); try { if (window.pushCloud) window.pushCloud(); } catch (e) {} };
+    /* [#415] 网关连通自检：区分「手机到网关网络不通」vs「网关通但大响应传输失败」 */
+    var _pingBtn = m.querySelector('#mx-diag-ping');
+    if (_pingBtn) _pingBtn.onclick = function () {
+      _pingBtn.textContent = '⏳ 测试中…';
+      var t0 = Date.now();
+      fetch(MX_GATEWAY + '/sync', { method: 'GET' }).then(function (r) { return r.text().then(function (t) { return { s: r.status, t: t }; }); }).then(function (x) {
+        _pingBtn.textContent = '✅ HTTP ' + x.s + ' · ' + (Date.now() - t0) + 'ms';
+        _pingBtn.title = '网关可达：' + String(x.t).slice(0, 60) + '。能通但同步仍失败 → 多为弱网传大快照失败，请升级到新版（已压缩传输）';
+      }).catch(function (e) {
+        _pingBtn.textContent = '❌ 不通 · ' + (Date.now() - t0) + 'ms';
+        _pingBtn.title = '手机到网关网络层不通：' + safeErr(e) + '。建议切换 WiFi/5G、关闭 iCloud 私密转送后再试';
+      });
+    };
     m.onclick = function (e) { if (e.target === m && m.parentNode) m.remove(); };
   }
   window.mxSyncDiag = mxSyncDiag;
