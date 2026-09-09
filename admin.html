@@ -195,7 +195,7 @@
         <button class="btn ghost sm" onclick="exportCSV('usageTable','云调用次数表')">⬇ 导出 CSV</button>
       </div>
       <div class="hint">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
-      <div class="scroll"><table id="usageTable"><thead><tr><th>用户(UID/设备)</th><th>调用次数</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="usageTable"><thead><tr><th>账号 / UID</th><th>调用次数</th><th>⬆ 上行</th><th>⬇ 下行</th><th>占比</th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
 
@@ -592,13 +592,22 @@ async function resetUserPassPrompt(uid, account){
   const r = await proxy('mxAdmin', { action:'resetUserPass', adminKey: ADMIN_KEY, uid: uid, newPass: np });
   alert((r && r.ok) ? '✅ ' + r.msg : '❌ ' + ((r && r.msg) || '操作失败'));
 }
+function fmtBytes(n){
+  n = Number(n) || 0;
+  if (n < 1024) return n + 'B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + 'KB';
+  if (n < 1073741824) return (n / 1048576).toFixed(2) + 'MB';
+  return (n / 1073741824).toFixed(2) + 'GB';
+}
+/* [#415] 真实用量：账号名+UID 对齐 mx_users，展示调用次数与真实上下行字节 */
 function renderUsage(list){
   const tb = $('usageTable').querySelector('tbody');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="3" class="sub">暂无云调用记录</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="sub">暂无云调用记录（新版网关部署后开始累积）</td></tr>'; return; }
   const top = list[0].calls || 1;
   tb.innerHTML = list.map(function(x){
-    const w = Math.max(6, Math.min(120, Math.round(x.calls/top*120)));
-    return '<tr><td>'+esc(x.who)+'</td><td>'+esc(x.calls)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
+    const who = x.account ? (esc(x.account) + ' <span class="sub" style="font-size:11px;color:#8a99ad">' + esc((x.who || '').slice(0, 18)) + '</span>') : esc(x.who || '');
+    const w = Math.max(6, Math.min(120, Math.round((x.calls || 0)/top*120)));
+    return '<tr><td>'+who+'</td><td>'+esc(x.calls)+'</td><td>'+fmtBytes(x.up)+'</td><td>'+fmtBytes(x.down)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('');
 }
 
