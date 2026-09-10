@@ -19756,43 +19756,102 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       localStorage.setItem('mx_dev_id',s); return s;
     }catch(e){ return 'dev-'+Math.floor(Math.random()*9e5); }
   }
+  /* [#419fix] renderAccount：实时拉取 VIP 状态（不再只读可能过期的 localStorage 缓存），
+     显示激活日期 + 到期时间（去掉错误"长期"兜底），并回写缓存供其他模块使用。
+     根因：mengxing_expire_at 为空时旧逻辑直接显示"长期"，即使云端有正确到期时间。 */
   function renderAccount(){
     var page=document.getElementById('page-account'); if(!page) return;
     mxRegisterDevice();
-    accounts().then(function(a){
-      var cur = localStorage.getItem('mx_user');
-      var isVipNow = isVip();
-      var expire = lsGet('mengxing_expire_at');
-      var expireTxt = isVipNow ? (expire && !isNaN(new Date(expire).getTime()) ? new Date(expire).toLocaleDateString() : '长期') : '未开通';
-      /* 【账号信息卡】顶部恒定展示：用户类型（普通/VIP）+ VIP 到期时间 */
-      var statusCard = '<div style="background:linear-gradient(90deg,' + (isVipNow ? '#fff7e0,#ffe9c7' : '#f3f6fb,#e8eefb') + ');border:1px solid ' + (isVipNow ? '#f0c060' : 'var(--border-color,rgba(0,0,0,.1))') + ';border-radius:14px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">' +
-        '<div><div style="font-size:17px;font-weight:800;color:#1f3a5f">' + (isVipNow ? '👑 VIP 会员' : '👤 普通用户') + '</div>' +
-        '<div style="font-size:12.5px;color:var(--text-secondary,#7b8ba3);margin-top:3px">VIP 到期：' + expireTxt + '</div></div>' +
-        (isVipNow ? '<div style="font-size:11px;font-weight:700;color:#e65100;background:#fff;border:1px solid #f0c060;border-radius:20px;padding:3px 10px">👑 已开通</div>' : '<div style="font-size:11px;font-weight:700;color:#78909c;background:#fff;border:1px solid #d5e3f7;border-radius:20px;padding:3px 10px">未开通 VIP</div>') +
+    var cur = localStorage.getItem('mx_user');
+    var isVipNow = isVip();
+    /* 先用缓存瞬时渲染（避免白屏），再异步拉取精准数据后刷新 */
+    var expire = lsGet('mengxing_expire_at');
+    var cachedExpireTxt = isVipNow ? (expire && !isNaN(new Date(expire).getTime()) ? new Date(expire).toLocaleDateString() : '查询中…') : '未开通';
+    /* 【账号信息卡】顶部恒定展示：用户类型（普通/VIP）+ VIP 到期时间 */
+    var statusCard = '<div style="background:linear-gradient(90deg,' + (isVipNow ? '#fff7e0,#ffe9c7' : '#f3f6fb,#e8eefb') + ');border:1px solid ' + (isVipNow ? '#f0c060' : 'var(--border-color,rgba(0,0,0,.1))') + ';border-radius:14px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">' +
+      '<div><div style="font-size:17px;font-weight:800;color:#1f3a5f">' + (isVipNow ? '👑 VIP 会员' : '👤 普通用户') + '</div>' +
+      '<div id="mx-acct-vip-detail" style="font-size:12.5px;color:var(--text-secondary,#7b8ba3);margin-top:3px">VIP 到期：' + cachedExpireTxt + '</div></div>' +
+      (isVipNow ? '<div style="font-size:11px;font-weight:700;color:#e65100;background:#fff;border:1px solid #f0c060;border-radius:20px;padding:3px 10px">👑 已开通</div>' : '<div style="font-size:11px;font-weight:700;color:#78909c;background:#fff;border:1px solid #d5e3f7;border-radius:20px;padding:3px 10px">未开通 VIP</div>') +
       '</div>';
-      var vipExitBtn = isVipNow ? '<button type="button" id="mx-vip-exit" style="width:100%;margin-bottom:12px;padding:10px;border:1px solid #f0c060;background:#fff;color:#e65100;border-radius:10px;font-size:13px;cursor:pointer">🚪 退出本机 VIP（恢复普通账号，用于测试）</button>' : '';
-      var body = vipExitBtn + statusCard + (cur
-        ? '<div style="background:#fff;border:1px solid var(--border-color,rgba(0,0,0,.1));border-radius:14px;padding:16px">'+
-            '<div style="font-size:20px;font-weight:800">👤 '+esc(cur)+'</div>'+
-            (isVipNow?'<div style="color:#c62828;font-weight:700">👑 VIP会员 · 到期 '+(expire&&!isNaN(new Date(expire).getTime())?new Date(expire).toLocaleDateString():'长期')+'</div>':'<div style="color:var(--text-secondary)">普通用户</div>')+
-            '<div style="color:var(--text-secondary)">已开启多端云同步</div>'+
-            '<div style="margin-top:12px"><button type="button" class="btn" id="mx-acct-logout" style="border:1px solid var(--border-color,rgba(0,0,0,.15))">退出登录</button></div>'+
-          '</div>'
-        : '<div class="mx-acct"><div style="font-size:16px;font-weight:800;margin-bottom:4px">👤 账号中心</div>'+
-            '<div class="empty-tip" style="font-size:12.5px">VIP 会员请注册/登录账号以开启<b>多端云同步</b>（邮箱+密码）。未注册也能用，但数据仅存本机。</div>'+
-            '<div id="mx-acct-tabs" style="display:flex;gap:8px;margin:6px 0">'+
-              '<button data-tab="reg" style="flex:1;padding:9px;border:none;border-radius:10px;background:var(--accent-primary,#7ec850);color:#fff;font-weight:800;cursor:pointer">注册</button>'+
-              '<button data-tab="login" style="flex:1;padding:9px;border:1px solid var(--border-color,rgba(0,0,0,.15));border-radius:10px;background:#fff;cursor:pointer">登录</button>'+
-            '</div>'+
-            '<input type="text" id="mx-acct-email" placeholder="邮箱 或 用户名（登录账号）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px;margin-bottom:8px">'+
-            '<input type="password" id="mx-acct-pass" placeholder="密码（至少6位）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px;margin-bottom:6px">'+
-            '<div id="mx-acct-msg" style="font-size:12px;color:#c62828;min-height:16px"></div>'+
-            '<button type="button" class="btn" id="mx-acct-go" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;width:100%">注册并开通</button>'+
-            '<div style="margin-top:12px"><input type="text" id="mx-acct-key" placeholder="输入VIP卡密（可留空）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px">'+
-            '<button type="button" class="btn" id="mx-acct-redeem" style="margin-top:4px;background:#ff9800;color:#fff;border:none;width:100%">🎫 兑换卡密开通VIP</button></div></div>');
-      page.innerHTML='<div class="content-section-title">👤 账号中心 <span class="sub">邮箱账号 · 设备管理 · 数据备份</span></div>'+body;
-      renderAccountExtras(page, null);
-      var atab = 'reg';
+    var vipExitBtn = isVipNow ? '<button type="button" id="mx-vip-exit" style="width:100%;margin-bottom:12px;padding:10px;border:1px solid #f0c060;background:#fff;color:#e65100;border-radius:10px;font-size:13px;cursor:pointer">🚪 退出本机 VIP（恢复普通账号，用于测试）</button>' : '';
+    var body = vipExitBtn + statusCard + (cur
+      ? '<div style="background:#fff;border:1px solid var(--border-color,rgba(0,0,0,.1));border-radius:14px;padding:16px">'+
+          '<div style="font-size:20px;font-weight:800">👤 '+esc(cur)+'</div>'+
+          '<div id="mx-acct-vip-status">' + (isVipNow ? '<div style="color:#c62828;font-weight:700">👑 VIP 会员</div>' : '<div style="color:var(--text-secondary)">普通用户</div>') + '</div>'+
+          '<div id="mx-acct-vip-dates" style="color:var(--text-secondary);font-size:12.5px;margin-top:4px">正在查询 VIP 状态…</div>'+
+          '<div style="color:var(--text-secondary)">已开启多端云同步</div>'+
+          '<div style="margin-top:12px"><button type="button" class="btn" id="mx-acct-logout" style="border:1px solid var(--border-color,rgba(0,0,0,.15))">退出登录</button></div>'+
+        '</div>'
+      : '<div class="mx-acct"><div style="font-size:16px;font-weight:800;margin-bottom:4px">👤 账号中心</div>'+
+          '<div class="empty-tip" style="font-size:12.5px">VIP 会员请注册/登录账号以开启<b>多端云同步</b>（邮箱+密码）。未注册也能用，但数据仅存本机。</div>'+
+          '<div id="mx-acct-tabs" style="display:flex;gap:8px;margin:6px 0">'+
+            '<button data-tab="reg" style="flex:1;padding:9px;border:none;border-radius:10px;background:var(--accent-primary,#7ec850);color:#fff;font-weight:800;cursor:pointer">注册</button>'+
+            '<button data-tab="login" style="flex:1;padding:9px;border:1px solid var(--border-color,rgba(0,0,0,.15));border-radius:10px;background:#fff;cursor:pointer">登录</button>'+
+          '</div>'+
+          '<input type="text" id="mx-acct-email" placeholder="邮箱 或 用户名（登录账号）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px;margin-bottom:8px">'+
+          '<input type="password" id="mx-acct-pass" placeholder="密码（至少6位）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px;margin-bottom:6px">'+
+          '<div id="mx-acct-msg" style="font-size:12px;color:#c62828;min-height:16px"></div>'+
+          '<button type="button" class="btn" id="mx-acct-go" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;width:100%">注册并开通</button>'+
+          '<div style="margin-top:12px"><input type="text" id="mx-acct-key" placeholder="输入VIP卡密（可留空）" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:14px;border:1px solid #ddd;border-radius:10px">'+
+          '<button type="button" class="btn" id="mx-acct-redeem" style="margin-top:4px;background:#ff9800;color:#fff;border:none;width:100%">🎫 兑换卡密开通VIP</button></div></div>');
+    page.innerHTML='<div class="content-section-title">👤 账号中心 <span class="sub">邮箱账号 · 设备管理 · 数据备份</span></div>'+body;
+    renderAccountExtras(page, null);
+
+    /* [#419fix] 异步实时拉取 VIP 精准状态，刷新显示并回写缓存 */
+    if (isVipNow && window.mxApiProxy) {
+      var detailEl = document.getElementById('mx-acct-vip-detail');
+      var statusEl = document.getElementById('mx-acct-vip-status');
+      var datesEl  = document.getElementById('mx-acct-vip-dates');
+      var code = lsGet(STORAGE.code) || '';
+      var uid = window.__mx_uid__ || '';
+      window.mxApiProxy('getVipStatus', { code: code, uid: uid }).then(function (vr) {
+        if (!vr || !vr.ok) {
+          var failTxt = 'VIP 状态查询失败：' + ((vr && vr.msg) || '网络异常');
+          if (detailEl) detailEl.innerHTML = 'VIP 状态：<span style="color:#c62828">' + failTxt + '</span>';
+          if (datesEl)  datesEl.innerHTML  = '<span style="color:#c62828">无法获取到期信息，请检查网络后刷新</span>';
+          return;
+        }
+        /* 回写缓存（确保其他模块读到最新值） */
+        if (vr.vip) {
+          try { window.mxWriteVipInfo({ vip: 1, vip_level: vr.vip_level || '1', expire_at: vr.expire_at || '' }); } catch (e) {}
+        }
+        /* 格式化到期时间 */
+        var expAt = vr.expire_at;
+        var expDate = null;
+        if (expAt) { try { expDate = new Date(expAt); if (isNaN(expDate.getTime())) expDate = null; } catch (e) { expDate = null; } }
+        var expTxt = expDate ? expDate.toLocaleDateString() : (vr.vip ? '未设置到期时间' : '未开通');
+        /* 刷新顶部状态卡 */
+        if (detailEl) detailEl.innerHTML = 'VIP 到期：<span style="color:' + (expDate ? '#e65100' : '#f0c060') + ';font-weight:700">' + expTxt + '</span>';
+        /* 刷新账号区状态 + 日期详情 */
+        if (statusEl) {
+          if (vr.vip) {
+            statusEl.innerHTML = '<div style="color:#c62828;font-weight:700">👑 VIP 会员 · 到期 ' + expTxt + '</div>';
+          } else {
+            statusEl.innerHTML = '<div style="color:var(--text-secondary)">普通用户</div>';
+          }
+        }
+        if (datesEl) {
+          if (vr.vip && expDate) {
+            var daysLeft = Math.ceil((expDate.getTime() - Date.now()) / 86400000);
+            var daysColor = daysLeft <= 7 ? '#c62828' : daysLeft <= 30 ? '#e65100' : '#2e7d32';
+            datesEl.innerHTML = '📅 到期时间：<b>' + expTxt + '</b>（剩余 <b style="color:' + daysLeft + '">' + daysLeft + '</b> 天）' +
+              (vr.code ? '<br>🎫 绑定卡密：' + vr.code.replace(/(.{4}).*(.{4})/, '$1****$2') : '');
+          } else if (vr.vip) {
+            datesEl.innerHTML = '⚠️ VIP 有效但<strong>未设置到期时间</strong>，请联系客服确认';
+          } else {
+            datesEl.innerHTML = '未开通 VIP 会员';
+          }
+        }
+      }).catch(function () {
+        if (detailEl) detailEl.innerHTML = 'VIP 到期：<span style="color:#c62828">查询失败（网络错误）</span>';
+        if (datesEl)  datesEl.innerHTML  = '<span style="color:#c62828">网络错误，请稍后刷新页面重试</span>';
+      });
+    } else if (!isVipNow) {
+      var datesEl2 = document.getElementById('mx-acct-vip-dates');
+      if (datesEl2) datesEl2.innerHTML = '未开通 VIP 会员';
+    }
+
+    var atab = 'reg';
       var atabs = page.querySelectorAll('#mx-acct-tabs button');
       var ago = page.querySelector('#mx-acct-go');
       var vipExit = page.querySelector('#mx-vip-exit');
@@ -19836,7 +19895,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if(k) k.onclick=function(){var ck=page.querySelector('#mx-acct-key').value.trim();doRedeem(ck);};
       var lo=page.querySelector('#mx-acct-logout');
       if(lo) lo.onclick=function(){ mxSignOut().then(function(){}); localStorage.removeItem('mx_user'); window.__mx_uid__=null; toast('已退出登录'); renderAccount(); };
-    });
   }
 
   /* ---- 账号中心扩展：孩子档案 / 设备管理 / 数据备份 ---- */
@@ -25356,29 +25414,49 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     function once() {
       var reqBody = Object.assign({ action: action, token: token }, extra || {});
       if (!window.__mx_no_gz__) { try { reqBody.gz = 1; } catch (e) {} }
+      /* [#418fix] 抓取真实 HTTP 状态码 + 原始响应体，供失败透传与 console 诊断（红线规则 #5） */
+      var _http = 0, _raw = '';
       return fetch(MX_GATEWAY + '/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reqBody)
       })
         .then(function (r) {
+          _http = r.status || 0;
           return r.text().then(function (t) {
+            _raw = (t || '');
             var gzH = null; try { gzH = r.headers && (r.headers.get('X-Mx-Gz') || r.headers.get('x-mx-gz')); } catch (e) {}
             if (gzH === '1') {
-              if (typeof DecompressionStream !== 'function') throw new Error('gzip-unsupported');
+              if (typeof DecompressionStream !== 'function') { var ge = new Error('gzip-unsupported'); ge.mxHttp = _http; throw ge; }
               var bin = atob(t), bytes = new Uint8Array(bin.length);
               for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
               return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
             }
-            try { return JSON.parse(t); } catch (e) { throw new Error('响应解析失败'); }
+            try { return JSON.parse(t); } catch (e) {
+              /* 非 2xx 网关错误页多为 HTML，JSON.parse 必败：透传真实 HTTP 码，避免被塌缩成「响应解析失败/网络错误」掩盖根因 */
+              var pe = new Error('响应解析失败'); pe.mxHttp = _http; pe.mxRaw = _raw.slice(0, 160); throw pe;
+            }
           });
         })
         .then(function (j) { return j || { ok: false, msg: '空响应' }; })
         .catch(function (e) {
           var m = (e && e.message) || '';
+          var http = (e && e.mxHttp) || 0;
+          /* [rule#5] 任何同步失败都向 console 透传：动作 / HTTP 码 / 服务端 msg / 原始响应前 160 字，
+             便于一键复现定位（网关拒绝 401/403 / 函数崩溃 500 / 超时无码），杜绝「同步失败却不知原因」 */
+          try {
+            if (http || /网络错误|响应解析|gzip/.test(m)) {
+              console.error('[mxApiSync] 同步失败 action=' + action + ' http=' + (http || '?') +
+                ' msg=' + m + (e && e.mxRaw ? (' raw=' + e.mxRaw) : ''));
+            }
+          } catch (e2) {}
           if (/gzip/.test(m)) { try { window.__mx_no_gz__ = true; } catch (e2) {} return { ok: false, retryable: true, msg: 'gzip 响应处理失败，已自动降级，请重试' }; }
-          if (/响应解析/.test(m)) return { ok: false, retryable: true, msg: '响应解析失败' };
-          return { ok: false, retryable: true, msg: '网络错误：' + safeErr(e) };
+          if (/响应解析/.test(m)) {
+            var pm = '响应解析失败'; if (http) pm += '（HTTP ' + http + '）';
+            return { ok: false, retryable: (http >= 500 || !http), msg: pm };
+          }
+          var nm = '网络错误：' + safeErr(e); if (http) nm += '（HTTP ' + http + '）';
+          return { ok: false, retryable: (http >= 500 || !http), msg: nm };
         });
     }
     function attempt(n, delay) {
@@ -25865,7 +25943,10 @@ function downloadResourceFromCloud(resId) {
     if (old && old.parentNode) old.parentNode.removeChild(old);
     if (lsGet(STORAGE.vip) !== '1') return;
     var code = lsGet(STORAGE.code);
-    if (!code) return;
+    var _uid = window.__mx_uid__ || '';
+    /* [#418fix] 密码登录账号本地无卡密 code，但服务端 getVipStatus 支持按 uid 查；
+       放开「无 code 即跳过」的早退，让这类账号也能看到过期横幅（避免「同步静默失败却不知原因」） */
+    if (!code && !_uid) return;
     window.mxApiProxy('getVipStatus', { code: code, uid: window.__mx_uid__ }).then(function (res) {
       if (!res || !res.ok || !res.expire_at) return;
       /* 以云端为准刷新本地过期时间，避免本地值被篡改/滞后 */
