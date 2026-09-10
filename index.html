@@ -40,7 +40,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 
   <link rel="manifest" href="manifest.json">
-  <script>window.MX_BUILD_TS = 202609101025; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
+  <script>window.MX_BUILD_TS = 202609101115; /* [#412 版本自愈哨兵标记] 每次发版递增 */</script>
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
@@ -22865,6 +22865,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           tags: cls.tags,
           source: 'folder-import'
         });
+        /* [#417] VIP 自动上云 */
+        uploadResourceToCloud(id).catch(function(){});
         stats[cls.module] = (stats[cls.module]||0)+1;
       } catch(e) { errors.push(file.name + '：' + (e && e.message || e)); }
       done++;
@@ -23120,7 +23122,36 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         try {
           window.DB.get('resources', resourceId).then(function (row) {
             if (row && row.fromCloud && row.externalLink) { try { window.open(row.externalLink, '_blank'); return; } catch (e) {} }
-            if (window.showToast) window.showToast(row && row.fromCloud ? '☁️ 这是其他设备导入的资源（文件本体不上云），请在导入的那台设备播放' : '⚠️ 本地文件缺失，请重新导入');
+            if (window.showToast) {
+          if (row && (row.fromCloud || row.cloudPath)) {
+            /* [#417] 尝试从云端下载 */
+            var _pvBtn = ov.querySelector('#res-pv-dl-cloud');
+            if (!_pvBtn) {
+              _pvBtn = document.createElement('button');
+              _pvBtn.id = 'res-pv-dl-cloud';
+              _pvBtn.textContent = '📥 从云端下载';
+              _pvBtn.style.cssText = 'margin-top:8px;padding:10px;border:none;border-radius:10px;background:#4facfe;color:#fff;font-size:14px;cursor:pointer;width:100%';
+              _pvBtn.onclick = function() {
+                _pvBtn.textContent = '⏳ 下载中...';
+                _pvBtn.disabled = true;
+                downloadResourceFromCloud(resourceId).then(function() {
+                  _pvBtn.textContent = '✅ 已下载，正在播放';
+                  setTimeout(function() { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 800);
+                  resPreview(resourceId); /* 重新预览（这次有本地文件了） */
+                }).catch(function(e) {
+                  _pvBtn.textContent = '❌ 下载失败: ' + ((e&&e.message)||e);
+                  _pvBtn.disabled = false;
+                });
+              };
+              var _pb = ov.querySelector('div');
+              if (_pb) _pb.appendChild(_pvBtn);
+            }
+          } else {
+            window.showToast('⚠️ 本地文件缺失，请重新导入');
+          }
+        } else {
+          window.showToast('⚠️ 本地文件缺失，请重新导入');
+        }
           }).catch(function () { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); });
         } catch (e) { if (window.showToast) window.showToast('⚠️ 本地文件缺失，请重新导入'); }
         return;
@@ -25362,6 +25393,56 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return attempt(2, 1500);
   }
   window.mxApiSync = mxApiSync;
+
+/* [#417] VIP 资源文件上云：导入后自动上传到 COS，跨设备可下载播放 */
+function uploadResourceToCloud(resId) {
+  return window.DB.get('resources', resId).then(function(row) {
+    if (!row) return Promise.resolve({ ok: false, msg: '资源记录不存在' });
+    if (!row.size || row.size === 0) return Promise.resolve({ ok: false, msg: '无文件体（链接类资源不上云）' });
+    /* 仅 VIP 上传文件本体 */
+    if (!isVip()) return Promise.resolve({ ok: false, skip: true, msg: '非VIP不上传文件' });
+    return window.DB.getResourceBlob(resId).then(function(rb) {
+      if (!rb || !rb.blob) return { ok: false, msg: '本地文件缺失' };
+      var fp = mxResFp(row);
+      var ext = (row.original_filename || '').split('.').pop() || 'bin';
+      /* 先查云端是否已有（指纹去重） */
+      return mxApiSync('cloudResCheck', { fp: fp, ext: ext }).then(function(chk) {
+        if (chk && chk.exists) return { ok: true, skipped: true, msg: '云端已存在（去重）' };
+        /* 读 blob 为 base64 并上传 */
+        return new Promise(function(resolve, reject) {
+          var fr = new FileReader();
+          fr.onload = function() {
+            var b64 = fr.result.split(',')[1]; /* 去掉 data:...;base64, 前缀 */
+            mxApiSync('cloudResUpload', { id: resId, fp: fp, ext: ext, data: b64, size: rb.blob.size, contentType: rb.type }).then(resolve).catch(reject);
+          };
+          fr.onerror = function() { reject(new Error('FileReader 读取失败')); };
+          fr.readAsDataURL(rb.blob);
+        });
+      });
+    });
+  });
+}
+
+/* [#417] 云端资源下载：播放时本机无文件 → 从 COS 拉 → 存入 audioCache → 播放 */
+function downloadResourceFromCloud(resId) {
+  return window.DB.get('resources', resId).then(function(row) {
+    if (!row) return Promise.reject(new Error('资源不存在'));
+    var fp = mxResFp(row);
+    var ext = (row.original_filename || '').split('.').pop() || 'bin';
+    return mxApiSync('cloudResDownload', { fp: fp, ext: ext }).then(function(dl) {
+      if (!dl || !dl.ok) return Promise.reject(new Error((dl && dl.msg) || '下载失败'));
+      /* base64 → Blob → 存入 audioCache */
+      var bin = atob(dl.data);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var mime = dl.contentType || (row.mediaType === 'video' ? 'video/mp4' : row.mediaType === 'audio' ? 'audio/mpeg' : 'application/octet-stream');
+      var blob = new Blob([bytes], { type: mime });
+      return window.DB.saveResourceBlob(resId, blob, row.mediaType || 'audio').then(function() {
+        return { ok: true, blob: blob, msg: '已缓存到本地' };
+      });
+    });
+  });
+}
   /* 兼容旧调用签名：mxSignUp(account, isEmail, pwd) / mxSignIn(account, isEmail, pwd) */
   function mxSignUp(account, isEmail, pwd) { return mxApiAuth('signup', account, isEmail, pwd); }
   function mxSignIn(account, isEmail, pwd) { return mxApiAuth('login', account, isEmail, pwd); }
