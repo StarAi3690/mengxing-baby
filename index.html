@@ -26506,7 +26506,7 @@ function downloadResourceFromCloud(resId) {
         else _ss(navigator.onLine === false ? 'offline' : 'error');   /* [rootfix] 失败不再塌缩成 local */
         return 'BAILED';
       });
-    }).then(function (b) { if (b !== 'BAILED') { mxSyncMarkRecovered(); _ss(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); _ss(navigator.onLine === false ? 'offline' : 'error'); });
+    }).then(function (b) { if (b !== 'BAILED') { if (!silent) mxSyncMarkRecovered(); _ss(navigator.onLine === false ? 'offline' : 'cloud'); } }).catch(function (e) { mxSyncErr(e && e.message ? e.message : '网络异常'); _ss(navigator.onLine === false ? 'offline' : 'error'); });
   }
   function startVipSync() {
     if (window.__mx_sync_started__) return;
