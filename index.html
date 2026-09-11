@@ -25423,18 +25423,38 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       })
         .then(function (r) {
           _http = r.status || 0;
+          var gzH = null; try { gzH = r.headers && (r.headers.get('X-Mx-Gz') || r.headers.get('x-mx-gz')); } catch (e) {}
+          /* [#420fix · 同步全挂真根因] 服务端返回 isBase64Encoded:true，CloudBase 网关已把 body base64
+             解码为**裸 gzip 二进制**（实测前 4 字节 1f8b0800= gzip 魔数）。旧代码却 atob(t) 把 body 当
+             base64 文本处理 → 对裸二进制必抛 InvalidCharacterError → 任何 >2KB 响应（快照必 >2KB）
+             两端全部同步失败。修复：读 arrayBuffer 拿裸字节直接 DecompressionStream 解压；
+             并兼容网关未解码（body 为 base64 文本）的形态（检测 gzip magic，非则按 base64 兜底解码）。
+             任何 gz 处理失败 → 抛含 "gzip" 的错误 → 外层 catch 关闭本会话 gz 并重试 → 自动降级明文，
+             等价于 gzip 引入前的可用行为，确保「最坏也不会同步全挂」。 */
+          if (gzH === '1') {
+            return r.arrayBuffer().then(function (ab) {
+              if (typeof DecompressionStream !== 'function') { var ge = new Error('gzip-unsupported'); ge.mxHttp = _http; throw ge; }
+              var bytes = new Uint8Array(ab);
+              /* 非 gzip 魔数 → 网关未解码，body 是 base64 文本，按 base64 解回二进制 */
+              if (!(bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b)) {
+                try {
+                  var s = new TextDecoder('utf-8').decode(bytes);
+                  var bin = atob(s.replace(/[^A-Za-z0-9+/=]/g, ''));
+                  var b2 = new Uint8Array(bin.length);
+                  for (var i = 0; i < bin.length; i++) b2[i] = bin.charCodeAt(i);
+                  bytes = b2;
+                } catch (e3) {}
+              }
+              return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
+            }).catch(function (e) {
+              var ge2 = new Error('gzip-decompress-failed'); ge2.mxHttp = _http; ge2.cause = e; throw ge2;
+            });
+          }
           return r.text().then(function (t) {
             _raw = (t || '');
-            var gzH = null; try { gzH = r.headers && (r.headers.get('X-Mx-Gz') || r.headers.get('x-mx-gz')); } catch (e) {}
-            if (gzH === '1') {
-              if (typeof DecompressionStream !== 'function') { var ge = new Error('gzip-unsupported'); ge.mxHttp = _http; throw ge; }
-              var bin = atob(t), bytes = new Uint8Array(bin.length);
-              for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-              return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
-            }
             try { return JSON.parse(t); } catch (e) {
               /* 非 2xx 网关错误页多为 HTML，JSON.parse 必败：透传真实 HTTP 码，避免被塌缩成「响应解析失败/网络错误」掩盖根因 */
-              var pe = new Error('响应解析失败'); pe.mxHttp = _http; pe.mxRaw = _raw.slice(0, 160); throw pe;
+              var pe = new Error('响应解析失败'); pe.mxHttp = _http; pe.mxRaw = (_raw || '').slice(0, 160); throw pe;
             }
           });
         })
