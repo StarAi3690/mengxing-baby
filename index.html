@@ -25492,6 +25492,61 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   window.mxApiSync = mxApiSync;
 
+  /* ===== [#421fix · 同步全挂真根因 2026-09-11] CloudBase HTTP 网关请求体硬上限 ≈100KB =====
+     真实浏览器实测（线上同源 + 真实 token）：
+       请求体 165B/20KB/50KB/80KB/95KB → HTTP 200；120KB → TypeError: Failed to fetch（连接被重置）。
+     而同步快照随使用必然增长（实测 dailySchedule 单字段即 64KB，整包 84KB），一旦破 100KB：
+       两端 push 全部失败 → 右上角恒「失败」→ 数据永远上不了云（云端停在最后一次能推进去的旧快照）。
+     修复：快照 >65KB 时，客户端 gzip 压缩 + base64 装进「信封」再上行（实测 84KB → 13KB，压缩率 0.11），
+       拉取时按同一信封格式还原；服务端无需改动（它把 snapshot 当不透明 JSON 存取）。
+     信封仅使用 __ 前缀键（{__mxgz:1,__d:'...'}）：旧客户端 applySnapshot 只遍历非 __ 键 → 自动忽略，
+       绝不会把信封当成空快照清库。 */
+  var MX_SNAP_PLAIN_MAX = 65000;    /* ≤65KB 走明文（兼容历史数据 / 便于排查），留足网关余量 */
+  var MX_SNAP_PACKED_WARN = 85000;  /* 信封体积告警线（网关实测 95KB 仍 OK，留 10KB 安全边距） */
+  function mxBytesToB64(bytes) {
+    var s = '', CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(s);
+  }
+  /* 打包快照为可上行值：明文对象 或 {__mxgz:1,__d:'<gzip+base64>'}；返回 {value,mode,rawLen,packedLen} */
+  function mxPackSnapshot(snap) {
+    var raw = '';
+    try { raw = JSON.stringify(snap) || ''; } catch (e) { return Promise.resolve({ value: snap, mode: 'plain-stringify-err', rawLen: 0, packedLen: 0 }); }
+    if (raw.length <= MX_SNAP_PLAIN_MAX || typeof CompressionStream !== 'function') {
+      return Promise.resolve({ value: snap, mode: (typeof CompressionStream !== 'function' && raw.length > MX_SNAP_PLAIN_MAX) ? 'plain-no-cs' : 'plain', rawLen: raw.length, packedLen: raw.length });
+    }
+    return new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer().then(function (ab) {
+      var b64 = mxBytesToB64(new Uint8Array(ab));
+      if (b64.length > MX_SNAP_PACKED_WARN) {
+        try { console.error('[mxApiSync] 快照打包后仍偏大 raw=' + raw.length + 'B packed=' + b64.length + 'B（网关上限≈100KB，可能仍失败）'); } catch (e2) {}
+      }
+      return { value: { __mxgz: 1, __d: b64 }, mode: 'gz', rawLen: raw.length, packedLen: b64.length };
+    }).catch(function () {
+      return { value: snap, mode: 'plain-gzerr', rawLen: raw.length, packedLen: raw.length };
+    });
+  }
+  /* 拉取时还原快照（兼容历史明文快照） */
+  function mxUnpackSnapshot(v) {
+    if (!v || typeof v !== 'object' || v.__mxgz !== 1 || typeof v.__d !== 'string') return Promise.resolve(v);
+    if (typeof DecompressionStream !== 'function') return Promise.reject(new Error('云端快照为压缩格式，但本浏览器不支持解压'));
+    var s = '';
+    try { s = atob(v.__d); } catch (e) { return Promise.reject(new Error('云端快照解压失败(1)')); }
+    var bytes = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+    return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json().catch(function () { throw new Error('云端快照解压失败(2)'); });
+  }
+  /* 同步诊断用滚动日志（诊断弹窗读取，供用户截图定位） */
+  function mxSyncLog(rec) {
+    try {
+      var arr = []; try { arr = JSON.parse(localStorage.getItem('mx_sync_log') || '[]') || []; } catch (e0) {}
+      arr.push(rec); if (arr.length > 10) arr = arr.slice(-10);
+      localStorage.setItem('mx_sync_log', JSON.stringify(arr));
+    } catch (e) {}
+  }
+  window.mxPackSnapshot = mxPackSnapshot;
+  window.mxUnpackSnapshot = mxUnpackSnapshot;
+  window.mxSyncLog = mxSyncLog;
+
 /* [#417] VIP 资源文件上云：导入后自动上传到 COS，跨设备可下载播放 */
 function uploadResourceToCloud(resId) {
   return window.DB.get('resources', resId).then(function(row) {
@@ -26305,7 +26360,27 @@ function downloadResourceFromCloud(resId) {
       '登录令牌：' + tokState + '<br>' +
       '登录身份：' + (window.__mx_uid__ ? '✅ ' + String(window.__mx_uid__).slice(0, 8) + '…' : '❌ 无（令牌过期或未登录）') + '<br>' +
       '当前状态：<b>' + (window.__MX_SYNC_STATUS || '-') + '</b><br>' +
-      '最近同步问题：' + lastErr + '</div>' +
+      '最近同步问题：' + lastErr + '<br>' +
+      '上次上行：' + (function () {
+        try {
+          var p = window.__mx_last_push__ || JSON.parse(localStorage.getItem('mx_last_push') || 'null');
+          if (!p) return '（无）';
+          return p.mode + ' ' + Math.round((p.raw || 0) / 1024) + 'KB→' + Math.round((p.packed || 0) / 1024) + 'KB';
+        } catch (e0) { return '（无）'; }
+      })() + '</div>' +
+      (function () {
+        try {
+          var l = JSON.parse(localStorage.getItem('mx_sync_log') || '[]') || [];
+          if (!l.length) return '';
+          var rows = l.slice(-6).map(function (x) {
+            var d = new Date(x.t || Date.now());
+            return d.toLocaleTimeString() + ' ' + (x.act || '') + (x.mode ? ' ' + x.mode : '') +
+              (x.raw != null ? ' ' + Math.round(x.raw / 1024) + '→' + Math.round((x.packed || 0) / 1024) + 'KB' : '') +
+              (x.ok === false ? ' ❌' + String(x.msg || '').slice(0, 30) : (x.ok ? ' ✅' : ''));
+          }).join('<br>');
+          return '<div style="font-size:11px;color:#78909c;max-height:108px;overflow:auto;margin-top:8px;border-top:1px dashed #ddd;padding-top:6px;line-height:1.6">最近同步记录：<br>' + rows + '</div>';
+        } catch (e1) { return ''; }
+      })() +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button id="mx-diag-retry" style="flex:1;padding:11px;border:none;border-radius:12px;background:#2e9e5b;color:#fff;font-weight:800;cursor:pointer">🔄 立即重试同步</button>' +
       '<button id="mx-diag-ping" style="flex:1;padding:11px;border:none;border-radius:12px;background:#8a6ff0;color:#fff;font-weight:800;cursor:pointer">🌐 测网关连通</button>' +
@@ -26383,9 +26458,18 @@ function downloadResourceFromCloud(resId) {
         /* token 由后端 sync.js 取出 uid；此处只传 code + snapshot */
         /* [rootfix] syncCloudGuarded 定义在另一个 <script> 块，必须走 window 导出（跨 IIFE 红线） */
         var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
-        return _scg('push', { code: code, snapshot: snap });
+        /* [#421fix] 大快照必须压缩后再上行：网关请求体上限≈100KB，超限必 Failed to fetch */
+        if (typeof window.mxPackSnapshot !== 'function') return _scg('push', { code: code, snapshot: snap });
+        return window.mxPackSnapshot(snap).then(function (pk) {
+          var meta = { mode: pk.mode, raw: pk.rawLen, packed: pk.packedLen, t: Date.now() };
+          window.__mx_last_push__ = meta;
+          try { localStorage.setItem('mx_last_push', JSON.stringify(meta)); } catch (e0) {}
+          try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'push', mode: pk.mode, raw: pk.rawLen, packed: pk.packedLen }); } catch (e1) {}
+          return _scg('push', { code: code, snapshot: pk.value });
+        });
       }).then(function (res) {
         if (res && res.ok) return 'OK';
+        try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'push', ok: false, msg: (res && res.msg) || '推送未成功' }); } catch (e2) {}
         mxSyncErr(res && res.msg ? res.msg : '推送未成功');
         if (res && res.msg && /未登录/.test(res.msg)) { setSyncStatus('expired'); return 'BAILED'; }
         setSyncStatus(navigator.onLine === false ? 'offline' : 'error');   /* [rootfix] 失败不再塌缩成 local */
@@ -26410,7 +26494,11 @@ function downloadResourceFromCloud(resId) {
       var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
       return _scg('pull', { code: code }).then(function (res) {
         if (res && res.ok) {
-          if (res.snapshot) return applySnapshot(res.snapshot).then(function () { return 'OK'; });
+          /* [#421fix] 云端快照可能是压缩信封（{__mxgz:1,__d}），先还原再落地 */
+          if (res.snapshot) {
+            try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'pull', ok: true }); } catch (e0) {}
+            return window.mxUnpackSnapshot(res.snapshot).then(function (s) { return applySnapshot(s); }).then(function () { return 'OK'; });
+          }
           return 'OK';
         }
         mxSyncErr(res && res.msg ? res.msg : '拉取未成功');
@@ -26441,9 +26529,15 @@ function downloadResourceFromCloud(resId) {
     return ensureUid().then(function (uid) {
       if (!uid) return null;
       return buildSnapshot().then(function (snap) {
-        return mxApiSync('snapshot', { snapshot: snap }).then(function (r) {
-          if (r && r.ok) { try { lsSet('mx_last_snapshot', String(Date.now())); } catch (e) {} }
-          return r;
+        /* [#421fix] 轻量快照同样受网关 100KB 请求体限制 → 走同一压缩信封（读取方需 mxUnpackSnapshot 还原） */
+        var _pk = (typeof window.mxPackSnapshot === 'function')
+          ? window.mxPackSnapshot(snap).then(function (p) { return p.value; })
+          : Promise.resolve(snap);
+        return _pk.then(function (val) {
+          return mxApiSync('snapshot', { snapshot: val }).then(function (r) {
+            if (r && r.ok) { try { lsSet('mx_last_snapshot', String(Date.now())); } catch (e) {} }
+            return r;
+          });
         });
       });
     }).catch(function () { return null; });
