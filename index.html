@@ -26468,7 +26468,7 @@ function downloadResourceFromCloud(resId) {
           return _scg('push', { code: code, snapshot: pk.value });
         });
       }).then(function (res) {
-        if (res && res.ok) return 'OK';
+        if (res && res.ok) { try { if (window.mxMarkSynced) window.mxMarkSynced(res.updated_at); } catch (e3) {} return 'OK'; }
         try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'push', ok: false, msg: (res && res.msg) || '推送未成功' }); } catch (e2) {}
         mxSyncErr(res && res.msg ? res.msg : '推送未成功');
         if (res && res.msg && /未登录/.test(res.msg)) { setSyncStatus('expired'); return 'BAILED'; }
@@ -26494,6 +26494,8 @@ function downloadResourceFromCloud(resId) {
       var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
       return _scg('pull', { code: code }).then(function (res) {
         if (res && res.ok) {
+          /* 记录本机已与云端一致（供多端同步提醒比对） */
+          try { if (window.mxMarkSynced) window.mxMarkSynced(res.updated_at); } catch (e9) {}
           /* [#421fix] 云端快照可能是压缩信封（{__mxgz:1,__d}），先还原再落地 */
           if (res.snapshot) {
             try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'pull', ok: true }); } catch (e0) {}
@@ -30339,6 +30341,321 @@ window.MX_SPRITE_COORDS = {
     setTimeout(function () { b.textContent = old; b.disabled = false; }, 1500);
   }, true);
   console.log('[MX-RW] 统一错题收录助手加载完毕');
+})();
+</script>
+<script id="mx-pwa-and-sync-remind">
+(function () {
+  'use strict';
+  /* ==========================================================================
+     [PWA+SREMIND] 萌星宝宝 · SW 提示式更新 + version.json 强制更新 + VIP 多端同步提醒
+     --------------------------------------------------------------------------
+     纯增量模块：只「读」现有全局能力（window.isVip / window.mxApiSync /
+     window.pullCloud / window.showToast），不修改卡密校验、IndexedDB、既有同步逻辑。
+     非 http(s) 环境（本地双击 file://）整体跳过 → 离线双击版不受任何影响。
+     兼容：iPhone / iPad(iOS Safari) · Android · HarmonyOS(ArkWeb) · Windows · macOS
+     注意：必须与 sw.js 中的 MX_CACHE 版本号一致，改了要一起改。
+     ========================================================================== */
+  var K_APP_VER    = 'mx_app_ver';          /* 本机已确认的版本号 */
+  var K_LAST_SYNC  = 'mx_last_sync_at';     /* 本机最后一次与云端一致的时间戳(ms) */
+  var K_SYNC_CD    = 'mx_sync_prompt_cd';   /* 同步提醒冷却 {uid,ts} */
+  var K_VER_CD     = 'mx_ver_prompt_cd';    /* 版本更新提醒冷却 {v,ts} */
+  var K_SW_CD      = 'mx_sw_prompt_cd';     /* SW 更新提醒冷却 {ts} */
+  var SYNC_CD_MS   = 5 * 60 * 1000;         /* 同一账号 5 分钟只提醒一次 */
+  var VER_CD_MS    = 30 * 60 * 1000;        /* 同版本 30 分钟只提醒一次 */
+  var TOLERANCE_MS = 3000;                  /* 3 秒容差，避免往返/时钟误差误报 */
+  var REMIND_DELAY = 7000;                  /* 首页加载后延迟，避免与应用初始化抢资源 */
+
+  var IS_HTTP = /^https?:$/.test(location.protocol);
+  var swReloading = false;
+  var updatePromptShown = false;
+
+  function LS(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function LSSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function curUid() { try { return localStorage.getItem('mx_user') || ''; } catch (e) { return ''; } }
+  function isVipNow() { try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
+  function toastSafe(m) { try { if (window.showToast) window.showToast(m); } catch (e) {} }
+
+  /* --------------------------------- 童趣弹窗 -------------------------------- */
+  var promptBusy = false;
+  var styleInjected = false;
+  function injectStyle() {
+    if (styleInjected || document.getElementById('mx-prompt-style')) { styleInjected = true; return; }
+    var s = document.createElement('style');
+    s.id = 'mx-prompt-style';
+    s.textContent =
+      '@keyframes mxPromptIn{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}' +
+      '@keyframes mxPromptMask{from{opacity:0}to{opacity:1}}' +
+      '#mx-prompt-mask{animation:mxPromptMask .18s ease-out}' +
+      '#mx-prompt-card{animation:mxPromptIn .24s cubic-bezier(.2,.9,.3,1.3)}' +
+      '.mx-prompt-btn{transition:transform .12s ease,box-shadow .12s ease}' +
+      '.mx-prompt-btn:active{transform:scale(.96)}';
+    (document.head || document.documentElement).appendChild(s);
+    styleInjected = true;
+  }
+
+  /* opt: {icon,title,desc,okText,cancelText,dismissable,onOk,onCancel} */
+  function showMxPrompt(opt) {
+    opt = opt || {};
+    if (promptBusy) return false;
+    if (!document.body) return false;
+    promptBusy = true;
+    injectStyle();
+
+    var mask = document.createElement('div');
+    mask.id = 'mx-prompt-mask';
+    mask.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;' +
+      'background:rgba(26,44,66,.44);display:flex;align-items:center;justify-content:center;padding:20px;' +
+      '-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)';
+
+    var card = document.createElement('div');
+    card.id = 'mx-prompt-card';
+    card.style.cssText = 'width:100%;max-width:330px;box-sizing:border-box;' +
+      'background:linear-gradient(180deg,#ffffff 0%,#f4fbff 100%);border-radius:22px;' +
+      'border:2px solid #ffd97a;box-shadow:0 18px 46px rgba(18,48,86,.30);padding:22px 18px 16px;' +
+      'text-align:center;font-family:inherit';
+
+    var icon = document.createElement('div');
+    icon.style.cssText = 'font-size:44px;line-height:1;margin-bottom:8px';
+    icon.textContent = opt.icon || '🌟';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:18px;font-weight:800;color:#1f3a5f;margin-bottom:7px';
+    title.textContent = opt.title || '';
+
+    var desc = document.createElement('div');
+    desc.style.cssText = 'font-size:13.5px;line-height:1.6;color:#5b7691;margin-bottom:16px';
+    desc.textContent = opt.desc || '';
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:9px';
+
+    function close() {
+      promptBusy = false;
+      try { if (mask.parentNode) mask.parentNode.removeChild(mask); } catch (e) {}
+    }
+    function mkBtn(text, primary, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mx-prompt-btn';
+      b.textContent = text;
+      b.style.cssText = 'flex:1;padding:11px 6px;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer;' +
+        (primary
+          ? 'border:none;background:linear-gradient(180deg,#8fd85c,#68b83e);color:#fff;box-shadow:0 6px 14px rgba(110,190,70,.36)'
+          : 'border:1.5px solid #dbe6f2;background:#fff;color:#78909c');
+      b.onclick = function () { close(); if (typeof fn === 'function') fn(); };
+      return b;
+    }
+
+    btnRow.appendChild(mkBtn(opt.okText || '好的', true, opt.onOk));
+    if (opt.cancelText) btnRow.appendChild(mkBtn(opt.cancelText, false, opt.onCancel));
+    if (opt.dismissable) {
+      mask.addEventListener('click', function (e) {
+        if (e.target === mask) { close(); if (typeof opt.onCancel === 'function') opt.onCancel(); }
+      });
+    }
+
+    card.appendChild(icon); card.appendChild(title); card.appendChild(desc); card.appendChild(btnRow);
+    mask.appendChild(card);
+    document.body.appendChild(mask);
+    return true;
+  }
+
+  /* --------------------------------- 版本号工具 ------------------------------ */
+  function verParts(v) { return String(v || '').split('.').map(function (n) { return parseInt(n, 10) || 0; }); }
+  function verGt(a, b) {
+    var A = verParts(a), B = verParts(b), n = Math.max(A.length, B.length);
+    for (var i = 0; i < n; i++) { var x = A[i] || 0, y = B[i] || 0; if (x > y) return true; if (x < y) return false; }
+    return false;
+  }
+
+  /* ---------------------- 一、应用版本强制更新（version.json） ---------------------- */
+  /* 通知 SW 清掉本项目静态资源缓存（版本变化时调用，保证图片/音频等不走旧缓存） */
+  function tellSwClearCache() {
+    try {
+      if (!navigator.serviceWorker) return;
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        var w = reg && (reg.active || reg.waiting);
+        if (w && w.postMessage) w.postMessage({ type: 'CLEAR_MX_CACHE' });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function checkAppVersion() {
+    if (!IS_HTTP || typeof fetch !== 'function') return;
+    fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return (r && r.ok) ? r.json() : null; })
+      .then(function (j) {
+        var server = (j && j.version) ? String(j.version).trim() : '';
+        if (!server) return;
+        var local = LS(K_APP_VER);
+        /* 首次访问：静默对齐本地版本，不打扰用户 */
+        if (!local) { LSSet(K_APP_VER, server); return; }
+        /* 版本有变化（升级/回退）→ 通知 SW 清掉旧静态资源缓存 */
+        if (server !== local) tellSwClearCache();
+        if (!verGt(server, local)) { LSSet(K_APP_VER, server); return; }
+        /* 冷却：同一版本 30 分钟内不重复弹 */
+        try { var cd = JSON.parse(LS(K_VER_CD) || 'null'); if (cd && cd.v === server && (Date.now() - cd.ts) < VER_CD_MS) return; } catch (e) {}
+        if (updatePromptShown) return;
+        updatePromptShown = true;
+        LSSet(K_VER_CD, JSON.stringify({ v: server, ts: Date.now() }));
+        showMxPrompt({
+          icon: '🚀',
+          title: '萌星宝宝升级啦！',
+          desc: '发现好玩的版本 ' + server + ' ～ 点一下刷新，马上体验新功能吧！',
+          okText: '🔄 立即刷新',
+          cancelText: '待会儿',
+          dismissable: true,
+          onOk: function () { doForceUpdate(server); }
+        });
+      })
+      .catch(function () {});
+  }
+
+  function doForceUpdate(server) {
+    LSSet(K_APP_VER, server);
+    var done = false;
+    function go() {
+      if (done) return; done = true;
+      try {
+        /* 带版本参数绕过 CDN 缓存，确保拿到最新页面 */
+        location.replace(location.pathname + '?v=' + encodeURIComponent(server) + (location.hash || ''));
+      } catch (e) { location.reload(); }
+    }
+    try {
+      /* 清掉本项目自己的 SW 缓存，再刷新 */
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (ks) {
+          return Promise.all(ks.filter(function (k) { return /^mx-/.test(k); }).map(function (k) { return caches.delete(k); }));
+        }).catch(function () {}).then(go);
+      } else { go(); }
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistration().then(function (reg) {
+          var w = reg && (reg.waiting || reg.active);
+          if (w && w.postMessage) { try { w.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {} }
+        }).catch(function () {});
+      }
+      setTimeout(go, 1600);   /* 兜底：无论如何 1.6s 后刷新 */
+    } catch (e) { go(); }
+  }
+
+  /* -------------------- 二、Service Worker 注册 & 提示式更新 -------------------- */
+  function registerSW() {
+    if (!IS_HTTP || !navigator.serviceWorker) return;
+    navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+      .then(function (reg) {
+        if (reg.waiting && navigator.serviceWorker.controller) onSwWaiting(reg);
+        try {
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) onSwWaiting(reg);
+            });
+          });
+        } catch (e) {}
+        try {
+          setInterval(function () { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+          document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { try { reg.update(); } catch (e) {} }
+          });
+        } catch (e) {}
+      })
+      .catch(function (e) { if (window.console) console.warn('[mx-sw] 注册失败（不影响使用）:', e && e.message); });
+
+    try {
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!swReloading) return;
+        swReloading = false;
+        location.reload();
+      });
+    } catch (e) {}
+  }
+
+  function onSwWaiting(reg) {
+    if (!reg || !reg.waiting) return;
+    try { var cd = JSON.parse(LS(K_SW_CD) || 'null'); if (cd && (Date.now() - cd.ts) < VER_CD_MS) return; } catch (e) {}
+    if (updatePromptShown) return;
+    updatePromptShown = true;
+    LSSet(K_SW_CD, JSON.stringify({ ts: Date.now() }));
+    showMxPrompt({
+      icon: '🎈',
+      title: '萌星宝宝换新装啦！',
+      desc: '有新版本可以体验哦～ 现在刷新就能用上啦！',
+      okText: '✨ 立即更新',
+      cancelText: '待会儿',
+      dismissable: true,
+      onOk: function () {
+        swReloading = true;
+        try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); }
+        catch (e) { swReloading = false; location.reload(); return; }
+        setTimeout(function () { if (swReloading) { swReloading = false; location.reload(); } }, 2000);
+      }
+    });
+  }
+
+  /* ---------------- 三、VIP 多端数据同步提醒（轻量 meta + 5 分钟冷却） ---------------- */
+  function checkSyncReminder() {
+    if (!IS_HTTP) return;
+    if (!isVipNow()) return;                                   /* 仅 VIP 用户 */
+    if (typeof window.mxApiSync !== 'function') return;
+
+    var uid = curUid() || 'anon';
+    /* 冷却：同一账号 5 分钟内只提示一次 */
+    try {
+      var cd = JSON.parse(LS(K_SYNC_CD) || 'null');
+      if (cd && cd.uid === uid && (Date.now() - cd.ts) < SYNC_CD_MS) return;
+    } catch (e) {}
+
+    window.mxApiSync('meta', {}).then(function (r) {
+      if (!r || !r.ok) return;                                  /* 后端未支持/未登录 → 静默降级 */
+      var cloudAt = Number(r.updated_at) || 0;
+      if (!cloudAt) return;                                     /* 云端暂无数据 */
+      var localAt = parseInt(LS(K_LAST_SYNC) || '0', 10) || 0;
+      if (cloudAt <= localAt + TOLERANCE_MS) return;            /* 本机已是最新，不打扰 */
+      /* 先落冷却（点"稍后同步"也算提醒过一次），避免反复打扰 */
+      LSSet(K_SYNC_CD, JSON.stringify({ uid: uid, ts: Date.now() }));
+      showMxPrompt({
+        icon: '📢',
+        title: '有新的学习记录啦！',
+        desc: '其他设备上的萌星宝宝有了新进度哦～ 要现在同步到这台设备吗？',
+        okText: '🚀 立即同步',
+        cancelText: '稍后同步',
+        dismissable: true,
+        onOk: function () { doSyncNow(cloudAt); }
+      });
+    }).catch(function () {});
+  }
+
+  function doSyncNow(cloudAt) {
+    /* 只有点击「立即同步」才真正拉取全量数据；点「稍后同步」不做任何下载 */
+    if (typeof window.pullCloud !== 'function') { toastSafe('同步暂时不可用，稍后再试试～'); return; }
+    window.pullCloud(false).then(function (b) {
+      if (b === 'BAILED') return;                              /* 未登录/非 VIP → 不标记已同步 */
+      try { if (window.mxMarkSynced) window.mxMarkSynced(cloudAt); } catch (e) {}
+      toastSafe('✅ 学习记录同步好啦！');
+    }).catch(function () { toastSafe('同步没成功，待会儿再试试～'); });
+  }
+
+  /* --------------------- 供同步链调用：记录"本机已与云端一致" --------------------- */
+  window.mxMarkSynced = function (ts) {
+    try { LSSet(K_LAST_SYNC, String(ts ? Number(ts) : Date.now())); } catch (e) {}
+  };
+
+  /* --------------------------------- 启动调度 --------------------------------- */
+  function boot() {
+    registerSW();
+    checkAppVersion();
+    setTimeout(function () { checkSyncReminder(); }, REMIND_DELAY);
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) setTimeout(function () { checkSyncReminder(); }, 1500);
+      });
+    } catch (e) {}
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  if (window.console) console.log('[mx-pwa] SW / 版本更新 / 同步提醒模块加载完成 (http=' + IS_HTTP + ')');
 })();
 </script>
 </body>
