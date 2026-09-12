@@ -17428,7 +17428,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     for (var r2 = 0; r2 < 5; r2++) {
       var shootersInRow = 0;
-      for (var c2 = 0; c < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && (pp.kind === 'pea' || pp.kind === 'ice' || pp.kind === 'bomb')) shootersInRow++; }
+      /* [pvzfix 2026-09-12] 循环条件原误用外层变量 c（此时恒为 9）→ 内层循环永不执行 → shootersInRow 恒 0
+         → 「每行攻击型植物每日清除本行 1 只僵尸」规则从未生效。修正为 c2。 */
+      for (var c2 = 0; c2 < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && (pp.kind === 'pea' || pp.kind === 'ice' || pp.kind === 'bomb')) shootersInRow++; }
       for (var k = 0; k < shootersInRow; k++) {
         var cand = pvz.zombies.filter(function (z) { return z.row === r2; });
         if (!cand.length) break;
@@ -17450,7 +17452,18 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* 跨自然日：逐日推进（封顶第7天），每天按那天任务完成情况判定；收集被吃植物 */
   function pvzRunCrossDays(cid, lastDay, steps) {
     var keys = [];
-    for (var i = 1; i <= steps; i++) { var d = new Date(lastDay); d.setDate(d.getDate() + i); keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
+    /* [pvzfix 2026-09-12] 跨引擎安全解析：lastDay 是 pvzToday() 产出的「YYYY-M-D」不补零格式，
+       Safari/iOS/微信 WebKit 对非 ISO 日期串返回 Invalid Date → 日期键退化成 "NaN-NaN-NaN"
+       → 查不到当天排期 → 被 pvzDayDoneRatio 的「空日程视为已完成」兜底吞掉 → 不吃植物、不弹跨日战报。
+       改用数字构造 new Date(+y, +m-1, +d)（与 #351 pvzDayDiff 同款写法），补零/不补零都能正确解析。
+       lastDay 仍无法解析时保守跳过（不推进、不吃植物），绝不产生 NaN 日期键。 */
+    var _lp = String(lastDay || '').split('-');
+    var _pvdBase = new Date(+_lp[0], (+_lp[1]) - 1, +_lp[2]);
+    if (!isNaN(_pvdBase.getTime())) {
+      for (var i = 1; i <= steps; i++) { var d = new Date(_pvdBase.getTime()); d.setDate(d.getDate() + i); keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
+    } else {
+      try { console.warn('[PVZ] 跨日结算跳过：lastDay 无法解析 =', lastDay); } catch (_e) {}
+    }
     var eatenAll = [];
     var chain = Promise.resolve();
     keys.forEach(function (key) {
