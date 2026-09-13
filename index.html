@@ -5887,6 +5887,16 @@ html, body {
 .mxg-pvz-zombie .zlv { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; color: #fff; background: #7cb342; border-radius: 6px; padding: 0 4px; }
 .mxg-pvz-zombie.lv2 .zlv { background: #fb8c00; }
 .mxg-pvz-zombie.lv3 .zlv { background: #e53935; }
+/* ===== #435 守卫战：冰冻 / 爆炸 / 坚果拦截 ===== */
+.mxg-pvz-zombie.frozen { animation: none; filter: drop-shadow(0 0 5px #4fc3f7) saturate(.35) brightness(1.3); }
+.mxg-pvz-zombie.frozen::after { content: '❄'; position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 13px; }
+.mxg-pvz-pea.ice { background: #81d4fa; box-shadow: 0 0 8px #29b6f6; }
+.mxg-pvz-boom { position: absolute; width: 33.334%; height: 60%; border-radius: 50%; pointer-events: none; z-index: 6;
+  background: radial-gradient(circle, rgba(255,241,118,.95), rgba(255,112,67,.78) 55%, rgba(255,112,67,0) 74%);
+  animation: mxg-boom .5s ease forwards; }
+@keyframes mxg-boom { 0% { transform: scale(.25); opacity: .95; } 100% { transform: scale(1.15); opacity: 0; } }
+.mxg-pvz-plant.blocking { animation: mxg-nut 1s ease infinite; }
+@keyframes mxg-nut { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
 /* 测试用天数步进器 */
 .mxg-pvz-daystep { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .mxg-pvz-daystep .ds { border: none; background: #e8f5e9; color: #33691e; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -16801,7 +16811,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   /* #207·#10 游戏文字提示：每个游戏统一的「玩法说明」内容（点开游戏即见） */
   var GAME_HELP = {
-    pvz: ['🌻 先在下方卡池选一株植物，再点草坪空格种下。', '☀️ 向日葵每 10 秒掉 1 个太阳，点它收集 = 1 积分。', '🌿 豌豆/寒冰/樱桃是攻击植物，白天每天清掉本行 1 只僵尸。', '🗓️ 共 7 天：完成今日任务僵尸只前进半格；第 7 天点「开启守卫战」实时打僵尸。', '🎯 守住花园即通关，积分可换盲盒与皮肤！'],
+    pvz: ['🌻 先在下方卡池选一株植物，再点草坪空格种下。', '☀️ 向日葵每 10 秒掉 1 个太阳，点它收集 = 1 积分。', '🌿 白天每个攻击植物清掉本行 1 只僵尸；第 7 天守卫战：豌豆打本行全体、寒冰附带冰冻 2 秒、樱桃炸九宫格、坚果拦截 5 秒。', '🗓️ 共 7 天：完成今日任务僵尸只前进半格；第 7 天点「开启守卫战」实时打僵尸。', '🎯 守住花园即通关，积分可换盲盒与皮肤！'],
     pony: ['🦄 用积分解锁小马与服装配饰，装扮专属小马。', '📸 完成照片故事组合可得分，集齐 20 套照片故事拿满进度。', '⭐ 进度满 7 即通关，进度会同步到首页看板。'],
     frozen: ['❄️ 把冰晶一块块稳稳叠起来，叠得越高分越多。', '🎯 保持平衡别让冰晶掉落，每日最多可得满分。', '⭐ 进度满 20 即通关。'],
     paw: ['🐶 帮汪汪队拼好修路图，把小伙伴安全送到家。', '🧩 拖动碎片完成拼图即可得分。', '⭐ 进度满 6 即通关。'],
@@ -17363,7 +17373,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       + '</div>'
       + '<div class="mxg-pvz-palette">' + palette + '</div>'
       + '<div class="mxg-pvz-lawn" id="mxg-pvz-lawn">' + rows + zhtml + '</div>'
-      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分；阳光会一直留在场上等你收集，当天 24 点仍未收的由系统自动入账）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——白天阶段每个攻击植物每天清除「本行」1 只僵尸（必须每行都布防才能守住）；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格，且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
+      + '<div class="mxg-tip" style="margin-top:12px">🌻 向日葵每 10 秒产出 1 ☀️（单棵每日最多 10 个，点击收集 = 1 积分；阳光会一直留在场上等你收集，当天 24 点仍未收的由系统自动入账）；🌿 豌豆/🌬️寒冰/🍒樱桃为攻击植物——🌿豌豆射手每 0.65 秒打「本行所有僵尸」各 1 血；🌬️寒冰射手同样伤害并冰冻 2 秒；🍒樱桃炸弹每 0.65 秒炸「周围 3×3 九宫格」内所有僵尸各 2 血；🥥坚果墙能拦住僵尸约 5 秒。白天阶段每个攻击植物每天清除「本行」1 只僵尸；积分统一在第 7 天守卫战结束时结算。僵尸每天前进：完成任务 0.5 格、未完成 1 格（最少保留 5 格，给守卫战留反应时间），且任务未完成会随机吃掉 1 株植物。第 7 天点「开启守卫战」进入实时战斗，僵尸分 3 级（🧟低级5下 / 👹中级6下 / 👺高级7下 清除，外貌不同）。测试用「天数」按钮仅测试环境可见。</div>';
     setWrap(container, 'pvz', pvz.sun, inner);
     wirePVZ(container);
     pvzSave();   /* [pvzfix] 界面重建即存档：种植/跨天/开战/重开等所有 lawn 变更都经过这里 */
@@ -17441,14 +17451,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var shootersInRow = 0;
       /* [pvzfix 2026-09-12] 循环条件原误用外层变量 c（此时恒为 9）→ 内层循环永不执行 → shootersInRow 恒 0
          → 「每行攻击型植物每日清除本行 1 只僵尸」规则从未生效。修正为 c2。 */
-      for (var c2 = 0; c2 < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && (pp.kind === 'pea' || pp.kind === 'ice' || pp.kind === 'bomb')) shootersInRow++; }
+      for (var c2 = 0; c2 < 9; c2++) { var pp = pvz.lawn[r2][c2]; if (pp && pvzIsAttacker(pp.kind)) shootersInRow++; }
       for (var k = 0; k < shootersInRow; k++) {
         var cand = pvz.zombies.filter(function (z) { return z.row === r2; });
         if (!cand.length) break;
         pvz.zombies = pvz.zombies.filter(function (z) { return z !== cand[0]; });
       }
     }
-    pvz.zpos = Math.max(0, pvz.zpos - (done ? 0.5 : 1));
+    /* [#435 B] 僵尸推进下限 5 格：连续多天没完成任务也只推到剩 5 格，
+       让玩家在第 7 天守卫战有充足反应时间（原实现可一路推到 0 格 = 开局贴脸）。 */
+    pvz.zpos = Math.max(5, pvz.zpos - (done ? 0.5 : 1));
     return eaten;
   }
   /* 任意日期的任务完成率（复用 getDailySchedule 按日期查询）；空日程视为已完成（无任务可完成） */
@@ -17572,6 +17584,35 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
        实时射击改到第 7 天「开启守卫战」(pvzStartBattle) 才启用。 */
   }
 
+  /* ===== #435 守卫战战斗辅助 ===== */
+  var NUT_BLOCK_MS = 5000;   /* 坚果墙拦停僵尸时长 */
+  var ICE_FREEZE_MS = 2000;  /* 寒冰射手冰冻时长 */
+  var FIRE_GAP_MS = 650;     /* 攻击植物出手间隔 */
+  /* 攻击型判定：向日葵只产阳光、坚果墙只拦截，其余（含云端新增植物）一律按攻击型处理 */
+  function pvzIsAttacker(kind) { return !!kind && kind !== 'sun' && kind !== 'nut'; }
+  /* 取某格植物 DOM（战斗中原地操作，避免重建棋盘丢实体） */
+  function pvzPlantEl(container, r, c) {
+    try {
+      var cell = container.querySelector('#mxg-pvz-lawn .mxg-pvz-cell[data-r="' + r + '"][data-c="' + c + '"]');
+      return cell ? cell.querySelector('.mxg-pvz-plant') : null;
+    } catch (e) { return null; }
+  }
+  /* 即时结算伤害：弹道只作视觉，多目标下不会漏伤/重复计伤 */
+  function pvzHit(e, dmg, freezeMs, now) {
+    if (!e || e.dead) return;
+    e.hp -= dmg;
+    if (freezeMs) e.frozenUntil = Math.max(e.frozenUntil || 0, now + freezeMs);
+    if (e.el) {
+      e.el.classList.add('hit');
+      setTimeout(function () { try { if (e.el) e.el.classList.remove('hit'); } catch (x) {} }, 300);
+    }
+    if (e.hp <= 0) {
+      e.dead = true;
+      if (pvzBattle) pvzBattle.cleared++;
+      if (e.el && e.el.parentNode) e.el.parentNode.removeChild(e.el);
+      beep(200);
+    }
+  }
   /* 第 7 天：开启守卫战（实时战斗，3 级僵尸各需 5/6/7 下清除，外貌不同） */
   var pvzBattle = null;
   function pvzStartBattle(container) {
@@ -17604,12 +17645,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }
       d.innerHTML = zl.emoji + '<div class="zbar"><i style="width:100%"></i></div><div class="zlv">L' + z.level + '</div>';
       lawn.appendChild(d);
-      return { row: z.row, level: z.level, hp: z.max, max: z.max, bx: pvz.zpos / 9, el: d, dead: false };
+      return { row: z.row, level: z.level, hp: z.max, max: z.max, bx: pvz.zpos / 9, el: d, dead: false, frozenUntil: 0 };
     });
-    var shooters = [];
+    var shooters = [], nuts = [];
     for (var r = 0; r < 5; r++) for (var c = 0; c < 9; c++) {
       var p = pvz.lawn[r][c];
-      if (p && (p.kind === 'pea' || p.kind === 'ice' || p.kind === 'bomb')) shooters.push({ r: r, bx: (c + 0.5) / 9, next: 0 });
+      if (!p) continue;
+      if (p.kind === 'nut') nuts.push({ r: r, c: c, bx: (c + 0.5) / 9, until: 0, dead: false, el: pvzPlantEl(container, r, c) });
+      else if (pvzIsAttacker(p.kind)) shooters.push({ r: r, c: c, bx: (c + 0.5) / 9, kind: p.kind, next: 0 });
     }
     if (!ents.length) {
       modal(container, '🛡️ 守卫战结束', '当前没有僵尸，花园已安然无恙！本轮积分已结算。', function () {
@@ -17617,47 +17660,80 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       });
       return;
     }
-    pvzBattle = { lawn: lawn, ents: ents, shooters: shooters, last: performance.now(), cleared: 0, broke: 0, over: false, peas: [] };
-    toast('⚔️ 守卫战开始！' + ents.length + ' 只僵尸来袭，' + shooters.length + ' 个攻击植物迎战。');
+    pvzBattle = { lawn: lawn, ents: ents, shooters: shooters, nuts: nuts, last: performance.now(), cleared: 0, broke: 0, over: false, peas: [] };
+    toast('⚔️ 守卫战开始！僵尸 ' + ents.length + ' 只 · 攻击植物 ' + shooters.length + ' 个 · 坚果墙 ' + nuts.length + ' 个。');
     requestAnimationFrame(function tick(now) {
       if (!pvzBattle || pvzBattle.over) return;
       var dt = now - pvzBattle.last; pvzBattle.last = now;
       var speed = 0.00006 * dt; // 每秒约 0.06（约 15 秒走完 1 格比例）
       pvzBattle.ents.forEach(function (e) {
         if (e.dead) return;
-        e.bx -= speed;
+        /* 寒冰射手冰冻：命中后 2 秒内原地不动 */
+        var frozen = !!(e.frozenUntil && now < e.frozenUntil);
+        if (!frozen) {
+          /* 坚果墙拦截：僵尸走到坚果前停下，最多挡 5 秒；挡满则坚果被啃掉、僵尸继续 */
+          var held = null;
+          for (var ni = 0; ni < pvzBattle.nuts.length; ni++) {
+            var nt = pvzBattle.nuts[ni];
+            if (nt.dead || nt.r !== e.row) continue;
+            if (e.bx <= nt.bx + 0.05 && e.bx >= nt.bx - 0.06) { held = nt; break; }
+          }
+          if (held) {
+            if (!held.until) { held.until = now + NUT_BLOCK_MS; if (held.el) held.el.classList.add('blocking'); }
+            if (now < held.until) { e.bx = held.bx + 0.03; }
+            else {
+              held.dead = true;
+              try { pvz.lawn[held.r][held.c] = null; } catch (x) {}
+              if (held.el && held.el.parentNode) held.el.parentNode.removeChild(held.el);
+              try { pvzSave(); } catch (x) {}
+            }
+          } else {
+            e.bx -= speed;
+          }
+        }
         if (e.bx <= 0) { e.bx = 0; e.dead = true; pvzBattle.broke++; if (e.el) e.el.remove(); return; }
         if (e.el) {
           e.el.style.left = Math.max(2, e.bx * 100) + '%';
+          e.el.classList.toggle('frozen', frozen);
           var bar = e.el.querySelector('.zbar > i');
-          if (bar) bar.style.width = (e.hp / e.max * 100) + '%';
+          if (bar) bar.style.width = Math.max(0, e.hp / e.max * 100) + '%';
         }
       });
+      /* 每个攻击植物每 650ms 出手一次（#435）：
+         · 豌豆射手/其它攻击植物 → 打「本行全部僵尸」各 1 血（不再要求僵尸在植物右侧）
+         · 寒冰射手           → 同上伤害 + 冰冻 2 秒不移动
+         · 樱桃炸弹           → 打「自身周围 3×3 九宫格」内所有僵尸各 2 血
+         伤害即时结算，弹道/爆炸只作视觉。 */
       pvzBattle.shooters.forEach(function (sh) {
         if (now < sh.next) return;
-        sh.next = now + 650;
-        var tgt = pvzBattle.ents.filter(function (e) { return !e.dead && e.row === sh.r && e.bx > sh.bx; })
-          .sort(function (a, b) { return a.bx - b.bx; })[0];
-        if (!tgt) return;
-        var pea = document.createElement('div'); pea.className = 'mxg-pvz-pea';
-        pea.style.top = (sh.r * 20 + 6) + '%';
-        pea.style.left = (sh.bx * 100) + '%';
-        lawn.appendChild(pea);
-        pvzBattle.peas.push({ el: pea, bx: sh.bx, tx: tgt.bx, target: tgt, hit: false });
-      });
-      pvzBattle.peas = pvzBattle.peas.filter(function (pp) {
-        pp.bx += (pp.tx - pp.bx) * 0.35 + 0.01;
-        if (pp.el) pp.el.style.left = (pp.bx * 100) + '%';
-        if (Math.abs(pp.bx - pp.tx) < 0.02 || pp.target.dead) {
-          if (!pp.hit && !pp.target.dead) {
-            pp.target.hp -= 1; pp.hit = true;
-            if (pp.target.el) pp.target.el.classList.add('hit');
-            if (pp.target.hp <= 0) { pp.target.dead = true; pvzBattle.cleared++; if (pp.target.el) pp.target.el.remove(); }
-          }
-          if (pp.el) pp.el.remove();
-          return false;
+        sh.next = now + FIRE_GAP_MS;
+        var isBomb = (sh.kind === 'bomb'), isIce = (sh.kind === 'ice');
+        var dmg = isBomb ? 2 : 1;
+        var targets = pvzBattle.ents.filter(function (e) {
+          if (e.dead) return false;
+          if (isBomb) return Math.abs(e.row - sh.r) <= 1 && Math.abs(e.bx - sh.bx) <= 1.5 / 9;
+          return e.row === sh.r;
+        });
+        if (!targets.length) return;
+        if (isBomb) {
+          var bm = document.createElement('div'); bm.className = 'mxg-pvz-boom';
+          bm.style.top = Math.max(0, (sh.r - 1) * 20 + 1) + '%';
+          bm.style.left = ((sh.bx - 1.5 / 9) * 100) + '%';
+          lawn.appendChild(bm);
+          setTimeout(function () { if (bm.parentNode) bm.parentNode.removeChild(bm); }, 520);
         }
-        return true;
+        targets.forEach(function (t) {
+          pvzHit(t, dmg, isIce ? ICE_FREEZE_MS : 0, now);
+          if (isBomb) return;
+          var pea = document.createElement('div');
+          pea.className = 'mxg-pvz-pea' + (isIce ? ' ice' : '');
+          pea.style.top = (sh.r * 20 + 6) + '%';
+          pea.style.left = (sh.bx * 100) + '%';
+          lawn.appendChild(pea);
+          var tx = (t.bx * 100) + '%';
+          requestAnimationFrame(function () { try { pea.style.left = tx; } catch (x) {} });
+          setTimeout(function () { if (pea.parentNode) pea.parentNode.removeChild(pea); }, 560);
+        });
       });
       var alive = pvzBattle.ents.filter(function (e) { return !e.dead; }).length;
       if (alive === 0) {
@@ -26964,6 +27040,12 @@ function downloadResourceFromCloud(resId) {
     mxCurrentUid: mxCurrentUid,
     bindCardToUser: bindCardToUser
   };
+  /* [#435fix] 埋点/安全检测统一走 window.deviceId。
+     此前只导出了 window.MX_GATE.deviceId，而 5 处调用点写的是 window.deviceId →
+     `typeof window.deviceId === 'function'` 恒为 false → deviceId 恒为空串，
+     mx_track / mx_events 的设备维度全部落空，「同账号多终端」检测无从判定。
+     这里别名导出同一个确定性指纹（与卡密绑卡 deviceId 同源，可互相印证）。 */
+  window.deviceId = deviceId;
   window.MX_CLOUD = {
     on: isCloudOn,
     redeem: redeem,

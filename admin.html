@@ -39,6 +39,19 @@
   code{background:#eef2fb;padding:1px 6px;border-radius:5px;font-size:12px}
   .scroll{overflow-x:auto}
   .hint{font-size:12px;color:var(--sub);margin-top:6px}
+  /* 商品配置表格化编辑器（#433） */
+  .gt{min-width:700px}
+  .gt#gtMall{min-width:900px}
+  .gt th,.gt td{padding:5px 5px;vertical-align:middle}
+  .gt th{font-size:12px}
+  .gt input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;width:100%}
+  .gt input:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,124,255,.13)}
+  .gt .c-emo input{text-align:center}
+  .gt .c-num input{text-align:right}
+  .gt .c-id input{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .gt .ico{border:0;background:#eef2fb;color:var(--pri);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;margin:0 2px 0 0}
+  .gt .ico.del{color:var(--bad)}
+  .gt tbody tr:hover{background:#f8fafd}
 </style>
 </head>
 <body data-page-node-id="smQgver1I8NjEG3k9089fM">
@@ -136,6 +149,7 @@
       <h3 style="margin:0 0 6px" data-page-node-id="WtugHU9ljBmmTmPvRclt2g">安全与违规</h3>
       <div class="sub" data-page-node-id="KimQ7uks0CC5X5Ev3K56kc">疑似多设备共享卡密、近 30 天激活、安全日志数见上方核心指标。下为最近安全日志（服务端记录）。</div>
       <div id="secInfo" class="sub" data-page-node-id="FeDH0H6WPuYa62w0yR7Gyh"></div>
+      <div id="acctAbuseBox"></div>
     </div>
   </div>
 
@@ -171,7 +185,7 @@
         <h3 style="margin:0" data-page-node-id="3cVAjHgBI1r87ODbnsnAdG">🔑 卡密绑定设备表 <code data-page-node-id="vxCgmqimBQ1qDKNhv1yXeN">card_activation</code></h3>
         <button class="btn ghost sm" onclick="exportCSV('cardsTable','卡密绑定设备表')" data-page-node-id="eg4WX0ceeEba21k3xDIvUC">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll" data-page-node-id="mcnSblMrYTAJa22JrxTcDr"><table id="cardsTable" data-page-node-id="lk03RtghakFu0WPgN5GWoF"><thead data-page-node-id="eLdvsHpOq3gEfWiQsOmcFl"><tr data-page-node-id="5Ar5kEpuIQobCYaJ9fxZtW"><th data-page-node-id="EMs7CjIJOeD4FRt1J4vkQS">卡号(脱敏)</th><th data-page-node-id="3XBuc7pDGftbr0HfWgSuZ4">类型</th><th data-page-node-id="dmInumrHqmVmUXvGZfCjvT">等级</th><th data-page-node-id="ld13aJ7Cd5uE6lZgffk5WZ">状态</th><th data-page-node-id="UkyYBv5LiR3Kv7nrWNxHCq">绑定UID</th><th data-page-node-id="oFWjCugPak9RNh4r1hgGRl">使用设备</th><th data-page-node-id="fe9FhLCEa7aFBc4318BVCG">首绑设备</th><th data-page-node-id="Zum50KlZLadkgS5NndB44P">激活时间</th><th data-page-node-id="wwS9YvVcUjnXiYP4OSGGyM">有效期</th><th data-page-node-id="C18MWG0kMVVqrwdGaKCGRG">有效期(天)</th></tr></thead><tbody data-page-node-id="SzxxgR2xNwbOsJCYvT6VSh"></tbody></table></div>
+      <div class="scroll" data-page-node-id="mcnSblMrYTAJa22JrxTcDr"><table id="cardsTable" data-page-node-id="lk03RtghakFu0WPgN5GWoF"><thead data-page-node-id="eLdvsHpOq3gEfWiQsOmcFl"><tr data-page-node-id="5Ar5kEpuIQobCYaJ9fxZtW"><th data-page-node-id="EMs7CjIJOeD4FRt1J4vkQS">卡号(脱敏)</th><th data-page-node-id="3XBuc7pDGftbr0HfWgSuZ4">类型</th><th data-page-node-id="dmInumrHqmVmUXvGZfCjvT">等级</th><th data-page-node-id="ld13aJ7Cd5uE6lZgffk5WZ">状态</th><th data-page-node-id="UkyYBv5LiR3Kv7nrWNxHCq">绑定UID</th><th data-page-node-id="oFWjCugPak9RNh4r1hgGRl">绑定设备数</th><th data-page-node-id="fe9FhLCEa7aFBc4318BVCG">设备明细</th><th data-page-node-id="Zum50KlZLadkgS5NndB44P">激活时间</th><th data-page-node-id="wwS9YvVcUjnXiYP4OSGGyM">有效期</th><th data-page-node-id="C18MWG0kMVVqrwdGaKCGRG">有效期(天)</th></tr></thead><tbody data-page-node-id="SzxxgR2xNwbOsJCYvT6VSh"></tbody></table></div>
     </div>
 
     <div class="card" data-page-node-id="WVmjCEiopEcUdroVxAUIMm">
@@ -198,6 +212,15 @@
       <div class="hint" data-page-node-id="YRxsii1hqfZVJgCAkXYXWj">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
       <div class="scroll" data-page-node-id="tc8CsZU2sTEBxpyYfvCJia"><table id="usageTable" data-page-node-id="DFlLsXqxTU5zV0BeU0wHNk"><thead data-page-node-id="cXz5ih1NUFIFtUAVSJzLLJ"><tr data-page-node-id="oC05WeSjAHJLnuEOAtU9O6"><th data-page-node-id="3gdcgVXNdBQy1mfqGU5viZ">账号 / UID</th><th data-page-node-id="NDIDT4jxIoAygW0YYtphDr">调用次数</th><th data-page-node-id="cyXhGSlceIYfzf3v9KOV0s">⬆ 上行</th><th data-page-node-id="q415up2">⬇ 下行</th><th data-page-node-id="q415bar">占比</th></tr></thead><tbody data-page-node-id="oubnvtlfRLjy8x1sJLRLjI"></tbody></table></div>
     </div>
+  <!-- #435(c) 一户一行表：激活码 → 账号 → 设备 -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-top:0">
+      <h3 style="margin:0">🧾 一户一行表 <code>激活码 → 账号 → 设备</code></h3>
+      <button class="btn ghost sm" onclick="exportCSV('acctTable','一户一行表')">⬇ 导出 CSV</button>
+    </div>
+    <div class="sub">一行 = 一张已激活卡密。设备明细来自 <code>card_activation.devices[]</code>（每张卡最多 5 台，满 5 台标红）；「该账号持卡」= 同一 UID 名下的卡密张数，&gt;1 说明一号多卡。</div>
+    <div class="scroll"><table id="acctTable"><thead><tr><th>激活码(脱敏)</th><th>类型</th><th>状态</th><th>账号</th><th>UID</th><th>设备数</th><th>设备明细</th><th>该账号持卡</th><th>激活时间</th><th>有效期</th></tr></thead><tbody></tbody></table></div>
+  </div>
   </div>
 
   <!-- 账号安全 -->
@@ -241,21 +264,34 @@
       <div class="row" style="justify-content:space-between;margin-top:6px">
         <h3 style="margin:0">⭐ 积分兑换商品（SHOP_GOODS）</h3>
         <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="goodsAdd('shop')">＋ 新增一行</button>
           <button class="btn ghost sm" onclick="resetGoods('shop')">↺ 重置默认</button>
           <button class="btn ghost sm" onclick="loadGoods()">↺ 刷新</button>
         </span>
       </div>
-      <div class="sub">字段：<code>id</code> / <code>name</code> / <code>emoji</code> / <code>cost</code>(积分) / <code>tag</code> / <code>desc</code>。下架某商品即从数组删除该行。</div>
-      <textarea id="goodsShop" rows="10" style="font-family:monospace"></textarea>
+      <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>id</b> 需唯一；<b>积分</b>填大于 0 的整数。</div>
+      <div class="scroll"><table class="gt" id="gtShop"><thead id="gtShopHead"></thead><tbody id="gtShopBody"></tbody></table></div>
+      <div class="row"><button class="btn ghost sm" onclick="goodsAdd('shop')">＋ 新增一行</button><span class="hint" style="margin:0">共 <b id="gtShopCount">0</b> 个</span></div>
 
-      <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div class="row" style="justify-content:space-between;margin-top:16px">
         <h3 style="margin:0">🏪 萌星好物（MALL_PRODUCTS）</h3>
         <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="goodsAdd('mall')">＋ 新增一行</button>
           <button class="btn ghost sm" onclick="resetGoods('mall')">↺ 重置默认</button>
         </span>
       </div>
-      <div class="sub">字段：<code>id</code> / <code>name</code> / <code>emoji</code> / <code>price</code> / <code>vipPrice</code>(可选) / <code>tag</code> / <code>desc</code> / <code>url</code>。<code>price</code> 如 <code>"¥199"</code>。</div>
-      <textarea id="goodsMall" rows="10" style="font-family:monospace"></textarea>
+      <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>价格</b>写成 <code>¥199</code> 这样；<b>VIP价</b>、<b>链接</b>留空即不展示。</div>
+      <div class="scroll"><table class="gt" id="gtMall"><thead id="gtMallHead"></thead><tbody id="gtMallBody"></tbody></table></div>
+      <div class="row"><button class="btn ghost sm" onclick="goodsAdd('mall')">＋ 新增一行</button><span class="hint" style="margin:0">共 <b id="gtMallCount">0</b> 个</span></div>
+
+      <details style="margin-top:16px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--sub)">高级：以 JSON 粘贴 / 备份（与上方表格双向同步）</summary>
+        <label>积分兑换商品 JSON</label>
+        <textarea id="goodsShop" rows="6" style="font-family:monospace;font-size:12px" oninput="goodsJsonIn('shop')"></textarea>
+        <label>萌星好物 JSON</label>
+        <textarea id="goodsMall" rows="6" style="font-family:monospace;font-size:12px" oninput="goodsJsonIn('mall')"></textarea>
+        <div class="hint">粘贴合法 JSON 数组会自动同步到上方表格；表格里的修改也会实时回写到这里。</div>
+      </details>
 
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="saveGoods()">🚀 发布商品配置到全站</button>
@@ -275,6 +311,25 @@ function proxy(fn, data){
     body: JSON.stringify({ fn: fn, data: data || {} }) }).then(r=>r.json());
 }
 function $(id){ return document.getElementById(id); }
+
+/* ===== #434 模块 id → 中文名 =====
+   自动生成，请勿手改；来源 index.html 的 PAGE_META（title）与 GAME_RENDER（游戏 id）。
+   重新生成：python temp/_patch_admin_modnames.py <admin.html> <index.html> */
+const HEAT_PAGE_NAMES = {"abc":"26个字母","account":"账号中心","achievements":"成就墙","algo":"四大算法","clock":"认识时钟","collection":"盲盒卡牌 · 我的卡册","daily":"日常表现","errors":"错题集","estory":"英语绘本","feedback":"建议与反馈","gacha":"盲盒卡牌","games":"游戏互动","home":"首页看板","listen-chinese":"熏听·语文","listen-english":"熏听·英语","listen-math":"熏听·数学","listen-news":"熏听·实事","listen-schedule":"熏听·排期","listen-science":"熏听·科普","listen-story":"熏听·绘本","literacy":"识字专区","mall":"萌星好物推荐","maththink":"数学思维","my-calendar":"个人日历·日程","parent":"家长工作台","phonics":"自然拼读","pinyin":"拼音专区","poem":"古诗专区","points":"积分兑换","resource-center":"资源中心","settings":"系统设置","sport":"每日运动","story":"语文绘本","sudoku":"数独游戏","tasksets":"学习任务·套组","tool-ai":"AI擦除/标记图片","tool-flash":"学习闪卡生成","tool-math":"口算随机生成器","tool-pinyin":"拼音拼读生成器","tool-print":"口算题卡打印","tool-resources":"免费资源","tool-tomato":"专注力番茄计时器","words":"生字独立页"};
+const HEAT_GAME_NAMES = {"frozen":"冰雪奇缘","paw":"汪汪队","pony":"小马宝莉","pvz":"植物大战僵尸","rhythm":"节奏盒子","shanhai":"AI山海经"};
+/* 返回 {n:显示名, raw:原始id}；未知 id 原样回显，绝不吞掉 */
+function heatLabel(m){
+  var raw = String(m == null ? '' : m).trim();
+  if (!raw) return { n: '(空)', raw: '' };
+  if (raw === 'unknown') return { n: '未标记', raw: '' };
+  if (raw.indexOf('game:') === 0) {
+    var g = raw.slice(5);
+    return { n: (HEAT_GAME_NAMES[g] || g) + ' · 游戏', raw: raw };
+  }
+  if (HEAT_PAGE_NAMES[raw]) return { n: HEAT_PAGE_NAMES[raw], raw: raw };
+  return { n: raw, raw: '' };
+}
+
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function setMsg(id, t, c){ const e=$(id); if(e){ e.textContent=t; e.style.color='var(--'+(c||'sub')+')'; } }
 
@@ -498,7 +553,8 @@ async function loadStats(){
     {b:r.loginCount, s:'累计登录次数', c:''},
     {b:r.loginUsers, s:'登录用户数', c:''},
     {b:r.feedbackCount, s:'用户反馈条数', c:'ok'},
-    {b:r.securityLogs, s:'安全日志条数', c:'warn'}
+    {b:r.securityLogs, s:'安全日志条数', c:'warn'},
+    {b:r.multiDeviceAccounts, s:'同账号多终端(≥2台)', c:'bad'}
   ];
   $('metrics').innerHTML = M.map(function(m){
     return '<div class="metric '+(m.c||'')+'"><b>'+esc(m.b)+'</b><span>'+m.s+'</span></div>';
@@ -507,9 +563,44 @@ async function loadStats(){
   const max = heat.length ? heat[0].count : 1;
   $('heatTable').querySelector('tbody').innerHTML = heat.length ? heat.map(function(h){
     const w = Math.max(6, Math.round(h.count/max*100));
-    return '<tr><td>'+esc(h.module)+'</td><td>'+esc(h.count)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
+    const L = heatLabel(h.module);
+    return '<tr><td>'+esc(L.n)+(L.raw ? ' <span class="hint" style="margin:0;font-family:ui-monospace,Consolas,monospace">'+esc(L.raw)+'</span>' : '')+'</td><td>'+esc(h.count)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
   $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+esc(r.securityLogs)+' 条。';
+
+  /* #435(a) 同账号多终端登录：同一 uid 在 ≥2 台设备出现过即列出（账号可能外泄/多人共用）。
+     数据口径：mx_track（pv/login 埋点，带 uid+deviceId）∪ mx_events（模块点击，带 uid+deviceId）。 */
+  const acctAbuse = r.accountAbuse || [];
+  const abox = $('acctAbuseBox');
+  if (abox) {
+    if (!acctAbuse.length) {
+      abox.innerHTML = '<h3 style="margin:12px 0 6px">📱 同账号多终端登录</h3>'
+        + '<div class="hint" style="margin:0">✅ 未发现同一账号在 2 台以上终端登录。判定依据：<code>card_activation.devices[]</code>（绑卡设备，存量真实数据）+ <code>mx_track</code> / <code>mx_events</code> 中同一 uid 的去重 deviceId。</div>';
+    } else {
+      let h2 = '<h3 style="margin:12px 0 6px;color:var(--bad)">📱 同账号多终端登录（' + acctAbuse.length + ' 个账号）</h3>'
+        + '<div class="sub" style="margin:0 0 6px">一个账号正常只在自己 1~2 台设备上用；出现 3 台以上请核实是否账号外泄。点设备按钮可直接关闭它的激活通道。</div>'
+        + '<div class="scroll"><table><thead><tr><th>账号</th><th>UID</th><th>终端数</th><th>设备明细（可点封锁）</th><th>来源</th><th>最近活跃</th></tr></thead><tbody>';
+      acctAbuse.forEach(function (a) {
+        const n = Number(a.deviceCount) || 0;
+        const tone = n >= 4 ? 'background:#fdecee;color:var(--bad)' : (n >= 3 ? 'background:#fff6e5;color:var(--warn)' : 'background:#eef6ff;color:var(--pri)');
+        const srcSet = {};
+        (a.devices || []).forEach(function (d) { String(d.src || '').split('+').forEach(function (s) { if (s) srcSet[s] = 1; }); });
+        const srcStr = Object.keys(srcSet).join(' / ') || '—';
+        const devs = (a.devices || []).map(function (d) {
+          return '<button class="btn ghost sm" style="margin:2px 4px 2px 0;font-family:ui-monospace,Consolas,monospace;font-size:11px" '
+            + 'title="关闭该设备的激活通道" onclick="blockDevicePrompt(\'' + esc(d.deviceId) + '\')">📵 ' + esc(String(d.deviceId).slice(0, 12)) + '…</button>';
+        }).join('');
+        h2 += '<tr><td><b>' + esc(a.account || '（无账号名）') + '</b></td>'
+          + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + esc((a.uid || '').slice(0, 18)) + '</td>'
+          + '<td><span class="pill" style="' + tone + '">' + esc(n) + ' 台</span></td>'
+          + '<td style="max-width:420px">' + (devs || '<span class="sub">—</span>') + '</td>'
+          + '<td style="white-space:nowrap"><span class="sub">' + esc(srcStr) + '</span></td>'
+          + '<td style="white-space:nowrap">' + esc(a.lastSeen || '—') + '</td></tr>';
+      });
+      h2 += '</tbody></table></div>';
+      abox.innerHTML = h2;
+    }
+  }
 
   /* #E 同设备多卡白嫖风险警告 + 封锁按钮 + 黑名单管理 */
   const abuse = r.deviceAbuse || [], blocked = r.blockedDevices || [];
@@ -587,6 +678,7 @@ async function loadData(){
     renderUsers(r.users || []);
     fillFb($('dataFbTable').querySelector('tbody'), r.feedback || []);
     renderUsage(r.usage || []);
+    renderAccounts(r.accounts || []);
     /* #D 头部块实内容化：各表条数汇总 + 服务端错误透出 */
     const c = r.counts || {};
     const errs = [];
@@ -599,6 +691,7 @@ async function loadData(){
       + '<div class="metric ok"><b>'+esc(c.users||0)+'</b><span>注册账号</span></div>'
       + '<div class="metric"><b>'+esc(c.feedback||0)+'</b><span>用户反馈</span></div>'
       + '<div class="metric warn"><b>'+esc(c.usage||0)+'</b><span>有调用记录的用户</span></div>'
+      + '<div class="metric ok"><b>'+esc(c.accounts||0)+'</b><span>一户一行记录</span></div>'
       + '<div class="metric'+((r.blocked||[]).length?' bad':'')+'"><b>'+esc((r.blocked||[]).length)+'</b><span>已封锁设备</span></div>';
     setMsg('dataMsg', errs.length ? ('⚠️ 部分表读取异常 → '+errs.join('；')) : '✅ 已加载（实时拉取云端）', errs.length ? 'bad' : 'sub');
   } catch(e) { setMsg('dataMsg','加载失败：'+esc(String(e.message||e)),'bad'); }
@@ -608,7 +701,7 @@ function renderCards(list){
   if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已绑定卡密</td></tr>'; return; }
   tb.innerHTML = list.map(function(c){
     const vip = (c.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通';
-    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td>'+esc(c.device)+'</td><td>'+esc(c.firstDevice)+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days||0)+'</td></tr>';
+    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td><span class="pill" style="background:#eef6ff;color:var(--pri)">'+esc(Number(c.deviceCount)||0)+' 台</span></td><td style="font-family:ui-monospace,Consolas,monospace;font-size:11px;max-width:300px">'+esc((c.devices&&c.devices.length)?c.devices.join(' / '):'—')+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days||0)+'</td></tr>';
   }).join('');
 }
 function renderUsers(list){
@@ -616,7 +709,7 @@ function renderUsers(list){
   if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="sub">暂无账号</td></tr>'; return; }
   tb.innerHTML = list.map(function(u){
     return '<tr><td>'+esc(u.account)+'</td><td>'+esc(u.uid)+'</td><td>'+esc(u.isEmail)+'</td><td>'+esc(u.verified)+'</td><td>'+esc(u.createdAt)+'</td>'
-      + '<td><button class="btn ghost sm" onclick="resetUserPassPrompt(\''+esc(u.uid)+'\',\''+esc(u.account)+'\')">🔑 重置密码</button></td></tr>';
+      + '<td><button class="btn ghost sm" onclick="resetUserPassPrompt(\''+esc(u.uidFull||u.uid)+'\',\''+esc(u.account)+'\')">🔑 重置密码</button></td></tr>';
   }).join('');
 }
 /* #F 重置用户密码（客服场景：用户忘记密码时管理员重置，重置后用户用新密码登录） */
@@ -643,6 +736,29 @@ function renderUsage(list){
     const who = x.account ? (esc(x.account) + ' <span class="sub" style="font-size:11px;color:#8a99ad">' + esc((x.who || '').slice(0, 18)) + '</span>') : esc(x.who || '');
     const w = Math.max(6, Math.min(120, Math.round((x.calls || 0)/top*120)));
     return '<tr><td>'+who+'</td><td>'+esc(x.calls)+'</td><td>'+fmtBytes(x.up)+'</td><td>'+fmtBytes(x.down)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
+  }).join('');
+}
+/* #435(c) 一户一行表：一张激活码 → 账号 → 绑定设备数 → 设备明细
+   设备明细来自 card_activation.devices[]（sync.bindCard 维护，每张卡上限 5 台） */
+function renderAccounts(list){
+  const tb = $('acctTable').querySelector('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已激活卡密</td></tr>'; return; }
+  tb.innerHTML = list.map(function(a){
+    const n = Number(a.deviceCount) || 0;
+    const tone = n >= 5 ? 'background:#fdecee;color:var(--bad)' : (n >= 3 ? 'background:#fff6e5;color:var(--warn)' : 'background:#eef6ff;color:var(--pri)');
+    const devs = (a.devices || []).map(function(d){
+      return '<code style="font-size:11px;background:#f4f7fb;border-radius:4px;padding:1px 4px;margin-right:4px">'+esc(String(d).slice(0,12))+'…</code>';
+    }).join('');
+    const devCell = n ? ('<span class="pill" style="'+tone+'">'+n+' 台</span> ' + devs) : '<span class="sub">未记录</span>';
+    return '<tr><td>'+esc(a.code)+'</td>'
+      + '<td>'+((a.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通')+'</td>'
+      + '<td>'+esc(a.status)+'</td>'
+      + '<td><b>'+esc(a.account || '—')+'</b></td>'
+      + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">'+esc(a.uidShort || '—')+'</td>'
+      + '<td>'+esc(n)+'</td><td style="max-width:320px">'+devCell+'</td>'
+      + '<td>'+esc(a.cardsOfAccount || 1)+'</td>'
+      + '<td style="white-space:nowrap">'+esc(a.used_at)+'</td>'
+      + '<td>'+esc(a.expire_at)+'</td></tr>';
   }).join('');
 }
 
@@ -751,30 +867,165 @@ const DEFAULT_MALL_PRODUCTS = [
   {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
   {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
 ];
+/* ===== #433 商品配置：表格化编辑器 =====
+   表格是唯一编辑入口；底部 JSON textarea 与表格双向同步（高级/批量用）。 */
+const GOODS = { shop: [], mall: [] };
+const GOODS_FIELDS = {
+  shop: [
+    {k:'id',    t:'id',   cls:'c-id',  w:'110px', ph:'gacha_ticket'},
+    {k:'name',  t:'名称', cls:'',      w:'130px', ph:'盲盒抽奖券'},
+    {k:'emoji', t:'图标', cls:'c-emo', w:'56px',  ph:'🎟️'},
+    {k:'cost',  t:'积分', cls:'c-num', w:'70px',  ph:'50', num:true},
+    {k:'tag',   t:'标签', cls:'',      w:'80px',  ph:'热门'},
+    {k:'desc',  t:'说明', cls:'',      w:'',      ph:'兑换说明'}
+  ],
+  mall: [
+    {k:'id',      t:'id',    cls:'c-id',  w:'74px',  ph:'p1'},
+    {k:'name',    t:'名称',  cls:'',      w:'120px', ph:'萌星点读笔'},
+    {k:'emoji',   t:'图标',  cls:'c-emo', w:'52px',  ph:'🖊️'},
+    {k:'price',   t:'价格',  cls:'c-num', w:'78px',  ph:'¥199'},
+    {k:'vipPrice',t:'VIP价', cls:'c-num', w:'78px',  ph:'¥169'},
+    {k:'tag',     t:'标签',  cls:'',      w:'72px',  ph:'硬件'},
+    {k:'desc',    t:'说明',  cls:'',      w:'',      ph:'描述'},
+    {k:'url',     t:'链接',  cls:'c-id',  w:'150px', ph:'https://...'}
+  ]
+};
+function goodsEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function goodsIds(which){
+  return which==='shop' ? {head:'gtShopHead', body:'gtShopBody', cnt:'gtShopCount', json:'goodsShop'}
+                        : {head:'gtMallHead', body:'gtMallBody', cnt:'gtMallCount', json:'goodsMall'};
+}
+function goodsRender(which){
+  const ids = goodsIds(which), fields = GOODS_FIELDS[which];
+  const head = $(ids.head), body = $(ids.body);
+  if (!head || !body) return;
+  head.innerHTML = '<tr><th style="width:28px">#</th>'
+    + fields.map(function(f){ return '<th'+(f.w?' style="width:'+f.w+'"':'')+'>'+f.t+'</th>'; }).join('')
+    + '<th style="width:96px">操作</th></tr>';
+  const arr = GOODS[which];
+  if (!arr.length){
+    body.innerHTML = '<tr><td colspan="'+(fields.length+2)+'" style="padding:12px;color:#9aa">暂无商品，点「＋ 新增一行」添加</td></tr>';
+  } else {
+    body.innerHTML = arr.map(function(o,i){
+      return '<tr><td style="color:#9aa">'+(i+1)+'</td>'
+        + fields.map(function(f){
+            const v = (o[f.k]==null) ? '' : String(o[f.k]);
+            return '<td class="'+f.cls+'"><input '+(f.num?'type="number" min="1" step="1" ':'type="text" ')
+              + 'value="'+goodsEsc(v)+'" placeholder="'+goodsEsc(f.ph||'')+'" '
+              + 'oninput="goodsSet(\''+which+'\','+i+',\''+f.k+'\',this.value)"></td>';
+          }).join('')
+        + '<td style="white-space:nowrap">'
+        + '<button class="ico" title="上移" onclick="goodsMove(\''+which+'\','+i+',-1)">↑</button>'
+        + '<button class="ico" title="下移" onclick="goodsMove(\''+which+'\','+i+',1)">↓</button>'
+        + '<button class="ico del" title="删除此行" onclick="goodsDel(\''+which+'\','+i+')">✕</button>'
+        + '</td></tr>';
+    }).join('');
+  }
+  const c = $(ids.cnt); if (c) c.textContent = arr.length;
+}
+function goodsSet(which, i, k, v){
+  const arr = GOODS[which]; if (!arr || !arr[i]) return;
+  arr[i][k] = v;
+  goodsSyncJson(which);
+}
+function goodsSyncJson(which, force){
+  const el = $(goodsIds(which).json);
+  if (!el) return;
+  if (!force && document.activeElement === el) return;
+  el.value = JSON.stringify(GOODS[which], null, 2);
+}
+function goodsJsonIn(which){
+  const el = $(goodsIds(which).json);
+  if (!el) return;
+  let v;
+  try { v = JSON.parse(el.value); } catch(e){ return; }
+  if (!Array.isArray(v)) return;
+  GOODS[which] = v;
+  goodsRender(which);
+  setMsg('goodsMsg','JSON 已同步到表格，点「发布」生效','sub');
+}
+function goodsAdd(which){
+  const o = {};
+  GOODS_FIELDS[which].forEach(function(f){ o[f.k] = ''; });
+  if (which==='shop'){ o.id='new_'+(GOODS.shop.length+1); o.name='新商品'; o.emoji='🎁'; o.cost=10; }
+  else { o.id='p'+(GOODS.mall.length+1); o.name='新商品'; o.emoji='🎁'; o.price='¥0'; }
+  GOODS[which].push(o);
+  goodsRender(which); goodsSyncJson(which, true);
+  setMsg('goodsMsg','已新增一行，改完点「发布」生效','warn');
+}
+function goodsDel(which, i){
+  const o = GOODS[which][i]; if (!o) return;
+  if (!confirm('确认删除「'+(o.name||o.id||('第'+(i+1)+'行'))+'」？点「发布」后才真正下架。')) return;
+  GOODS[which].splice(i,1);
+  goodsRender(which); goodsSyncJson(which, true);
+  setMsg('goodsMsg','已删除一行，点「发布」生效','warn');
+}
+function goodsMove(which, i, d){
+  const arr = GOODS[which], j = i + d;
+  if (j < 0 || j >= arr.length) return;
+  const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  goodsRender(which); goodsSyncJson(which, true);
+}
+/* 出参前清洗：必填校验 + 空的可选字段直接删键（保持与旧数据同构） */
+function goodsBuild(which){
+  const errs = [], out = [], seen = {};
+  const optStr = which==='shop' ? ['emoji','tag','desc'] : ['emoji','vipPrice','tag','desc','url'];
+  GOODS[which].forEach(function(o,i){
+    const label = (which==='shop'?'积分商品 ':'好物 ')+'第'+(i+1)+'行';
+    const rec = {};
+    Object.keys(o).forEach(function(k){ rec[k] = o[k]; });   /* 先全量复制 → 未知字段不丢 */
+    const id = String(o.id==null?'':o.id).trim();
+    if (!id) errs.push(label+'：id 不能为空');
+    else if (seen[id]) errs.push(label+'：id「'+id+'」与第 '+seen[id]+' 行重复');
+    else seen[id] = i+1;
+    rec.id = id;
+    const name = String(o.name==null?'':o.name).trim();
+    if (!name) errs.push(label+'：名称不能为空');
+    rec.name = name;
+    if (which==='shop'){
+      const c = parseInt(o.cost,10);
+      if (!(c>0)) errs.push(label+'：积分（cost）必须是大于 0 的整数'); else rec.cost = c;
+    } else {
+      const p = String(o.price==null?'':o.price).trim();
+      if (!p) errs.push(label+'：价格（price）不能为空'); else rec.price = p;
+    }
+    optStr.forEach(function(k){
+      const v = String(o[k]==null?'':o[k]).trim();
+      if (v) rec[k] = v; else delete rec[k];
+    });
+    out.push(rec);
+  });
+  return { list: out, errs: errs };
+}
 async function loadGoods(){
   setMsg('goodsMsg','加载中…','sub');
   try {
     const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY });
     const g = (r && r.goods) || {};
-    $('goodsShop').value = JSON.stringify(g.shop && g.shop.length ? g.shop : DEFAULT_SHOP_GOODS, null, 2);
-    $('goodsMall').value = JSON.stringify(g.mall && g.mall.length ? g.mall : DEFAULT_MALL_PRODUCTS, null, 2);
+    GOODS.shop = (Array.isArray(g.shop) && g.shop.length) ? g.shop.map(function(x){ return Object.assign({},x); }) : DEFAULT_SHOP_GOODS.map(function(x){ return Object.assign({},x); });
+    GOODS.mall = (Array.isArray(g.mall) && g.mall.length) ? g.mall.map(function(x){ return Object.assign({},x); }) : DEFAULT_MALL_PRODUCTS.map(function(x){ return Object.assign({},x); });
+    goodsRender('shop'); goodsRender('mall');
+    goodsSyncJson('shop', true); goodsSyncJson('mall', true);
     setMsg('goodsMsg', (r && r.ok) ? '已读取当前商品配置' : '读取失败', 'sub');
   } catch(e){ setMsg('goodsMsg','读取失败：'+String(e.message||e),'bad'); }
 }
 function resetGoods(which){
-  if (!confirm('确认将「'+(which==='shop'?'积分兑换商品':'萌星好物')+'」重置为代码默认？当前编辑框内容将被覆盖（未发布的改动会丢失）。')) return;
-  if (which==='shop') $('goodsShop').value = JSON.stringify(DEFAULT_SHOP_GOODS, null, 2);
-  else $('goodsMall').value = JSON.stringify(DEFAULT_MALL_PRODUCTS, null, 2);
-  setMsg('goodsMsg','已重置为默认（点发布才生效）','warn');
+  if (!confirm('确认将「'+(which==='shop'?'积分兑换商品':'萌星好物')+'」重置为代码默认？表格里未发布的改动会丢失。')) return;
+  const src = which==='shop' ? DEFAULT_SHOP_GOODS : DEFAULT_MALL_PRODUCTS;
+  GOODS[which] = src.map(function(x){ return Object.assign({},x); });
+  goodsRender(which); goodsSyncJson(which, true);
+  setMsg('goodsMsg','已重置为默认（点「发布」才生效）','warn');
 }
 async function saveGoods(){
-  let shop, mall;
-  try { shop = JSON.parse($('goodsShop').value); } catch(e){ setMsg('goodsMsg','❌ 积分商品 JSON 解析失败：'+String(e.message||e),'bad'); return; }
-  try { mall = JSON.parse($('goodsMall').value); } catch(e){ setMsg('goodsMsg','❌ 好物 JSON 解析失败：'+String(e.message||e),'bad'); return; }
-  if (!Array.isArray(shop) || !Array.isArray(mall)) { setMsg('goodsMsg','❌ 两项都必须是 JSON 数组','bad'); return; }
+  const a = goodsBuild('shop'), b = goodsBuild('mall');
+  const errs = a.errs.concat(b.errs);
+  if (errs.length){
+    const head = errs.slice(0,12).join('\n');
+    if (!confirm('检测到 '+errs.length+' 处问题：\n\n'+head+(errs.length>12?'\n…':'')+'\n\n仍要强行发布吗？（不推荐）')) return;
+  }
   setMsg('goodsMsg','发布中…','sub');
-  const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'set', goods:{ shop: shop, mall: mall } });
-  if (r && r.ok) setMsg('goodsMsg','✅ 已发布，全端用户刷新后生效','ok');
+  const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'set', goods:{ shop: a.list, mall: b.list } });
+  if (r && r.ok) setMsg('goodsMsg','✅ 已发布（'+a.list.length+' 个积分商品 / '+b.list.length+' 个好物），全端用户刷新后生效','ok');
   else setMsg('goodsMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
 }
 </script>
