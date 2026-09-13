@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="zh-CN" data-page-node-id="Ah3AEicIZMdz3fxh5vjjUD">
+<head data-page-node-id="rRaP30QdP9QOkNqwzfQFlF">
+<meta charset="utf-8" data-page-node-id="mVmceFCYWDIFnJ2lwljMlA">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="5X2vFhAQ6UV4OjtK83f6CN">
 <title>萌星宝宝 · 管理后台</title>
 <style>
   :root{ --bg:#f4f7fb; --card:#fff; --line:#e3e9f2; --txt:#243049; --sub:#6b7a93; --pri:#4f7cff; --pri2:#7a5cff; --ok:#1faa6b; --warn:#e8a33d; --bad:#e25563; }
@@ -41,48 +41,49 @@
   .hint{font-size:12px;color:var(--sub);margin-top:6px}
 </style>
 </head>
-<body>
+<body data-page-node-id="smQgver1I8NjEG3k9089fM">
 
-<div id="loginBox" class="login">
-  <h1>🔐 管理后台登录</h1>
-  <div class="sub">仅产品管理者可进入。使用云端账号密码登录（账号密码存于 CloudBase <code>admin_users</code>，每次需校验）。</div>
-  <input id="accInput" type="text" placeholder="管理员账号" autocomplete="off">
-  <input id="pwdInput" type="password" placeholder="管理员密码" autocomplete="off">
-  <label style="margin:6px 0 0;display:flex;align-items:center;gap:6px;color:var(--txt)"><input type="checkbox" id="remember"> 记住本次登录（2 小时内免重复输入）</label>
-  <button onclick="unlock()" style="margin-top:14px">进入后台</button>
-  <span id="loginMsg" class="msg"></span>
+<div id="loginBox" class="login" data-page-node-id="X9ctaP8V3XImsU2rR3r0MB">
+  <h1 data-page-node-id="nPAvW2dQqT2d5VATxX0k1P">🔐 管理后台登录</h1>
+  <div class="sub" data-page-node-id="9jmRffw4LzYSe6ZZmZl5WH">仅产品管理者可进入。使用云端账号密码登录（账号密码存于 CloudBase <code data-page-node-id="2DoV9CfNjwiTCzJpz7bXWf">admin_users</code>，每次需校验）。</div>
+  <input id="accInput" type="text" placeholder="管理员账号" autocomplete="off" data-page-node-id="H3JNBjKL84RmsclMdzxg4x">
+  <input id="pwdInput" type="password" placeholder="管理员密码" autocomplete="off" data-page-node-id="l7PiFZmJR5JPiciG2BgxpT">
+  <label style="margin:6px 0 0;display:flex;align-items:center;gap:6px;color:var(--txt)" data-page-node-id="Wz7dDWk46FCorhLmvliOGN"><input type="checkbox" id="remember" data-page-node-id="0raO6hVNyhLmRSEHacCvlY"> 记住本次登录（2 小时内免重复输入）</label>
+  <button onclick="unlock()" style="margin-top:14px" data-page-node-id="2naUgftQvB7Rc7AuGMNSF0">进入后台</button>
+  <span id="loginMsg" class="msg" data-page-node-id="wRHLarIsKXULxfSp7QqGfe"></span>
 </div>
 
-<div id="appBox" class="app" hidden>
-  <h1>萌星宝宝 · 管理后台</h1>
-  <div class="sub">公网端运营控制台 · <a href="https://StarAi3690.github.io/mengxing-baby/" target="_blank" style="color:var(--pri)">打开公网端 ↗</a> · <a href="javascript:logout()" style="color:var(--sub)">退出登录</a></div>
-  <div class="tabs">
-    <div class="tab on" id="tab-ann" onclick="switchTab('ann')">📢 全站公告</div>
-    <div class="tab" id="tab-nav" onclick="switchTab('nav')">🧭 初始菜单顺序</div>
-    <div class="tab" id="tab-mon" onclick="switchTab('mon')">📊 运营监控</div>
-    <div class="tab" id="tab-fb" onclick="switchTab('fb')">💌 用户反馈</div>
-    <div class="tab" id="tab-data" onclick="switchTab('data')">📋 数据明细</div>
-    <div class="tab" id="tab-sec" onclick="switchTab('sec')">⚙️ 账号安全</div>
+<div id="appBox" class="app" hidden data-page-node-id="SrBnNmYpMCLnaUB9omoc2R">
+  <h1 data-page-node-id="LB3NEv0ntoT6JKUoT3XF1Q">萌星宝宝 · 管理后台</h1>
+  <div class="sub" data-page-node-id="kKia1kyCaKefsFgWpFvMtE">公网端运营控制台 · <a href="https://StarAi3690.github.io/mengxing-baby/" target="_blank" style="color:var(--pri)" data-page-node-id="6NflCqMPCIvgBe9dZi3EGA">打开公网端 ↗</a> · <a href="javascript:logout()" style="color:var(--sub)" data-page-node-id="85tbXGocAcDjvk0DJVVWPy">退出登录</a></div>
+  <div class="tabs" data-page-node-id="JCfz94KwsQ44AP8kvUgcZE">
+    <div class="tab on" id="tab-ann" onclick="switchTab('ann')" data-page-node-id="ywrBwOmVumHaiJIbklxrAi">📢 全站公告</div>
+    <div class="tab" id="tab-nav" onclick="switchTab('nav')" data-page-node-id="E5Uhjw6yKaKfBgHovtJ5Go">🧭 初始菜单顺序</div>
+    <div class="tab" id="tab-mon" onclick="switchTab('mon')" data-page-node-id="8PsEbHuq3S0cokXMSYXS8V">📊 运营监控</div>
+    <div class="tab" id="tab-fb" onclick="switchTab('fb')" data-page-node-id="S3uIFWJVAZsNKTfKq6Is10">💌 用户反馈</div>
+    <div class="tab" id="tab-data" onclick="switchTab('data')" data-page-node-id="2Vt2j8HyzhM0J9P7PUhA8H">📋 数据明细</div>
+    <div class="tab" id="tab-sec" onclick="switchTab('sec')" data-page-node-id="J0dqbNKoDJq6GcIyTyOGFb">⚙️ 账号安全</div>
+    <div class="tab" id="tab-goods" onclick="switchTab('goods')">🛍️ 商品配置</div>
   </div>
 
   <!-- 公告编辑 -->
-  <div id="pane-ann">
-    <div class="card">
-      <h3 style="margin:0 0 4px">傻瓜式公告编辑</h3>
-      <div class="sub">填好文字 → 点「发布」，所有公网端用户立刻看到同一条公告。留空或取消启用则全站不显示。</div>
-      <label>公告文字（必填）</label>
+  <div id="pane-ann" data-page-node-id="YrN79Yhk12oGhf5oDB7WKY">
+    <div class="card" data-page-node-id="Lzbx8D1MJS7dFUpkI9coBK">
+      <h3 style="margin:0 0 4px" data-page-node-id="h8ERgqGHSjUrRZfqzIPt49">傻瓜式公告编辑</h3>
+      <div class="sub" data-page-node-id="bEhn9YmnpECU3Nv7qecbRg">填好文字 → 点「发布」，所有公网端用户立刻看到同一条公告。留空或取消启用则全站不显示。</div>
+      <label data-page-node-id="ZQafqt2WzANtALNCUQtiqG">公告文字（必填）</label>
       <textarea id="annText" rows="3" placeholder="例如：暑期特惠进行中，VIP 畅享全部模块～"></textarea>
-      <label>跳转链接（可选，点击公告打开）</label>
-      <input id="annUrl" type="text" placeholder="https://... 留空则纯展示">
-      <div class="row">
-        <label style="margin:0"><input type="checkbox" id="annEnabled" checked> 启用公告</label>
+      <label data-page-node-id="GLjaMThI4YC5lMHvfCN83b">跳转链接（可选，点击公告打开）</label>
+      <input id="annUrl" type="text" placeholder="https://... 留空则纯展示" data-page-node-id="wkMAeWRfVWqZM8QGeU3sNH">
+      <div class="row" data-page-node-id="G5pHR6F5fZiBT9fH7d0wQ9">
+        <label style="margin:0" data-page-node-id="HEhI7KcTPRiHl2XGZCo1pr"><input type="checkbox" id="annEnabled" checked data-page-node-id="ynOpVY0aoMqdoWVvdgaIj3"> 启用公告</label>
       </div>
-      <div class="row">
-        <button class="btn" onclick="saveAnnounce()">🚀 发布到全站</button>
-        <button class="btn ghost" onclick="loadAnnounce()">↺ 重新读取</button>
-        <span id="annMsg" class="msg"></span>
+      <div class="row" data-page-node-id="RRzZYwUsPQ4o75oq0aekWR">
+        <button class="btn" onclick="saveAnnounce()" data-page-node-id="TpJiUimLpkbCCfWNFtTGjf">🚀 发布到全站</button>
+        <button class="btn ghost" onclick="loadAnnounce()" data-page-node-id="QRFf5UvXHWr61TKjlt9ITr">↺ 重新读取</button>
+        <span id="annMsg" class="msg" data-page-node-id="XMPdIDHwV7hCyXGsZuG3Yp"></span>
       </div>
-      <div class="sub" style="margin-top:12px">提示：公告数据存储于云端 <code>CFG::linkage_config.announcement</code>，孩子端首页顶部自动展示（悬浮公告条）。孩子端每 3 分钟 + 回前台自动刷新，无需等每天 24 点。</div>
+      <div class="sub" style="margin-top:12px" data-page-node-id="MePZhkLk7RHEQk3iECoSvo">提示：公告数据存储于云端 <code data-page-node-id="NdcjOLCuJnV9HTnpaEoxCs">CFG::linkage_config.announcement</code>，孩子端首页顶部自动展示（悬浮公告条）。孩子端每 3 分钟 + 回前台自动刷新，无需等每天 24 点。</div>
     </div>
     <div class="card">
       <h3 style="margin:0 0 4px">📜 公告明细（#407）</h3>
@@ -98,135 +99,167 @@
   </div>
 
   <!-- 菜单初始顺序（#360） -->
-  <div id="pane-nav" hidden>
-    <div class="card">
-      <h3 style="margin:0 0 4px">菜单初始顺序设定</h3>
-      <div class="sub">
-        这里设定的顺序就是<b>所有用户</b>看到的「初始位置」：一级菜单作为默认顺序（用户可在系统设置里自行微调），<b>二级子菜单顺序完全锁定</b>，用户不可更改。发布后全端生效。
+  <div id="pane-nav" hidden data-page-node-id="a1ZGr5K6ypwPqXNH2tt8TE">
+    <div class="card" data-page-node-id="q2DL7SRH3oJWXUGIx9w3eK">
+      <h3 style="margin:0 0 4px" data-page-node-id="FDEd3FGwOMGCYLl5rGiHCX">菜单初始顺序设定</h3>
+      <div class="sub" data-page-node-id="R0ftGEwIRHdL9kxqxSMZrA">
+        这里设定的顺序就是<b data-page-node-id="5vSCWtAeLKvFy5MWRZ1IUY">所有用户</b>看到的「初始位置」：一级菜单作为默认顺序（用户可在系统设置里自行微调），<b data-page-node-id="kFQyILhPwhO0Kc1GisOc6e">二级子菜单顺序完全锁定</b>，用户不可更改。发布后全端生效。
       </div>
-      <div id="navTree" style="margin-top:8px"></div>
-      <div class="row">
-        <button class="btn" onclick="saveNavOrder()">🚀 发布到全站</button>
-        <button class="btn ghost" onclick="loadNavOrder()">↺ 还原为云端已存顺序</button>
-        <button class="btn ghost" onclick="clearNavOrder()">🗑️ 清除云端初始顺序（回到代码默认）</button>
-        <span id="navMsg" class="msg"></span>
+      <div id="navTree" style="margin-top:8px" data-page-node-id="2BgqzX4gyOt3kf9bSEmwoJ"></div>
+      <div class="row" data-page-node-id="huGxfoABEZuKZthtdzxMXa">
+        <button class="btn" onclick="saveNavOrder()" data-page-node-id="DmLQRKkshKBscxVAuPgTB9">🚀 发布到全站</button>
+        <button class="btn ghost" onclick="loadNavOrder()" data-page-node-id="5vExmbBgslqVvJwUhHoRzv">↺ 还原为云端已存顺序</button>
+        <button class="btn ghost" onclick="clearNavOrder()" data-page-node-id="8hxwOtoW9OCxFVaAOlq86A">🗑️ 清除云端初始顺序（回到代码默认）</button>
+        <span id="navMsg" class="msg" data-page-node-id="HMuNlSoKz6In1WDPFKSoBX"></span>
       </div>
-      <div class="sub" style="margin-top:12px">提示：数据存储于云端 <code>CFG::linkage_config.navOrder</code>，与全站公告同一配置文档。</div>
+      <div class="sub" style="margin-top:12px" data-page-node-id="5S4IO9aRonnISqZjFZ48th">提示：数据存储于云端 <code data-page-node-id="d38GMLDLMgDlmICrBAQyrD">CFG::linkage_config.navOrder</code>，与全站公告同一配置文档。</div>
     </div>
   </div>
 
   <!-- 运营监控 -->
-  <div id="pane-mon" hidden>
-    <div id="abuseBox" hidden></div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h3 style="margin:0">核心指标</h3>
-        <button class="btn ghost" onclick="loadStats()">↺ 刷新</button>
+  <div id="pane-mon" hidden data-page-node-id="lB6zFKguLb2BBKHVMAi6tF">
+    <div id="abuseBox" hidden data-page-node-id="IztLdOPILntAvr6eyqMW3d"></div>
+    <div class="card" data-page-node-id="1Fm6P8TgL7fa0HxNXAsKCT">
+      <div class="row" style="justify-content:space-between" data-page-node-id="a1bVB8FE8lMzratDC88xHa">
+        <h3 style="margin:0" data-page-node-id="3KFg4lVhqw4J57tnFHgjuN">核心指标</h3>
+        <button class="btn ghost" onclick="loadStats()" data-page-node-id="c25gmMGMQ5IuaerFmFvaIR">↺ 刷新</button>
       </div>
-      <div class="grid" id="metrics" style="margin-top:12px"></div>
-      <div id="statsMsg" class="msg"></div>
+      <div class="grid" id="metrics" style="margin-top:12px" data-page-node-id="frNCoM2iLkOq0X4VgYZ2D1"></div>
+      <div id="statsMsg" class="msg" data-page-node-id="mnMHVHWC1REzlnq5Njlvdw"></div>
     </div>
-    <div class="card">
-      <h3 style="margin:0 0 10px">模块热度（点击次数 · 最喜爱功能）</h3>
-      <div class="sub">来自云端 <code>mx_events</code> 的模块点击上报，反映各功能点受欢迎程度。</div>
-      <div class="scroll"><table id="heatTable"><thead><tr><th>模块</th><th>点击量</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="card" data-page-node-id="JziVMpsCQlOAZ7mbT1TMSE">
+      <h3 style="margin:0 0 10px" data-page-node-id="kb7iDE6euuxbKDB0xmKX0z">模块热度（点击次数 · 最喜爱功能）</h3>
+      <div class="sub" data-page-node-id="k2i7ezMSZe7UFQvqxFQLe1">来自云端 <code data-page-node-id="UTT67gBeyiduMHBNA3FzUe">mx_events</code> 的模块点击上报，反映各功能点受欢迎程度。</div>
+      <div class="scroll" data-page-node-id="WRVicCNfkLsJB1FlEyFA6R"><table id="heatTable" data-page-node-id="4R2GYFzyFzKMYdXU9H6BLa"><thead data-page-node-id="l4gRppNBi2wZgV81v3pHlh"><tr data-page-node-id="wNj84Z6rTGLtt7S5WLJv55"><th data-page-node-id="9iotsgBzUMTCXlCsqgCT58">模块</th><th data-page-node-id="0yZigFK6cCsnozLccEz1LE">点击量</th><th data-page-node-id="gnfoJewS3oxKddkVxcgGfv"></th></tr></thead><tbody data-page-node-id="Dc4Pojor7hac8lxEehroY3"></tbody></table></div>
     </div>
-    <div class="card">
-      <h3 style="margin:0 0 6px">安全与违规</h3>
-      <div class="sub">疑似多设备共享卡密、近 30 天激活、安全日志数见上方核心指标。下为最近安全日志（服务端记录）。</div>
-      <div id="secInfo" class="sub"></div>
+    <div class="card" data-page-node-id="QtPAurQywa0Vo2oyaJW3pQ">
+      <h3 style="margin:0 0 6px" data-page-node-id="WtugHU9ljBmmTmPvRclt2g">安全与违规</h3>
+      <div class="sub" data-page-node-id="KimQ7uks0CC5X5Ev3K56kc">疑似多设备共享卡密、近 30 天激活、安全日志数见上方核心指标。下为最近安全日志（服务端记录）。</div>
+      <div id="secInfo" class="sub" data-page-node-id="FeDH0H6WPuYa62w0yR7Gyh"></div>
     </div>
   </div>
 
   <!-- 用户反馈 -->
-  <div id="pane-fb" hidden>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h3 style="margin:0">用户反馈列表</h3>
-        <span style="display:flex;gap:8px">
-          <button class="btn ghost sm" onclick="exportCSV('fbTable','用户反馈表')">⬇ 导出 CSV</button>
-          <button class="btn ghost sm" onclick="loadFeedback()">↺ 刷新</button>
+  <div id="pane-fb" hidden data-page-node-id="1m1Ls3ddAq3J7C8oRFEJDr">
+    <div class="card" data-page-node-id="tjUpGGZyZyQnhGOHokMUab">
+      <div class="row" style="justify-content:space-between" data-page-node-id="5LbNjzPFIzAypTuDuvBk2J">
+        <h3 style="margin:0" data-page-node-id="mbnTUTQt6GuDnGfDK7OFu4">用户反馈列表</h3>
+        <span style="display:flex;gap:8px" data-page-node-id="uRI2zhX0pmsEIaiNlZLbbt">
+          <button class="btn ghost sm" onclick="exportCSV('fbTable','用户反馈表')" data-page-node-id="YAaVou5ZRKS5dTMV8nJFaH">⬇ 导出 CSV</button>
+          <button class="btn ghost sm" onclick="loadFeedback()" data-page-node-id="NKFLHR4ses0lw0AkGD1UOs">↺ 刷新</button>
         </span>
       </div>
-      <div class="sub">用户在「建议与反馈」模块提交的内容会同步到云端 <code>Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
-      <div class="scroll"><table id="fbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>账号</th><th>原激活卡密</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+      <div class="sub" data-page-node-id="VOuz6vxIQKjU6I7ya6SPhk">用户在「建议与反馈」模块提交的内容会同步到云端 <code data-page-node-id="iX5n67d9n7LlfVRx0cTQdm">Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
+      <div class="scroll" data-page-node-id="FPFH7WbRABWtfTCChgTLBr"><table id="fbTable" data-page-node-id="ZRsoLbfrEzGS9HTJrK838Z"><thead data-page-node-id="BQOQncseyU2IkPDDqvKFMz"><tr data-page-node-id="kVr4lqjnjwADQKQE9FdFL2"><th data-page-node-id="gAdEAk4vgHpXh0GYrOPXGB">时间</th><th data-page-node-id="l94acfnVRAX6oEoqJ5RITO">称呼</th><th data-page-node-id="9zJHqHpIDjgfk3oZduLG75">联系方式</th><th data-page-node-id="7MAUrfn9sBBlLgpfJXCMYE">账号</th><th data-page-node-id="0DhVbGS3exAvC52NPqB7xK">原激活卡密</th><th data-page-node-id="67WDWW58HSYt7U2g7Dquy7">来源页</th><th data-page-node-id="6KA2fVgrUzYRymnZn5IwL0">反馈内容</th></tr></thead><tbody data-page-node-id="1DoPgBHg0ozdStxlBgCJSF"></tbody></table></div>
     </div>
   </div>
 
   <!-- 数据明细 -->
-  <div id="pane-data" hidden>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h3 style="margin:0">📋 云端数据表可视化</h3>
-        <button class="btn ghost" onclick="loadData()">↺ 刷新</button>
+  <div id="pane-data" hidden data-page-node-id="hZC7DgcoRKaODR4EW1Rjga">
+    <div class="card" data-page-node-id="TSpszmPUR9wYOPvzeuxVEi">
+      <div class="row" style="justify-content:space-between" data-page-node-id="YBEFdK2LDcNdxvsqIbQ0WC">
+        <h3 style="margin:0" data-page-node-id="C984bz1nCV5eI0KIYfTTev">📋 云端数据表可视化</h3>
+        <button class="btn ghost" onclick="loadData()" data-page-node-id="2FUuFI595OAizplPFShOn4">↺ 刷新</button>
       </div>
-      <div class="sub">直接读取云端各集合内容：卡密绑定设备表、账号表、反馈表、各用户云调用次数（流量近似）。</div>
-      <div class="grid" id="dataCounts" style="margin-top:10px"></div>
-      <span id="dataMsg" class="msg"></span>
+      <div class="sub" data-page-node-id="nMv6qwezCHGW7sSVQiQDZw">直接读取云端各集合内容：卡密绑定设备表、账号表、反馈表、各用户云调用次数（流量近似）。</div>
+      <div class="grid" id="dataCounts" style="margin-top:10px" data-page-node-id="aHa3yLpyGWZUYi6NvWRTzz"></div>
+      <span id="dataMsg" class="msg" data-page-node-id="Hczpwxxv7yfnQ9LshMZ35J"></span>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-top:0">
-        <h3 style="margin:0">🔑 卡密绑定设备表 <code>card_activation</code></h3>
-        <button class="btn ghost sm" onclick="exportCSV('cardsTable','卡密绑定设备表')">⬇ 导出 CSV</button>
+    <div class="card" data-page-node-id="BWBCRSf92hZIM44dNHuWzp">
+      <div class="row" style="justify-content:space-between;margin-top:0" data-page-node-id="aIVAWVE4YznDvNnFUl1G4Z">
+        <h3 style="margin:0" data-page-node-id="3cVAjHgBI1r87ODbnsnAdG">🔑 卡密绑定设备表 <code data-page-node-id="vxCgmqimBQ1qDKNhv1yXeN">card_activation</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('cardsTable','卡密绑定设备表')" data-page-node-id="eg4WX0ceeEba21k3xDIvUC">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll"><table id="cardsTable"><thead><tr><th>卡号(脱敏)</th><th>类型</th><th>等级</th><th>状态</th><th>绑定UID</th><th>使用设备</th><th>首绑设备</th><th>激活时间</th><th>有效期</th><th>有效期(天)</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll" data-page-node-id="mcnSblMrYTAJa22JrxTcDr"><table id="cardsTable" data-page-node-id="lk03RtghakFu0WPgN5GWoF"><thead data-page-node-id="eLdvsHpOq3gEfWiQsOmcFl"><tr data-page-node-id="5Ar5kEpuIQobCYaJ9fxZtW"><th data-page-node-id="EMs7CjIJOeD4FRt1J4vkQS">卡号(脱敏)</th><th data-page-node-id="3XBuc7pDGftbr0HfWgSuZ4">类型</th><th data-page-node-id="dmInumrHqmVmUXvGZfCjvT">等级</th><th data-page-node-id="ld13aJ7Cd5uE6lZgffk5WZ">状态</th><th data-page-node-id="UkyYBv5LiR3Kv7nrWNxHCq">绑定UID</th><th data-page-node-id="oFWjCugPak9RNh4r1hgGRl">使用设备</th><th data-page-node-id="fe9FhLCEa7aFBc4318BVCG">首绑设备</th><th data-page-node-id="Zum50KlZLadkgS5NndB44P">激活时间</th><th data-page-node-id="wwS9YvVcUjnXiYP4OSGGyM">有效期</th><th data-page-node-id="C18MWG0kMVVqrwdGaKCGRG">有效期(天)</th></tr></thead><tbody data-page-node-id="SzxxgR2xNwbOsJCYvT6VSh"></tbody></table></div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-top:0">
-        <h3 style="margin:0">👤 账号密码表 <code>mx_users</code></h3>
-        <button class="btn ghost sm" onclick="exportCSV('usersTable','账号密码表')">⬇ 导出 CSV</button>
+    <div class="card" data-page-node-id="WVmjCEiopEcUdroVxAUIMm">
+      <div class="row" style="justify-content:space-between;margin-top:0" data-page-node-id="HtH8BO2lsG3GGK6dfg1VB5">
+        <h3 style="margin:0" data-page-node-id="64oJJ61fhgDTs8umJ9ZhfV">👤 账号密码表 <code data-page-node-id="JR0kPEvRrEQo0109Ro4OWY">mx_users</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('usersTable','账号密码表')" data-page-node-id="Jzx6cNak07AQifKL98A5tC">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll"><table id="usersTable"><thead><tr><th>账号</th><th>UID</th><th>类型</th><th>验证状态</th><th>注册日期</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll" data-page-node-id="DxslJN5c3NqyCNPHF2AVf9"><table id="usersTable" data-page-node-id="rOA9q1wxETW19RviUtOhVQ"><thead data-page-node-id="DcPuKD3EK2BGr7JCohLsGf"><tr data-page-node-id="y2DM4Ns3MTsR8IiGKr7VYL"><th data-page-node-id="d3gZ7SSxZBln9u3dGIAB24">账号</th><th data-page-node-id="tqR5RgTVcl1ES0wt9TR5Ar">UID</th><th data-page-node-id="618cDHj0jKNXa1TWV0OmDP">类型</th><th data-page-node-id="zIOT1rbmmtL4fL87LHUwtz">验证状态</th><th data-page-node-id="AYllHOk5fK8bMClWrBD0uh">注册日期</th><th data-page-node-id="aqRndBUG7OBvx9nwlZNJmO">操作</th></tr></thead><tbody data-page-node-id="T8Thyi5Yj1jjYVCJkfmYwG"></tbody></table></div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-top:0">
-        <h3 style="margin:0">💌 反馈表 <code>Feedback</code></h3>
-        <button class="btn ghost sm" onclick="exportCSV('dataFbTable','用户反馈表')">⬇ 导出 CSV</button>
+    <div class="card" data-page-node-id="Kaipd3JAcxCb8ww62SxLvg">
+      <div class="row" style="justify-content:space-between;margin-top:0" data-page-node-id="9heCpU1Cl3aNCBeGLQPrRt">
+        <h3 style="margin:0" data-page-node-id="v3Sb3hZYCT0UXrRUpnXSOW">💌 反馈表 <code data-page-node-id="94eFm6L9HjYPWLdLx0Gaa0">Feedback</code></h3>
+        <button class="btn ghost sm" onclick="exportCSV('dataFbTable','用户反馈表')" data-page-node-id="qQrKGIQTlqQoGir0mCZmLe">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll"><table id="dataFbTable"><thead><tr><th>时间</th><th>称呼</th><th>联系方式</th><th>账号</th><th>原激活卡密</th><th>来源页</th><th>反馈内容</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll" data-page-node-id="Ly45D6WHwAEUS4DGBiqIe9"><table id="dataFbTable" data-page-node-id="qQb2ZAnGM80jV6Ux3mQPBU"><thead data-page-node-id="qWyVAqIEE0aIjFVUo8O5CR"><tr data-page-node-id="6STdO270yXwW6OhZDG2A4m"><th data-page-node-id="IE0p5Hdc5Zt2yWiiVWcRB2">时间</th><th data-page-node-id="v9DwN469GycH6B0sdOkI0V">称呼</th><th data-page-node-id="Bk0yWO2U1ZAcQJQAa9iCOo">联系方式</th><th data-page-node-id="nM6WBRxKE2GnyIXushwQKq">账号</th><th data-page-node-id="l46gwwOOJIujqMZXsEMv8F">原激活卡密</th><th data-page-node-id="852QTJesKFv6YJEuIUwkZD">来源页</th><th data-page-node-id="IopN0ibBHNw7uOZDBrozoD">反馈内容</th></tr></thead><tbody data-page-node-id="Zn5mG14CTDQqK7Kl0mj49G"></tbody></table></div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-top:0">
-        <h3 style="margin:0">📡 各用户云调用次数 <code>mx_track</code>（上下行流量近似）</h3>
-        <button class="btn ghost sm" onclick="exportCSV('usageTable','云调用次数表')">⬇ 导出 CSV</button>
+    <div class="card" data-page-node-id="GMd7RsjQ7aRsxZBtHkFf4l">
+      <div class="row" style="justify-content:space-between;margin-top:0" data-page-node-id="v3RJrNFNjp3nW5laR6rr7h">
+        <h3 style="margin:0" data-page-node-id="FPzal60o3zYVBw8uapUreF">📡 各用户云调用次数 <code data-page-node-id="L6lA8eelksDnKep9XEjCoh">mx_track</code>（上下行流量近似）</h3>
+        <button class="btn ghost sm" onclick="exportCSV('usageTable','云调用次数表')" data-page-node-id="62qBQjxuORSP7Iazme2cQP">⬇ 导出 CSV</button>
       </div>
-      <div class="hint">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
-      <div class="scroll"><table id="usageTable"><thead><tr><th>账号 / UID</th><th>调用次数</th><th>⬆ 上行</th><th>⬇ 下行</th><th>占比</th></tr></thead><tbody></tbody></table></div>
+      <div class="hint" data-page-node-id="YRxsii1hqfZVJgCAkXYXWj">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
+      <div class="scroll" data-page-node-id="tc8CsZU2sTEBxpyYfvCJia"><table id="usageTable" data-page-node-id="DFlLsXqxTU5zV0BeU0wHNk"><thead data-page-node-id="cXz5ih1NUFIFtUAVSJzLLJ"><tr data-page-node-id="oC05WeSjAHJLnuEOAtU9O6"><th data-page-node-id="3gdcgVXNdBQy1mfqGU5viZ">账号 / UID</th><th data-page-node-id="NDIDT4jxIoAygW0YYtphDr">调用次数</th><th data-page-node-id="cyXhGSlceIYfzf3v9KOV0s">⬆ 上行</th><th data-page-node-id="q415up2">⬇ 下行</th><th data-page-node-id="q415bar">占比</th></tr></thead><tbody data-page-node-id="oubnvtlfRLjy8x1sJLRLjI"></tbody></table></div>
     </div>
   </div>
 
   <!-- 账号安全 -->
-  <div id="pane-sec" hidden>
-    <div class="card">
-      <h3 style="margin:0 0 10px">🔑 修改密码</h3>
-      <div class="sub">修改后需重新登录。所有设备的登录会话将自动注销。</div>
-      <label>当前密码</label>
-      <input id="oldPass" type="password" placeholder="输入当前密码" autocomplete="off">
-      <label>新密码（至少 6 位）</label>
-      <input id="newPass" type="password" placeholder="输入新密码" autocomplete="off">
-      <label>确认新密码</label>
-      <input id="newPass2" type="password" placeholder="再次输入新密码" autocomplete="off">
-      <div class="row" style="margin-top:12px">
-        <button class="btn" onclick="doChangePass()">✅ 修改密码</button>
-        <span id="cpMsg" class="msg"></span>
+  <div id="pane-sec" hidden data-page-node-id="LQ4YqiN9nBypOZsd34iUGs">
+    <div class="card" data-page-node-id="2HxBWAIwFl437FskmhzXHM">
+      <h3 style="margin:0 0 10px" data-page-node-id="MEjds7vRXGX52BXdyDrlwv">🔑 修改密码</h3>
+      <div class="sub" data-page-node-id="gNJGGltrWRhwgo5py7f6xl">修改后需重新登录。所有设备的登录会话将自动注销。</div>
+      <label data-page-node-id="fwH5GrjieIq9qCy2bEiIgL">当前密码</label>
+      <input id="oldPass" type="password" placeholder="输入当前密码" autocomplete="off" data-page-node-id="ZZP2owlxsuDHGrzNraPkqR">
+      <label data-page-node-id="wdaiLL04LD4tlMK0dt6um5">新密码（至少 6 位）</label>
+      <input id="newPass" type="password" placeholder="输入新密码" autocomplete="off" data-page-node-id="XZfU2OW3SRS3MF4aWyeC2L">
+      <label data-page-node-id="Ix12wgHcx5HjunUqI5IcfI">确认新密码</label>
+      <input id="newPass2" type="password" placeholder="再次输入新密码" autocomplete="off" data-page-node-id="3BxpBB8i44KABblebp5RAI">
+      <div class="row" style="margin-top:12px" data-page-node-id="Cg3KheTNKkd5AuleFekKkJ">
+        <button class="btn" onclick="doChangePass()" data-page-node-id="9wunHgEYKUrmkiHki52qHl">✅ 修改密码</button>
+        <span id="cpMsg" class="msg" data-page-node-id="LnyhMyrnL8tCsHlAMkcKG8"></span>
       </div>
     </div>
 
+    <div class="card" data-page-node-id="SVGvyVOKvSKpFK7PURsy8P">
+      <h3 style="margin:0 0 10px" data-page-node-id="cZguSbXxivQC72ypYkZQwk">🛡️ 安全问题</h3>
+      <div class="sub" data-page-node-id="NoTmNDPPfWRgVSkcXVpnwP">设置安全问题后，若忘记密码可通过问题验证重置（未来功能）。答案经哈希存储，不可逆。</div>
+      <div id="secQStatus" class="sub" data-page-node-id="t1W8tLPKgPCkOQ2t2tlwcV"></div>
+      <label data-page-node-id="xanIsex83a5rHMkLwaZQsU">安全问题</label>
+      <input id="secQ" type="text" placeholder="例如：你小学的学校名是什么？" autocomplete="off" data-page-node-id="0kM9yGaXhvMQJCNEL9KLPV">
+      <label data-page-node-id="YvL88DnsbRn0VI56FgIpNO">答案</label>
+      <input id="secA" type="password" placeholder="输入答案（请牢记）" autocomplete="off" data-page-node-id="tSmS6W2SNoOdIhllAazgYU">
+      <div class="row" style="margin-top:12px" data-page-node-id="NMkzfAkiq2s6eMKn0wKji9">
+        <button class="btn" onclick="doSetSecQ()" data-page-node-id="2iMtHb8yHvF2Wso8T7guCa">💾 保存安全问题</button>
+        <span id="sqMsg" class="msg" data-page-node-id="w9xWDeAM86GcwncT6MR2dc"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 商品配置（#421-d） -->
+  <div id="pane-goods" hidden>
     <div class="card">
-      <h3 style="margin:0 0 10px">🛡️ 安全问题</h3>
-      <div class="sub">设置安全问题后，若忘记密码可通过问题验证重置（未来功能）。答案经哈希存储，不可逆。</div>
-      <div id="secQStatus" class="sub"></div>
-      <label>安全问题</label>
-      <input id="secQ" type="text" placeholder="例如：你小学的学校名是什么？" autocomplete="off">
-      <label>答案</label>
-      <input id="secA" type="password" placeholder="输入答案（请牢记）" autocomplete="off">
-      <div class="row" style="margin-top:12px">
-        <button class="btn" onclick="doSetSecQ()">💾 保存安全问题</button>
-        <span id="sqMsg" class="msg"></span>
+      <h3 style="margin:0 0 4px">🛍️ 商品配置（萌星好物 / 积分兑换）</h3>
+      <div class="sub">上架 / 下架、调价、改库存均在此配置，点「发布」后全端生效。数据存于云端 <code>CFG::linkage_config.goods</code>。某分类留空数组 <code>[]</code> = 该分类不展示。孩子端每 3 分钟自动刷新。</div>
+
+      <div class="row" style="justify-content:space-between;margin-top:6px">
+        <h3 style="margin:0">⭐ 积分兑换商品（SHOP_GOODS）</h3>
+        <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="resetGoods('shop')">↺ 重置默认</button>
+          <button class="btn ghost sm" onclick="loadGoods()">↺ 刷新</button>
+        </span>
+      </div>
+      <div class="sub">字段：<code>id</code> / <code>name</code> / <code>emoji</code> / <code>cost</code>(积分) / <code>tag</code> / <code>desc</code>。下架某商品即从数组删除该行。</div>
+      <textarea id="goodsShop" rows="10" style="font-family:monospace"></textarea>
+
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <h3 style="margin:0">🏪 萌星好物（MALL_PRODUCTS）</h3>
+        <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="resetGoods('mall')">↺ 重置默认</button>
+        </span>
+      </div>
+      <div class="sub">字段：<code>id</code> / <code>name</code> / <code>emoji</code> / <code>price</code> / <code>vipPrice</code>(可选) / <code>tag</code> / <code>desc</code> / <code>url</code>。<code>price</code> 如 <code>"¥199"</code>。</div>
+      <textarea id="goodsMall" rows="10" style="font-family:monospace"></textarea>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="saveGoods()">🚀 发布商品配置到全站</button>
+        <span id="goodsMsg" class="msg"></span>
       </div>
     </div>
   </div>
@@ -281,7 +314,7 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','nav','mon','fb','data','sec'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec','goods'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
@@ -289,6 +322,7 @@ function switchTab(t){
   if (t==='data') loadData();
   if (t==='sec') loadSecQ();
   if (t==='nav') loadNavOrder();
+  if (t==='goods') loadGoods();
 }
 
 async function loadAnnounce(){
@@ -309,6 +343,7 @@ async function saveAnnounce(){
   if (r && r.ok) { setMsg('annMsg','✅ 已发布，全站用户即将看到','ok'); loadAnnLog(); }
   else setMsg('annMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
 }
+
 /* [#407 公告明细] 拉取最近 50 条发布归档 */
 async function loadAnnLog(){
   try {
@@ -696,6 +731,51 @@ async function doSetSecQ(){
     if(r&&r.ok){setMsg('sqMsg','✅ '+r.msg,'ok');loadSecQ();}
     else{setMsg('sqMsg','❌ '+((r&&r.msg)||'保存失败'),'bad');}
   }catch(e){setMsg('sqMsg','❌ 网络错误','bad');}
+}
+
+/* [#421-d 商品配置] 默认数组（与 index.html SHOP_GOODS/MALL_PRODUCTS 对齐；首次无云端配置时回填编辑器） */
+const DEFAULT_SHOP_GOODS = [
+  {id:'gacha_ticket', name:'盲盒抽奖券', emoji:'🎟️', cost:50, tag:'热门', desc:'兑换1张盲盒抽卡券，集齐6大主题角色'},
+  {id:'hint_card', name:'智慧提示卡×5', emoji:'💡', cost:40, tag:'学习', desc:'做题遇到困难时使用提示，轻松过关'},
+  {id:'pet_food', name:'宠物粮食×10', emoji:'🍖', cost:30, tag:'宠物', desc:'喂养宠物，提升好感度'},
+  {id:'badge_star', name:'闪亮勋章', emoji:'🏅', cost:80, tag:'荣誉', desc:'个人主页展示专属成就勋章'},
+  {id:'skin_rainbow', name:'彩虹主题皮肤', emoji:'🌈', cost:120, tag:'装扮', desc:'首页与游戏界面切换为彩虹配色'},
+  {id:'vip_day', name:'VIP体验卡(7天)', emoji:'👑', cost:200, tag:'VIP', desc:'解锁全部VIP特权7天'},
+  {id:'toy_pack', name:'实物周边兑换券', emoji:'🎁', cost:500, tag:'实物', desc:'兑换萌星周边实体礼包（包邮）'}
+];
+const DEFAULT_MALL_PRODUCTS = [
+  {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'硬件', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
+  {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'礼盒', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
+  {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'教具', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
+  {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
+  {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
+  {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
+];
+async function loadGoods(){
+  setMsg('goodsMsg','加载中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY });
+    const g = (r && r.goods) || {};
+    $('goodsShop').value = JSON.stringify(g.shop && g.shop.length ? g.shop : DEFAULT_SHOP_GOODS, null, 2);
+    $('goodsMall').value = JSON.stringify(g.mall && g.mall.length ? g.mall : DEFAULT_MALL_PRODUCTS, null, 2);
+    setMsg('goodsMsg', (r && r.ok) ? '已读取当前商品配置' : '读取失败', 'sub');
+  } catch(e){ setMsg('goodsMsg','读取失败：'+String(e.message||e),'bad'); }
+}
+function resetGoods(which){
+  if (!confirm('确认将「'+(which==='shop'?'积分兑换商品':'萌星好物')+'」重置为代码默认？当前编辑框内容将被覆盖（未发布的改动会丢失）。')) return;
+  if (which==='shop') $('goodsShop').value = JSON.stringify(DEFAULT_SHOP_GOODS, null, 2);
+  else $('goodsMall').value = JSON.stringify(DEFAULT_MALL_PRODUCTS, null, 2);
+  setMsg('goodsMsg','已重置为默认（点发布才生效）','warn');
+}
+async function saveGoods(){
+  let shop, mall;
+  try { shop = JSON.parse($('goodsShop').value); } catch(e){ setMsg('goodsMsg','❌ 积分商品 JSON 解析失败：'+String(e.message||e),'bad'); return; }
+  try { mall = JSON.parse($('goodsMall').value); } catch(e){ setMsg('goodsMsg','❌ 好物 JSON 解析失败：'+String(e.message||e),'bad'); return; }
+  if (!Array.isArray(shop) || !Array.isArray(mall)) { setMsg('goodsMsg','❌ 两项都必须是 JSON 数组','bad'); return; }
+  setMsg('goodsMsg','发布中…','sub');
+  const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'set', goods:{ shop: shop, mall: mall } });
+  if (r && r.ok) setMsg('goodsMsg','✅ 已发布，全端用户刷新后生效','ok');
+  else setMsg('goodsMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
 }
 </script>
 </body>

@@ -6834,6 +6834,9 @@ html, body {
 /* [rootfix 2026-09-07] 新增两档失败态：可点击重试，与「仅本地」明确区分 */
 .mx-sync-badge.vipfail { background: #fff8e1; color: #b26a00; border-color: #ffe082; cursor: pointer; }
 .mx-sync-badge.error { background: #fdecea; color: #c0392b; border-color: #f5c6c2; cursor: pointer; }
+.mx-force-sync-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: linear-gradient(135deg,#7b5cff,#a06bff); color: #fff; border: 1px solid #c9b6ff; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 8px rgba(123,92,255,.25); }
+.mx-force-sync-btn:hover { filter: brightness(1.05); }
+.mx-force-sync-btn:disabled { opacity: .6; cursor: default; }
 .mx-sync-badge.cloud { background: #e8f7ee; color: #2e9e5b; border-color: #bfe8cd; }
 .mx-sync-badge.syncing { background: #eaf1ff; color: #3f7ef5; border-color: #c5d8ff; }
 .mx-sync-badge.offline { background: #fdecec; color: #e0533d; border-color: #f6c9c9; }
@@ -7156,6 +7159,7 @@ html, body {
   .gx-pet-avatar { width: 18px; height: 18px; font-size: 12px; }
   .gx-pet-status { font-size: 10px; }
   .mx-sync-badge { padding: 2px 5px; font-size: 10px; }
+  .mx-force-sync-btn { padding: 2px 5px; font-size: 10px; }
   #header-parent-btn { padding: 2px 6px; font-size: 11px; }
 }
 /* ⑧ 手机横屏整体缩放 10%（等效 Ctrl+滚轮缩小，缓解按压困难和视觉遮挡） */
@@ -7262,6 +7266,7 @@ html, body {
         <span class="mode-badge" id="mode-badge" data-page-node-id="p0cBADwFBDyZ8A4OGHONtb">🧒 儿童模式</span>
         <button type="button" class="header-parent-btn no-print" id="header-parent-btn" title="进入家长工作台（需验证）" data-page-node-id="zkCAChkAFfRyXh3OVpVX4g">👨‍👩‍👧 家长</button>
         <span class="mx-sync-badge" id="mx-sync-badge" title="云端同步状态" data-page-node-id="FzTE7G6cWDbqbQsh0Egsxk">💾 仅本地</span>
+        <button type="button" class="mx-force-sync-btn no-print" id="mx-force-sync-btn" title="VIP 多端强制同步：拉取云端最新并回推本机，双向对齐所有设备" style="display:none">🔄 强制同步</button>
 
         <!-- 预留：阳光/星星积分面板（阶段二实现） -->
 
@@ -15794,37 +15799,37 @@ window.MX_SEED = data;
       { id: 'paw_rocks', name: '灰灰', emoji: '♻️', rarity:'史诗' }
     ]},
     shanhai: { name: 'AI山海经', color: '#4db6ac', emoji: '🐉', motto: '小怪兽偷走了灵气，快召唤灵兽守护灵境！', summonVerb: '召唤', enemy: '🐒', enemyName: '偷灵小怪兽', chars: [
-      { id: 'sh_hippo', name: '仙人河马', emoji: '🦛', rarity: '史诗', img: 'assets/images/shanhai/sh_hippo.png' },
-      { id: 'sh_elephant', name: '仙人象', emoji: '🐘', rarity: '史诗', img: 'assets/images/shanhai/sh_elephant.png' },
-      { id: 'sh_capybara', name: '卡皮巴椰', emoji: '🦫', rarity: '传说', img: 'assets/images/shanhai/sh_capybara.png' },
-      { id: 'sh_ninja', name: '咖啡忍者', emoji: '☕', rarity: '稀有', img: 'assets/images/shanhai/sh_ninja.png' },
-      { id: 'sh_bigfoot', name: '大脚怪', emoji: '🦶', rarity: '稀有', img: 'assets/images/shanhai/sh_bigfoot.png' },
-      { id: 'sh_cow', name: '星球奶牛', emoji: '🐄', rarity: '史诗', img: 'assets/images/shanhai/sh_cow.png' },
-      { id: 'sh_stick', name: '木棍人', emoji: '🪵', rarity: '普通', img: 'assets/images/shanhai/sh_stick.png' },
-      { id: 'sh_pig', name: '炸弹猪', emoji: '🐷', rarity: '史诗', img: 'assets/images/shanhai/sh_pig.png' },
-      { id: 'sh_catfish', name: '猫鱼', emoji: '🐱', rarity: '普通', img: 'assets/images/shanhai/sh_catfish.png' },
-      { id: 'sh_salt', name: '盐罐', emoji: '🧂', rarity: '普通', img: 'assets/images/shanhai/sh_salt.png' },
-      { id: 'sh_peach', name: '羊桃', emoji: '🍑', rarity: '稀有', img: 'assets/images/shanhai/sh_peach.png' },
-      { id: 'sh_shark', name: '耐克鲨鱼', emoji: '🦈', rarity: '稀有', img: 'assets/images/shanhai/sh_shark.png' },
-      { id: 'sh_fish', name: '胖头鱼', emoji: '🐟', rarity: '普通', img: 'assets/images/shanhai/sh_fish.png' },
-      { id: 'sh_teapot', name: '茶壶', emoji: '🫖', rarity: '普通', img: 'assets/images/shanhai/sh_teapot.png' },
-      { id: 'sh_teacup', name: '茶杯', emoji: '☕', rarity: '普通', img: 'assets/images/shanhai/sh_teacup.png' },
-      { id: 'sh_octopus', name: '茸茸章鱼', emoji: '🐙', rarity: '稀有', img: 'assets/images/shanhai/sh_octopus.png' },
-      { id: 'sh_strawberry', name: '草莓骑士', emoji: '🍓', rarity: '普通', img: 'assets/images/shanhai/sh_strawberry.png' },
-      { id: 'sh_gorilla3', name: '菠萝猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla3.png' },
-      { id: 'sh_honey', name: '蜜罐', emoji: '🍯', rarity: '稀有', img: 'assets/images/shanhai/sh_honey.png' },
-      { id: 'sh_zebra', name: '西瓜斑马', emoji: '🦓', rarity: '传说', img: 'assets/images/shanhai/sh_zebra.png' },
-      { id: 'sh_gorilla', name: '西瓜猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla.png' },
-      { id: 'sh_crocoboy', name: '西瓜鳄', emoji: '🐊', rarity: '稀有', img: 'assets/images/shanhai/sh_crocoboy.png' },
-      { id: 'sh_melondeer', name: '西瓜鹿', emoji: '🦌', rarity: '稀有', img: 'assets/images/shanhai/sh_melondeer.png' },
-      { id: 'sh_tire', name: '轮胎蛙', emoji: '🐸', rarity: '普通', img: 'assets/images/shanhai/sh_tire.png' },
-      { id: 'sh_bird', name: '飞车鸟', emoji: '🐦', rarity: '稀有', img: 'assets/images/shanhai/sh_bird.png' },
-      { id: 'sh_banana', name: '香蕉猴子', emoji: '🐒', rarity: '普通', img: 'assets/images/shanhai/sh_banana.png' },
-      { id: 'sh_camel', name: '驼冰王', emoji: '🐪', rarity: '史诗', img: 'assets/images/shanhai/sh_camel.png' },
-      { id: 'sh_croco', name: '鳄鱼轰炸机', emoji: '🐊', rarity: '史诗', img: 'assets/images/shanhai/sh_croco.png' },
-      { id: 'sh_bomber', name: '鹅式轰炸机', emoji: '✈️', rarity: '稀有', img: 'assets/images/shanhai/sh_bomber.png' },
-      { id: 'sh_deer', name: '鹿鹿', emoji: '🦌', rarity: '普通', img: 'assets/images/shanhai/sh_deer.png' },
-      { id: 'sh_mouse', name: '鼠鼠', emoji: '🐭', rarity: '普通', img: 'assets/images/shanhai/sh_mouse.png' }
+      { id: 'sh_hippo', name: '仙人河马', emoji: '🦛', rarity: '史诗', img: 'assets/images/shanhai/sh_hippo.webp' },
+      { id: 'sh_elephant', name: '仙人象', emoji: '🐘', rarity: '史诗', img: 'assets/images/shanhai/sh_elephant.webp' },
+      { id: 'sh_capybara', name: '卡皮巴椰', emoji: '🦫', rarity: '传说', img: 'assets/images/shanhai/sh_capybara.webp' },
+      { id: 'sh_ninja', name: '咖啡忍者', emoji: '☕', rarity: '稀有', img: 'assets/images/shanhai/sh_ninja.webp' },
+      { id: 'sh_bigfoot', name: '大脚怪', emoji: '🦶', rarity: '稀有', img: 'assets/images/shanhai/sh_bigfoot.webp' },
+      { id: 'sh_cow', name: '星球奶牛', emoji: '🐄', rarity: '史诗', img: 'assets/images/shanhai/sh_cow.webp' },
+      { id: 'sh_stick', name: '木棍人', emoji: '🪵', rarity: '普通', img: 'assets/images/shanhai/sh_stick.webp' },
+      { id: 'sh_pig', name: '炸弹猪', emoji: '🐷', rarity: '史诗', img: 'assets/images/shanhai/sh_pig.webp' },
+      { id: 'sh_catfish', name: '猫鱼', emoji: '🐱', rarity: '普通', img: 'assets/images/shanhai/sh_catfish.webp' },
+      { id: 'sh_salt', name: '盐罐', emoji: '🧂', rarity: '普通', img: 'assets/images/shanhai/sh_salt.webp' },
+      { id: 'sh_peach', name: '羊桃', emoji: '🍑', rarity: '稀有', img: 'assets/images/shanhai/sh_peach.webp' },
+      { id: 'sh_shark', name: '耐克鲨鱼', emoji: '🦈', rarity: '稀有', img: 'assets/images/shanhai/sh_shark.webp' },
+      { id: 'sh_fish', name: '胖头鱼', emoji: '🐟', rarity: '普通', img: 'assets/images/shanhai/sh_fish.webp' },
+      { id: 'sh_teapot', name: '茶壶', emoji: '🫖', rarity: '普通', img: 'assets/images/shanhai/sh_teapot.webp' },
+      { id: 'sh_teacup', name: '茶杯', emoji: '☕', rarity: '普通', img: 'assets/images/shanhai/sh_teacup.webp' },
+      { id: 'sh_octopus', name: '茸茸章鱼', emoji: '🐙', rarity: '稀有', img: 'assets/images/shanhai/sh_octopus.webp' },
+      { id: 'sh_strawberry', name: '草莓骑士', emoji: '🍓', rarity: '普通', img: 'assets/images/shanhai/sh_strawberry.webp' },
+      { id: 'sh_gorilla3', name: '菠萝猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla3.webp' },
+      { id: 'sh_honey', name: '蜜罐', emoji: '🍯', rarity: '稀有', img: 'assets/images/shanhai/sh_honey.webp' },
+      { id: 'sh_zebra', name: '西瓜斑马', emoji: '🦓', rarity: '传说', img: 'assets/images/shanhai/sh_zebra.webp' },
+      { id: 'sh_gorilla', name: '西瓜猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla.webp' },
+      { id: 'sh_crocoboy', name: '西瓜鳄', emoji: '🐊', rarity: '稀有', img: 'assets/images/shanhai/sh_crocoboy.webp' },
+      { id: 'sh_melondeer', name: '西瓜鹿', emoji: '🦌', rarity: '稀有', img: 'assets/images/shanhai/sh_melondeer.webp' },
+      { id: 'sh_tire', name: '轮胎蛙', emoji: '🐸', rarity: '普通', img: 'assets/images/shanhai/sh_tire.webp' },
+      { id: 'sh_bird', name: '飞车鸟', emoji: '🐦', rarity: '稀有', img: 'assets/images/shanhai/sh_bird.webp' },
+      { id: 'sh_banana', name: '香蕉猴子', emoji: '🐒', rarity: '普通', img: 'assets/images/shanhai/sh_banana.webp' },
+      { id: 'sh_camel', name: '驼冰王', emoji: '🐪', rarity: '史诗', img: 'assets/images/shanhai/sh_camel.webp' },
+      { id: 'sh_croco', name: '鳄鱼轰炸机', emoji: '🐊', rarity: '史诗', img: 'assets/images/shanhai/sh_croco.webp' },
+      { id: 'sh_bomber', name: '鹅式轰炸机', emoji: '✈️', rarity: '稀有', img: 'assets/images/shanhai/sh_bomber.webp' },
+      { id: 'sh_deer', name: '鹿鹿', emoji: '🦌', rarity: '普通', img: 'assets/images/shanhai/sh_deer.webp' },
+      { id: 'sh_mouse', name: '鼠鼠', emoji: '🐭', rarity: '普通', img: 'assets/images/shanhai/sh_mouse.webp' }
     ]},
     beat:    { name: '节奏盒子', color: '#ba68c8', emoji: '🎵', motto: '无序噪音入侵舞台，快让角色登台演奏！', summonVerb: '安排登台', enemy: '📢', enemyName: '无序噪音', chars: [
       { id: 'bt_red', name: '红节奏', emoji: '🔴', rarity:'普通' },
@@ -16890,6 +16895,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         window.mxApiProxy('getConfig', { key: 'linkage_config' }).then(function (r) {
           if (r && r.ok && r.linkage) {
             window.MX_LINKAGE = r.linkage;
+            /* [#421-d] 云端「商品配置」：管理后台 → 🛍️ 商品配置 写入 linkage_config.goods（{shop,mall}），
+               覆盖前端 SHOP_GOODS/MALL_PRODUCTS 默认；renderShop/renderMall 经 MX_SHOP_GOODS()/MX_MALL_PRODUCTS() 取值 */
+            try {
+              if (r.linkage.goods && Array.isArray(r.linkage.goods.shop) && r.linkage.goods.shop.length) window.MX_GOODS_SHOP = r.linkage.goods.shop;
+              if (r.linkage.goods && Array.isArray(r.linkage.goods.mall) && r.linkage.goods.mall.length) window.MX_GOODS_MALL = r.linkage.goods.mall;
+            } catch (eG) {}
             /* [imgopt B] 管理端在配置表把 imgVer 改大 → 全端图片URL带新?v= → 强制刷新图鉴/卡面缓存 */
             try { var nv = parseInt(r.linkage.imgVer, 10); if (nv > 0) window.MX_IMG_VER = nv; } catch (e) {}
             /* [导航权限#360] 云端「菜单初始顺序」：管理后台 → 🧭 初始菜单顺序 写入 linkage_config.navOrder（平铺 {navId:权重}），
@@ -18520,7 +18531,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return a;
   }
   /* 角色立绘：优先用 assets/images/shanhai/<id>.png 真实原型，缺图自动回退 emoji（不影响可用性） */
-  function shImgPath(id) { return id ? ('assets/images/shanhai/' + id + '.png') : ''; }
+  function shImgPath(id) { return id ? ('assets/images/shanhai/' + id + '.webp') : ''; }
   function shArt(id, emoji, name, size) {
     size = size || 52;
     var ch = null;
@@ -18538,7 +18549,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var pool = shShuffle(SH_ALL.slice());
     SH_CHARS = pool.slice(0, 8).map(function (ch) {
       var c = Object.assign({}, ch);
-      c.img = c.img || ('assets/images/shanhai/' + c.id + '.png');
+      c.img = c.img || ('assets/images/shanhai/' + c.id + '.webp');
       return c;
     });
     while (SH_CHARS.length < 8) SH_CHARS.push({ id: 'sh_x' + SH_CHARS.length, name: '灵兽', emoji: '🐉', rarity: '普通', img: '' });
@@ -22521,6 +22532,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     {id:'toy_pack',     name:'实物周边兑换券', emoji:'🎁', cost:500, tag:'实物', desc:'兑换萌星周边实体礼包（包邮）'}
   ];
 
+  /* [#421-d] 云端商品配置取值器：优先用管理后台下发的 MX_GOODS_SHOP/MALL，回退本地默认 */
+  function MX_SHOP_GOODS(){ return (window.MX_GOODS_SHOP && window.MX_GOODS_SHOP.length) ? window.MX_GOODS_SHOP : SHOP_GOODS; }
+  function MX_MALL_PRODUCTS(){ return (window.MX_GOODS_MALL && window.MX_GOODS_MALL.length) ? window.MX_GOODS_MALL : MALL_PRODUCTS; }
+
   /* ---------- 数据：免费资源库 ---------- */
   var RESOURCE_CATALOG=[
     {id:'pointread', cat:'点读包', name:'幼小衔接点读包（拼音/识字）', emoji:'🔊', dir:'assets/audio/', note:'点读包音频，配套课本即点即读'},
@@ -22577,37 +22592,37 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       {id:'paw_rocks', name:'灰灰', emoji:'♻️', rarity:'史诗'}
     ]},
     {key:'shanhai', name:'AI山海经', emoji:'🐉', color:'#4db6ac', chars:[
-      { id: 'sh_hippo', name: '仙人河马', emoji: '🦛', rarity: '史诗', img: 'assets/images/shanhai/sh_hippo.png' },
-      { id: 'sh_elephant', name: '仙人象', emoji: '🐘', rarity: '史诗', img: 'assets/images/shanhai/sh_elephant.png' },
-      { id: 'sh_capybara', name: '卡皮巴椰', emoji: '🦫', rarity: '传说', img: 'assets/images/shanhai/sh_capybara.png' },
-      { id: 'sh_ninja', name: '咖啡忍者', emoji: '☕', rarity: '稀有', img: 'assets/images/shanhai/sh_ninja.png' },
-      { id: 'sh_bigfoot', name: '大脚怪', emoji: '🦶', rarity: '稀有', img: 'assets/images/shanhai/sh_bigfoot.png' },
-      { id: 'sh_cow', name: '星球奶牛', emoji: '🐄', rarity: '史诗', img: 'assets/images/shanhai/sh_cow.png' },
-      { id: 'sh_stick', name: '木棍人', emoji: '🪵', rarity: '普通', img: 'assets/images/shanhai/sh_stick.png' },
-      { id: 'sh_pig', name: '炸弹猪', emoji: '🐷', rarity: '史诗', img: 'assets/images/shanhai/sh_pig.png' },
-      { id: 'sh_catfish', name: '猫鱼', emoji: '🐱', rarity: '普通', img: 'assets/images/shanhai/sh_catfish.png' },
-      { id: 'sh_salt', name: '盐罐', emoji: '🧂', rarity: '普通', img: 'assets/images/shanhai/sh_salt.png' },
-      { id: 'sh_peach', name: '羊桃', emoji: '🍑', rarity: '稀有', img: 'assets/images/shanhai/sh_peach.png' },
-      { id: 'sh_shark', name: '耐克鲨鱼', emoji: '🦈', rarity: '稀有', img: 'assets/images/shanhai/sh_shark.png' },
-      { id: 'sh_fish', name: '胖头鱼', emoji: '🐟', rarity: '普通', img: 'assets/images/shanhai/sh_fish.png' },
-      { id: 'sh_teapot', name: '茶壶', emoji: '🫖', rarity: '普通', img: 'assets/images/shanhai/sh_teapot.png' },
-      { id: 'sh_teacup', name: '茶杯', emoji: '☕', rarity: '普通', img: 'assets/images/shanhai/sh_teacup.png' },
-      { id: 'sh_octopus', name: '茸茸章鱼', emoji: '🐙', rarity: '稀有', img: 'assets/images/shanhai/sh_octopus.png' },
-      { id: 'sh_strawberry', name: '草莓骑士', emoji: '🍓', rarity: '普通', img: 'assets/images/shanhai/sh_strawberry.png' },
-      { id: 'sh_gorilla3', name: '菠萝猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla3.png' },
-      { id: 'sh_honey', name: '蜜罐', emoji: '🍯', rarity: '稀有', img: 'assets/images/shanhai/sh_honey.png' },
-      { id: 'sh_zebra', name: '西瓜斑马', emoji: '🦓', rarity: '传说', img: 'assets/images/shanhai/sh_zebra.png' },
-      { id: 'sh_gorilla', name: '西瓜猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla.png' },
-      { id: 'sh_crocoboy', name: '西瓜鳄', emoji: '🐊', rarity: '稀有', img: 'assets/images/shanhai/sh_crocoboy.png' },
-      { id: 'sh_melondeer', name: '西瓜鹿', emoji: '🦌', rarity: '稀有', img: 'assets/images/shanhai/sh_melondeer.png' },
-      { id: 'sh_tire', name: '轮胎蛙', emoji: '🐸', rarity: '普通', img: 'assets/images/shanhai/sh_tire.png' },
-      { id: 'sh_bird', name: '飞车鸟', emoji: '🐦', rarity: '稀有', img: 'assets/images/shanhai/sh_bird.png' },
-      { id: 'sh_banana', name: '香蕉猴子', emoji: '🐒', rarity: '普通', img: 'assets/images/shanhai/sh_banana.png' },
-      { id: 'sh_camel', name: '驼冰王', emoji: '🐪', rarity: '史诗', img: 'assets/images/shanhai/sh_camel.png' },
-      { id: 'sh_croco', name: '鳄鱼轰炸机', emoji: '🐊', rarity: '史诗', img: 'assets/images/shanhai/sh_croco.png' },
-      { id: 'sh_bomber', name: '鹅式轰炸机', emoji: '✈️', rarity: '稀有', img: 'assets/images/shanhai/sh_bomber.png' },
-      { id: 'sh_deer', name: '鹿鹿', emoji: '🦌', rarity: '普通', img: 'assets/images/shanhai/sh_deer.png' },
-      { id: 'sh_mouse', name: '鼠鼠', emoji: '🐭', rarity: '普通', img: 'assets/images/shanhai/sh_mouse.png' }
+      { id: 'sh_hippo', name: '仙人河马', emoji: '🦛', rarity: '史诗', img: 'assets/images/shanhai/sh_hippo.webp' },
+      { id: 'sh_elephant', name: '仙人象', emoji: '🐘', rarity: '史诗', img: 'assets/images/shanhai/sh_elephant.webp' },
+      { id: 'sh_capybara', name: '卡皮巴椰', emoji: '🦫', rarity: '传说', img: 'assets/images/shanhai/sh_capybara.webp' },
+      { id: 'sh_ninja', name: '咖啡忍者', emoji: '☕', rarity: '稀有', img: 'assets/images/shanhai/sh_ninja.webp' },
+      { id: 'sh_bigfoot', name: '大脚怪', emoji: '🦶', rarity: '稀有', img: 'assets/images/shanhai/sh_bigfoot.webp' },
+      { id: 'sh_cow', name: '星球奶牛', emoji: '🐄', rarity: '史诗', img: 'assets/images/shanhai/sh_cow.webp' },
+      { id: 'sh_stick', name: '木棍人', emoji: '🪵', rarity: '普通', img: 'assets/images/shanhai/sh_stick.webp' },
+      { id: 'sh_pig', name: '炸弹猪', emoji: '🐷', rarity: '史诗', img: 'assets/images/shanhai/sh_pig.webp' },
+      { id: 'sh_catfish', name: '猫鱼', emoji: '🐱', rarity: '普通', img: 'assets/images/shanhai/sh_catfish.webp' },
+      { id: 'sh_salt', name: '盐罐', emoji: '🧂', rarity: '普通', img: 'assets/images/shanhai/sh_salt.webp' },
+      { id: 'sh_peach', name: '羊桃', emoji: '🍑', rarity: '稀有', img: 'assets/images/shanhai/sh_peach.webp' },
+      { id: 'sh_shark', name: '耐克鲨鱼', emoji: '🦈', rarity: '稀有', img: 'assets/images/shanhai/sh_shark.webp' },
+      { id: 'sh_fish', name: '胖头鱼', emoji: '🐟', rarity: '普通', img: 'assets/images/shanhai/sh_fish.webp' },
+      { id: 'sh_teapot', name: '茶壶', emoji: '🫖', rarity: '普通', img: 'assets/images/shanhai/sh_teapot.webp' },
+      { id: 'sh_teacup', name: '茶杯', emoji: '☕', rarity: '普通', img: 'assets/images/shanhai/sh_teacup.webp' },
+      { id: 'sh_octopus', name: '茸茸章鱼', emoji: '🐙', rarity: '稀有', img: 'assets/images/shanhai/sh_octopus.webp' },
+      { id: 'sh_strawberry', name: '草莓骑士', emoji: '🍓', rarity: '普通', img: 'assets/images/shanhai/sh_strawberry.webp' },
+      { id: 'sh_gorilla3', name: '菠萝猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla3.webp' },
+      { id: 'sh_honey', name: '蜜罐', emoji: '🍯', rarity: '稀有', img: 'assets/images/shanhai/sh_honey.webp' },
+      { id: 'sh_zebra', name: '西瓜斑马', emoji: '🦓', rarity: '传说', img: 'assets/images/shanhai/sh_zebra.webp' },
+      { id: 'sh_gorilla', name: '西瓜猩猩', emoji: '🦍', rarity: '史诗', img: 'assets/images/shanhai/sh_gorilla.webp' },
+      { id: 'sh_crocoboy', name: '西瓜鳄', emoji: '🐊', rarity: '稀有', img: 'assets/images/shanhai/sh_crocoboy.webp' },
+      { id: 'sh_melondeer', name: '西瓜鹿', emoji: '🦌', rarity: '稀有', img: 'assets/images/shanhai/sh_melondeer.webp' },
+      { id: 'sh_tire', name: '轮胎蛙', emoji: '🐸', rarity: '普通', img: 'assets/images/shanhai/sh_tire.webp' },
+      { id: 'sh_bird', name: '飞车鸟', emoji: '🐦', rarity: '稀有', img: 'assets/images/shanhai/sh_bird.webp' },
+      { id: 'sh_banana', name: '香蕉猴子', emoji: '🐒', rarity: '普通', img: 'assets/images/shanhai/sh_banana.webp' },
+      { id: 'sh_camel', name: '驼冰王', emoji: '🐪', rarity: '史诗', img: 'assets/images/shanhai/sh_camel.webp' },
+      { id: 'sh_croco', name: '鳄鱼轰炸机', emoji: '🐊', rarity: '史诗', img: 'assets/images/shanhai/sh_croco.webp' },
+      { id: 'sh_bomber', name: '鹅式轰炸机', emoji: '✈️', rarity: '稀有', img: 'assets/images/shanhai/sh_bomber.webp' },
+      { id: 'sh_deer', name: '鹿鹿', emoji: '🦌', rarity: '普通', img: 'assets/images/shanhai/sh_deer.webp' },
+      { id: 'sh_mouse', name: '鼠鼠', emoji: '🐭', rarity: '普通', img: 'assets/images/shanhai/sh_mouse.webp' }
     ]},
     {key:'beat', name:'节奏盒子', emoji:'🎵', color:'#f06292', chars:[
       {id:'bt_red', name:'红节奏', emoji:'🔴', rarity:'普通'},
@@ -22628,7 +22643,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           var prow=(arr[0])||{id:cid,total:pts,history:[]};
           var history=((prow.history)||[]).slice().reverse();
           var orders=((arr[1])||[]).filter(function(o){return o&&o.kind==='points'&&o.cid===cid;}).sort(function(a,b){return (b.at||0)-(a.at||0);});
-          var cards=SHOP_GOODS.map(function(g){
+          var cards=MX_SHOP_GOODS().map(function(g){
             var can=pts>=g.cost;
             return '<div class="mx-goods-card">'+
               '<div class="mx-goods-emoji">'+g.emoji+'</div>'+
@@ -22659,7 +22674,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           page.querySelectorAll('.mx-goods-buy').forEach(function(b){
             if(b.disabled) return;
             b.onclick=function(){
-              var id=b.dataset.id; var g=SHOP_GOODS.find(function(x){return x.id===id;});
+              var id=b.dataset.id; var g=MX_SHOP_GOODS().find(function(x){return x.id===id;});
               if(!g) return;
               childId().then(function(c){
                 spend(c,g.cost,'积分兑换·'+g.name).then(function(tot){
@@ -22683,7 +22698,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       DB.getAll('virtualOrders').then(function(all){
         var orders=(all||[]).filter(function(o){return o&&o.kind==='mall'&&o.cid===cid;});
         var isVip=!!(window.isVip && window.isVip());
-        var cards=MALL_PRODUCTS.map(function(p){
+        var cards=MX_MALL_PRODUCTS().map(function(p){
           var showVip=isVip && p.vipPrice;
           var priceHtml=showVip
             ? '<div class="mx-mall-price"><span style="text-decoration:line-through;color:#aaa;font-weight:400;margin-right:6px">'+esc(p.price)+'</span><span style="color:#e53935;font-weight:800">'+esc(p.vipPrice)+'</span> <span style="background:#ffe0b2;color:#e65100;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">👑VIP</span></div>'
@@ -22703,7 +22718,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           (orders.length?'<div class="mx-order-list"><div class="dash-block-title">📋 我的意向订单</div>'+orders.slice().reverse().map(function(o){return '<div class="mx-order-row">'+esc(o.goods||o.name)+' · '+esc(o.price||'')+' <span class="sub">'+new Date(o.at).toLocaleString()+'</span></div>';}).join('')+'</div>':'');
         page.querySelectorAll('.mx-mall-buy').forEach(function(b){
           b.onclick=function(){
-            var id=b.dataset.id; var p=MALL_PRODUCTS.find(function(x){return x.id===id;}); if(!p) return;
+            var id=b.dataset.id; var p=MX_MALL_PRODUCTS().find(function(x){return x.id===id;}); if(!p) return;
             var paid=(isVip && p.vipPrice)?p.vipPrice:p.price;
             DB.put('virtualOrders',{id:Date.now(),cid:cid,goods:p.name,price:paid,kind:'mall',at:Date.now()}).catch(function(){});
             T('🛒 已记录意向'+(paid!==p.price?('（VIP价 '+paid+'）'):'')+'，正在跳转…');
@@ -22924,20 +22939,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           continue;
         }
         var id = window.DB.makeResourceId(file.name + '|' + rel + '|' + file.size);
-        await window.DB.saveResourceBlob(id, file, cls.mediaType);
+        /* [#421-e] 官方池命中判定（名字规范化 + 大小≤1%）：命中则打标，跳过云端上传 */
+        var _ph = mxPoolMatchOne(file.name, file.size);
+        /* [#421-f] 上传前自动压缩（图片） */
+        var _upFile = file;
+        try { var _cz = await mxCompressBeforeUpload(file, cls.mediaType); if (_cz && _cz.blob) _upFile = _cz.blob; } catch (e) {}
+        await window.DB.saveResourceBlob(id, _upFile, cls.mediaType);
         await window.DB.putResource({
           id: id,
           module: cls.module,
           category: cls.category,
           title: String(file.name).replace(/\.[^.]+$/, ''),
           original_filename: file.name,
-          size: file.size,
+          size: (_upFile && _upFile.size) || file.size,
+          origSize: ((_upFile && _upFile.size) && _upFile.size !== file.size) ? file.size : undefined,
           mediaType: cls.mediaType,
           tags: cls.tags,
-          source: 'folder-import'
+          source: 'folder-import',
+          poolUrl: (_ph && !_ph.soft) ? mxPoolUrl(_ph.item) : undefined,
+          poolZone: (_ph && !_ph.soft) ? _ph.item.z : undefined,
+          poolHit: (_ph && !_ph.soft) ? 1 : undefined
         });
-        /* [#417] VIP 自动上云 */
-        uploadResourceToCloud(id).catch(function(){});
+        /* [#421-e] 池命中则不再重复上传云端（省存储/流量）；未命中走原 [#417] VIP 自动上云 */
+        if (!(_ph && !_ph.soft)) { uploadResourceToCloud(id).catch(function(){}); }
         stats[cls.module] = (stats[cls.module]||0)+1;
       } catch(e) { errors.push(file.name + '：' + (e && e.message || e)); }
       done++;
@@ -22949,6 +22973,156 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* ===== [资源中心#358-阶段二] CSV 表格导入（VIP）+ 网盘链接（全员）+ VIP 云端配额 ===== */
   var RES_CLOUD_QUOTA_MB = 20; /* 用户拍板：VIP 云端累计配额 20MB 硬顶（文件本体永不上云，仅元数据） */
   function resIsVip(){ try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
+
+  /* ===== [#421-e] 资源池匹配：用户"上传"的其实只是文件名清单，命中官方池即直接复用 =====
+     · A 池 assets/（登录即可见的基础池）  B 池 assets/pool/（储备池，用户看不到目录）
+     · 索引 assets/pool-index.json（可被内联到 #mx-pool-index-data，离线亦可用）
+     · 命中即不产生任何上传/存储/流量消耗，用户侧仍显示"上传成功"                       */
+  var MX_POOL_INDEX = null, MX_POOL_LOADING = null;
+  function mxPoolIndexInline(){
+    try {
+      var el = document.getElementById('mx-pool-index-data');
+      if (!el) return null;
+      var txt = (el.textContent || '').trim();
+      if (!txt || txt === 'null') return null;
+      var j = JSON.parse(txt);
+      return (j && j.items && j.items.length) ? j : null;
+    } catch (e) { return null; }
+  }
+  function mxPoolNorm(name){
+    var s = String(name || '');
+    s = s.replace(/\.[^./]+$/, '');          /* 去扩展名 */
+    try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) {}
+    s = s.toLowerCase();
+    s = s.replace(/^[\s\[\]【】(（]*\d+[\s.\]】)）\-—–_、]*/, '');   /* 去开头序号 */
+    s = s.replace(/\s*[（(][^)）]{0,12}[)）]\s*$/, '');              /* 去结尾括注 */
+    s = s.replace(/[\s_\-—–·．.、,，()（）\[\]【】"'‘’“”:：;；!！?？+＋&＆#＃@]+/g, '');
+    var sfx = ['跟读','朗读','伴奏','纯音乐','完整版','高清','扫描版','打印版'];
+    for (var i = 0; i < sfx.length; i++) {
+      if (s.length > sfx[i].length + 1 && s.slice(-sfx[i].length) === sfx[i]) { s = s.slice(0, -sfx[i].length); break; }
+    }
+    return s;
+  }
+  function mxPoolLoad(){
+    if (MX_POOL_INDEX) return Promise.resolve(MX_POOL_INDEX);
+    if (MX_POOL_LOADING) return MX_POOL_LOADING;
+    MX_POOL_LOADING = new Promise(function (resolve) {
+      var done = function (j) {
+        if (j && j.items && j.items.length) {
+          MX_POOL_INDEX = j;
+          try { localStorage.setItem('mx_pool_index', JSON.stringify(j)); } catch (e) {}
+        }
+        resolve(MX_POOL_INDEX);
+      };
+      /* 1) 内联优先（离线/本地双击可用） 2) 网络索引 3) localStorage 缓存 */
+      var inl = mxPoolIndexInline();
+      if (inl) { done(inl); return; }
+      try {
+        fetch('assets/pool-index.json', { cache: 'no-cache' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) { if (j && j.items) done(j); else throw new Error('empty'); })
+          .catch(function () {
+            try { var c = localStorage.getItem('mx_pool_index'); if (c) { done(JSON.parse(c)); return; } } catch (e) {}
+            done(null);
+          });
+      } catch (e) {
+        try { var c2 = localStorage.getItem('mx_pool_index'); if (c2) { done(JSON.parse(c2)); return; } } catch (e2) {}
+        done(null);
+      }
+    });
+    return MX_POOL_LOADING;
+  }
+  /* 返回 {item, level, soft} 或 null。level1=名字+大小均匹配（高置信，自动复用）
+     level2=同名但大小不符  level3=模糊包含（2/3 仅作疑似提示，不自动采用） */
+  function mxPoolMatchOne(name, size){
+    if (!MX_POOL_INDEX || !MX_POOL_INDEX.items) return null;
+    /* 清单里可能是带目录的路径，先取文件名 */
+    var k = mxPoolNorm(String(name || '').replace(/^.*[\\/]/, ''));
+    if (!k || k.length < 2) return null;
+    var items = MX_POOL_INDEX.items, sameName = null, fuzzy = null;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.k === k) {
+        if (!size || !it.s) return { item: it, level: 1 };
+        if (Math.abs(it.s - size) <= Math.max(1024, size * 0.01)) return { item: it, level: 1 };
+        if (!sameName) sameName = it;
+        continue;
+      }
+      if (!fuzzy && k.length >= 4 && (it.k.indexOf(k) >= 0 || k.indexOf(it.k) >= 0)) {
+        if (size && it.s && Math.abs(it.s - size) > 0 && Math.abs(it.s - size) <= Math.max(4096, size * 0.02)) fuzzy = it;
+      }
+    }
+    if (sameName) return { item: sameName, level: 2, soft: true };
+    if (fuzzy) return { item: fuzzy, level: 3, soft: true };
+    return null;
+  }
+  function mxPoolUrl(it){
+    try { return (MX_POOL_INDEX && MX_POOL_INDEX.base ? MX_POOL_INDEX.base : 'assets/') + it.p; } catch (e) { return 'assets/' + (it && it.p || ''); }
+  }
+  /* 批量匹配一份清单（[{title,name,size,module}]）→ {hits:[], softs:[], miss:[]} */
+  function mxPoolMatchList(list){
+    var hits = [], softs = [], miss = [];
+    for (var i = 0; i < (list || []).length; i++) {
+      var x = list[i] || {};
+      var r = mxPoolMatchOne(x.name || x.title || '', x.size || 0);
+      if (r && !r.soft) hits.push({ src: x, item: r.item, url: mxPoolUrl(r.item) });
+      else if (r) softs.push({ src: x, item: r.item, level: r.level, url: mxPoolUrl(r.item) });
+      else miss.push(x);
+    }
+    return { hits: hits, softs: softs, miss: miss };
+  }
+
+  /* ===== [#421-f] 上传前自动压缩：图片转 WebP，减小本地占用 / 云端流量 / VIP 月额度 =====
+     · 默认开启，可用 window.mxSetUpCompress(false) 关闭   · 小于 60KB 或压缩后变大都放弃
+     · 只处理图片（浏览器端音频重编码不可靠，音频保持原样）                              */
+  var MX_UP_COMPRESS = (function () { try { var v = localStorage.getItem('mx_compress_on_upload'); return v === null ? 1 : (v === '1' ? 1 : 0); } catch (e) { return 1; } })();
+  var MX_UP_COMPRESS_MIN = 60 * 1024;
+  var MX_UP_COMPRESS_MAXPX = 1600;
+  var MX_UP_COMPRESS_Q = 0.82;
+  var MX_UP_COMPRESS_STAT = { n: 0, before: 0, after: 0 };
+  function mxSetUpCompress(on) {
+    MX_UP_COMPRESS = on ? 1 : 0;
+    try { localStorage.setItem('mx_compress_on_upload', on ? '1' : '0'); } catch (e) {}
+    return MX_UP_COMPRESS;
+  }
+  function mxUpCompressOn() { return !!MX_UP_COMPRESS; }
+  function mxCompressBeforeUpload(file, mediaType) {
+    return new Promise(function (resolve) {
+      try {
+        if (!MX_UP_COMPRESS) return resolve(null);
+        if (!file || !file.size || file.size < MX_UP_COMPRESS_MIN) return resolve(null);
+        if (!/^image\//i.test(file.type || '')) return resolve(null);
+        if (typeof document === 'undefined' || !document.createElement || typeof Image === 'undefined') return resolve(null);
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        var settled = false;
+        var done = function (r) { if (settled) return; settled = true; try { URL.revokeObjectURL(url); } catch (e) {} resolve(r); };
+        img.onload = function () {
+          try {
+            var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (!w || !h) return done(null);
+            var sc = Math.min(1, MX_UP_COMPRESS_MAXPX / Math.max(w, h));
+            var cw = Math.max(1, Math.round(w * sc)), ch = Math.max(1, Math.round(h * sc));
+            var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+            cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+            if (!cv.toBlob) return done(null);
+            cv.toBlob(function (blob) {
+              if (!blob || blob.size >= file.size) return done(null);   /* 变大则放弃，避免负优化 */
+              try { blob.name = file.name; } catch (e) {}
+              MX_UP_COMPRESS_STAT.n++;
+              MX_UP_COMPRESS_STAT.before += file.size;
+              MX_UP_COMPRESS_STAT.after += blob.size;
+              done({ blob: blob, origSize: file.size, newSize: blob.size, ratio: blob.size / file.size });
+            }, 'image/webp', MX_UP_COMPRESS_Q);
+          } catch (e) { done(null); }
+        };
+        img.onerror = function () { done(null); };
+        setTimeout(function () { done(null); }, 15000);   /* 兜底，避免卡住导入流程 */
+        img.src = url;
+      } catch (e) { resolve(null); }
+    });
+  }
+  try { window.mxSetUpCompress = mxSetUpCompress; window.mxUpCompressOn = mxUpCompressOn; window.mxUpCompressStat = MX_UP_COMPRESS_STAT; } catch (e) {}
 
   /* 识别网盘分享链接 */
   function resDetectNetdisk(url){
@@ -23102,7 +23276,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             stats[mod] = (stats[mod] || 0) + 1;
           }
         } else if (r.path) {
-          errors.push(r.title + '：表格里是本地路径，请用「模式一：上传文件夹」把文件传进来');
+          /* [#421-e] 先拿清单去官方池核对：命中即"伪上传"成功（直接引用，零消耗） */
+          var _pm = mxPoolMatchOne(r.path, 0);
+          if (_pm && !_pm.soft) {
+            var _pid = window.DB.makeResourceId('pool|' + _pm.item.p);
+            await window.DB.putResource({
+              id: _pid, module: mod, category: '官方资源', title: r.title,
+              original_filename: _pm.item.n, size: _pm.item.s,
+              mediaType: _pm.item.t === 'pdf' ? 'pdf' : (_pm.item.t === 'image' ? 'image' : (_pm.item.t === 'video' ? 'video' : 'audio')),
+              poolUrl: mxPoolUrl(_pm.item), poolZone: _pm.item.z, source: 'pool-match', tags: ['官方池']
+            });
+            stats[mod] = (stats[mod] || 0) + 1;
+          } else {
+            errors.push(r.title + '：表格里是本地路径，请用「模式一：上传文件夹」把文件传进来');
+          }
         } else {
           errors.push(r.title + '：缺少「文件路径/网盘链接」');
         }
@@ -23193,30 +23380,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         try {
           window.DB.get('resources', resourceId).then(function (row) {
             if (row && row.fromCloud && row.externalLink) { try { window.open(row.externalLink, '_blank'); return; } catch (e) {} }
-            if (window.showToast) {
-          if (row && (row.fromCloud || row.cloudPath)) {
-            /* [#417] 尝试从云端下载 */
-            var _pvBtn = ov.querySelector('#res-pv-dl-cloud');
-            if (!_pvBtn) {
-              _pvBtn = document.createElement('button');
-              _pvBtn.id = 'res-pv-dl-cloud';
-              _pvBtn.textContent = '📥 从云端下载';
-              _pvBtn.style.cssText = 'margin-top:8px;padding:10px;border:none;border-radius:10px;background:#4facfe;color:#fff;font-size:14px;cursor:pointer;width:100%';
-              _pvBtn.onclick = function() {
-                _pvBtn.textContent = '⏳ 下载中...';
-                _pvBtn.disabled = true;
-                downloadResourceFromCloud(resourceId).then(function() {
-                  _pvBtn.textContent = '✅ 已下载，正在播放';
-                  setTimeout(function() { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 800);
-                  resPreview(resourceId); /* 重新预览（这次有本地文件了） */
-                }).catch(function(e) {
-                  _pvBtn.textContent = '❌ 下载失败: ' + ((e&&e.message)||e);
-                  _pvBtn.disabled = false;
-                });
-              };
-              var _pb = ov.querySelector('div');
-              if (_pb) _pb.appendChild(_pvBtn);
+            /* [#421-e] 池命中条目：无本地文件也能直接引用官方池地址（伪上传） */
+            if (row && row.poolUrl) {
+              try { window.open(row.poolUrl, '_blank'); if (window.showToast) window.showToast('✅ 已从官方资源池加载'); return; } catch (e) {}
             }
+            if (window.showToast) {
+          if (row && (row.fromCloud || row.cloud || row.cloudPath)) {
+            /* [#419 两者都要] VIP 文件跨端自动从云端拉取，不再死等「请重新导入」 */
+            var _dlWrap = ov.querySelector('#res-pv-dl-cloud');
+            if (!_dlWrap) {
+              _dlWrap = document.createElement('div');
+              _dlWrap.id = 'res-pv-dl-cloud';
+              _dlWrap.style.cssText = 'margin-top:8px;font-size:13px;color:#1f3a5f;text-align:center';
+              var _pb = ov.querySelector('div');
+              if (_pb) _pb.appendChild(_dlWrap);
+            }
+            _dlWrap.textContent = '⏳ 正在从云端获取文件…';
+            downloadResourceFromCloud(resourceId).then(function () {
+              _dlWrap.textContent = '✅ 已获取，正在打开…';
+              setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 600);
+              resPreview(resourceId);
+            }).catch(function (e) {
+              _dlWrap.textContent = '❌ 云端获取失败：' + ((e && e.message) || e) + '（请稍后重试）';
+            });
           } else {
             window.showToast('⚠️ 本地文件缺失，请重新导入');
           }
@@ -23861,6 +24047,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return { cid: cid, pet: p };
   }
   function save(cid, p) {
+    /* [#417宠物同步] 打 updatedAt：applySnapshot 行级合并靠 updatedAt 判版本（与积分/daily 同款），
+       否则 pet 记录版本恒为 0 → 多端最后推送者整行覆盖 → 喂养/成长记录互相丢更新。 */
+    try { p.updatedAt = Date.now(); } catch (e) {}
     return window.DB.put('pet', p).catch(function () {});
   }
 
@@ -25560,51 +25749,80 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.mxUnpackSnapshot = mxUnpackSnapshot;
   window.mxSyncLog = mxSyncLog;
 
-/* [#417] VIP 资源文件上云：导入后自动上传到 COS，跨设备可下载播放 */
+/* [#421] VIP 资源文件上云：优先 COS 预签名直传（绕开网关约100KB限制），失败自动降级 base64 通道 */
 function uploadResourceToCloud(resId) {
   return window.DB.get('resources', resId).then(function(row) {
     if (!row) return Promise.resolve({ ok: false, msg: '资源记录不存在' });
     if (!row.size || row.size === 0) return Promise.resolve({ ok: false, msg: '无文件体（链接类资源不上云）' });
     /* 仅 VIP 上传文件本体 */
     if (!isVip()) return Promise.resolve({ ok: false, skip: true, msg: '非VIP不上传文件' });
-    return window.DB.getResourceBlob(resId).then(function(rb) {
-      if (!rb || !rb.blob) return { ok: false, msg: '本地文件缺失' };
-      var fp = mxResFp(row);
-      var ext = (row.original_filename || '').split('.').pop() || 'bin';
-      /* 先查云端是否已有（指纹去重） */
-      return mxApiSync('cloudResCheck', { fp: fp, ext: ext }).then(function(chk) {
-        if (chk && chk.exists) return { ok: true, skipped: true, msg: '云端已存在（去重）' };
-        /* 读 blob 为 base64 并上传 */
-        return new Promise(function(resolve, reject) {
-          var fr = new FileReader();
-          fr.onload = function() {
-            var b64 = fr.result.split(',')[1]; /* 去掉 data:...;base64, 前缀 */
-            mxApiSync('cloudResUpload', { id: resId, fp: fp, ext: ext, data: b64, size: rb.blob.size, contentType: rb.type }).then(resolve).catch(reject);
-          };
-          fr.onerror = function() { reject(new Error('FileReader 读取失败')); };
-          fr.readAsDataURL(rb.blob);
+    var fp = mxResFp(row);
+    var ext = (row.original_filename || '').split('.').pop() || 'bin';
+    var mark = function () { try { row.cloudUploaded = 1; window.DB.put('resources', row).catch(function(){}); } catch (e) {} };
+    /* 先查云端是否已有（指纹去重） */
+    return mxApiSync('cloudResCheck', { fp: fp, ext: ext }).then(function(chk) {
+      if (chk && chk.exists) { mark(); return { ok: true, skipped: true, msg: '云端已存在（去重）' }; }
+      return window.DB.getResourceBlob(resId).then(function(rb) {
+        if (!rb || !rb.blob) return { ok: false, msg: '本地文件缺失' };
+        /* 直传：取预签名 URL → PUT 裸 Blob（清空 type，避免触发 CORS 预检） */
+        return mxApiSync('cloudResSign', { mode: 'put', fp: fp, ext: ext, size: rb.blob.size }).then(function(sg) {
+          if (!sg || !sg.ok || !sg.url) throw new Error((sg && sg.msg) || '获取上传签名失败');
+          var body = rb.blob;
+          try { if (body.type) body = body.slice(0, body.size); } catch (e) {}
+          return fetch(sg.url, { method: 'PUT', body: body }).then(function(r) {
+            if (!r.ok) throw new Error('COS 直传失败 HTTP ' + r.status);
+            return mxApiSync('cloudResCommit', { fp: fp, ext: ext, size: rb.blob.size, id: resId });
+          }).then(function(cm) {
+            if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '元数据登记失败');
+            mark(); return { ok: true, via: 'direct', size: rb.blob.size, msg: '已直传云端' };
+          });
+        }).catch(function(e1) {
+          /* 降级：base64 经网关（仅小文件可用） */
+          return new Promise(function(resolve, reject) {
+            var fr = new FileReader();
+            fr.onload = function() {
+              var b64 = fr.result.split(',')[1]; /* 去掉 data:...;base64, 前缀 */
+              mxApiSync('cloudResUpload', { id: resId, fp: fp, ext: ext, data: b64, size: rb.blob.size, contentType: rb.type })
+                .then(function (ur) { if (ur && ur.ok) { mark(); resolve({ ok: true, via: 'gateway', msg: '已上传（降级通道）' }); } else reject(new Error((ur && ur.msg) || '上传失败')); })
+                .catch(reject);
+            };
+            fr.onerror = function() { reject(new Error('FileReader 读取失败')); };
+            fr.readAsDataURL(rb.blob);
+          }).catch(function(e2) {
+            return { ok: false, msg: '直传失败：' + ((e1 && e1.message) || e1) + '｜降级失败：' + ((e2 && e2.message) || e2) };
+          });
         });
       });
     });
   });
 }
 
-/* [#417] 云端资源下载：播放时本机无文件 → 从 COS 拉 → 存入 audioCache → 播放 */
+/* [#421] 云端资源下载：优先 COS 签名直取（绕开网关约100KB限制），失败自动降级 base64 通道 */
 function downloadResourceFromCloud(resId) {
   return window.DB.get('resources', resId).then(function(row) {
     if (!row) return Promise.reject(new Error('资源不存在'));
     var fp = mxResFp(row);
     var ext = (row.original_filename || '').split('.').pop() || 'bin';
-    return mxApiSync('cloudResDownload', { fp: fp, ext: ext }).then(function(dl) {
-      if (!dl || !dl.ok) return Promise.reject(new Error((dl && dl.msg) || '下载失败'));
-      /* base64 → Blob → 存入 audioCache */
-      var bin = atob(dl.data);
-      var bytes = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      var mime = dl.contentType || (row.mediaType === 'video' ? 'video/mp4' : row.mediaType === 'audio' ? 'audio/mpeg' : 'application/octet-stream');
-      var blob = new Blob([bytes], { type: mime });
+    var mime = row.mediaType === 'video' ? 'video/mp4' : row.mediaType === 'audio' ? 'audio/mpeg' : 'application/octet-stream';
+    var save = function (blob) {
       return window.DB.saveResourceBlob(resId, blob, row.mediaType || 'audio').then(function() {
         return { ok: true, blob: blob, msg: '已缓存到本地' };
+      });
+    };
+    return mxApiSync('cloudResSign', { mode: 'get', fp: fp, ext: ext }).then(function(sg) {
+      if (!sg || !sg.ok || !sg.url) throw new Error((sg && sg.msg) || '获取下载签名失败');
+      return fetch(sg.url).then(function(r) {
+        if (!r.ok) throw new Error('COS 直取失败 HTTP ' + r.status);
+        return r.blob();
+      }).then(function(b) { return save(new Blob([b], { type: mime })); });
+    }).catch(function(e1) {
+      /* 降级：base64 经网关（仅小文件可用） */
+      return mxApiSync('cloudResDownload', { fp: fp, ext: ext }).then(function(dl) {
+        if (!dl || !dl.ok) return Promise.reject(new Error('直取失败：' + ((e1 && e1.message) || e1) + '｜降级失败：' + ((dl && dl.msg) || '下载失败')));
+        var bin = atob(dl.data);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return save(new Blob([bytes], { type: dl.contentType || mime }));
       });
     });
   });
@@ -26156,7 +26374,7 @@ function downloadResourceFromCloud(resId) {
               var _m = [];
               (rrows || []).forEach(function (r) {
                 if (!r) return;
-                _m.push({ id: r.id || '', fp: mxResFp(r), module: r.module || 'community', category: r.category || '', title: r.title || '', original_filename: r.original_filename || '', size: r.size || 0, mediaType: r.mediaType || '', localPath: r.localPath || '', audioUrl: r.audioUrl || '', externalLink: r.externalLink || '', source: r.source || '', createdAt: r.createdAt || 0 });
+                _m.push({ id: r.id || '', fp: mxResFp(r), module: r.module || 'community', category: r.category || '', title: r.title || '', original_filename: r.original_filename || '', size: r.size || 0, mediaType: r.mediaType || '', localPath: r.localPath || '', audioUrl: r.audioUrl || '', externalLink: r.externalLink || '', source: r.source || '', cloud: (r.cloudUploaded ? 1 : 0), createdAt: r.createdAt || 0 });
               });
               _m.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
               if (_m.length > 3000) _m.length = 3000;
@@ -26238,7 +26456,7 @@ function downloadResourceFromCloud(resId) {
             if (!m) return;
             if (m.fp && byFp[m.fp]) return;
             if (m.id && byId[m.id]) return;
-            var row = { id: m.id || ('res_c_' + (m.fp || '')), module: m.module || 'community', category: m.category || '其他', title: m.title || m.original_filename || '', original_filename: m.original_filename || m.title || '', size: m.size || 0, mediaType: m.mediaType || 'audio', localPath: m.localPath || '', audioUrl: m.audioUrl || '', externalLink: m.externalLink || '', tags: [], source: m.source || 'folder-import', fp: m.fp || '', fromCloud: 1, localMissing: 1, createdAt: m.createdAt || Date.now() };
+            var row = { id: m.id || ('res_c_' + (m.fp || '')), module: m.module || 'community', category: m.category || '其他', title: m.title || m.original_filename || '', original_filename: m.original_filename || m.title || '', size: m.size || 0, mediaType: m.mediaType || 'audio', localPath: m.localPath || '', audioUrl: m.audioUrl || '', externalLink: m.externalLink || '', tags: [], source: m.source || 'folder-import', fp: m.fp || '', fromCloud: 1, localMissing: 1, cloud: m.cloud || 0, createdAt: m.createdAt || Date.now() };
             tasks.push(window.DB.put('resources', row).catch(function () {}));
           });
           return Promise.all(tasks);
@@ -26336,6 +26554,8 @@ function downloadResourceFromCloud(resId) {
         else if (s === 'vipfail' || s === 'error') { try { mxSyncDiag(); } catch (e) {} try { if (window.pushCloud) window.pushCloud(); } catch (e) {} }
         else mxSyncDiag();
       };
+      /* [#420 VIP 强制同步按钮] 每次角标刷新时同步刷新「🔄 强制同步」可见性（仅 VIP） */
+      try { if (window.mxRefreshForceSyncBtn) window.mxRefreshForceSyncBtn(); } catch (e) {}
     }
   }
   window.setSyncStatus = setSyncStatus;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
@@ -26417,6 +26637,34 @@ function downloadResourceFromCloud(resId) {
     m.onclick = function (e) { if (e.target === m && m.parentNode) m.remove(); };
   }
   window.mxSyncDiag = mxSyncDiag;
+  /* #420 VIP 多端强制同步：先 pull 云端最新合并到本机，再 push 本机增量回传，达成双向对齐。仅 VIP 用（非 VIP 云端配额受限）。 */
+  function mxForceSyncAll() {
+    try {
+      var btn = document.getElementById('mx-force-sync-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '🔄 同步中…'; }
+      var done = function () { if (btn) { btn.disabled = false; btn.textContent = '🔄 强制同步'; } };
+      var pull = window.pullCloud ? window.pullCloud(false) : Promise.resolve();
+      Promise.resolve(pull).then(function () { return window.pushCloud ? window.pushCloud() : Promise.resolve(); }).then(function () {
+        try { if (window.showToast) window.showToast('✅ 已与云端双向强制同步'); } catch (e) {}
+      }).catch(function (e) {
+        try { if (window.showToast) window.showToast('⚠️ 强制同步失败：' + ((e && e.message) ? e.message : e)); } catch (e2) {}
+        try { if (window.mxSyncErr) window.mxSyncErr((e && e.message) ? e.message : String(e)); } catch (e2) {}
+      }).then(done, done);
+    } catch (e) { try { if (window.mxSyncErr) window.mxSyncErr((e && e.message) ? e.message : String(e)); } catch (e2) {} }
+  }
+  window.mxForceSyncAll = mxForceSyncAll;
+  /* #420 刷新「🔄 强制同步」按钮可见性：仅 VIP 显示；延迟兜底以应对首屏 VIP 令牌未就绪 */
+  function mxRefreshForceSyncBtn() {
+    try {
+      var _fsb = document.getElementById('mx-force-sync-btn');
+      if (_fsb) {
+        if (window.isVip && window.isVip()) { _fsb.style.display = ''; _fsb.onclick = function () { try { if (window.mxForceSyncAll) window.mxForceSyncAll(); } catch (e2) {} }; }
+        else { _fsb.style.display = 'none'; }
+      }
+    } catch (e) {}
+  }
+  window.mxRefreshForceSyncBtn = mxRefreshForceSyncBtn;
+  try { if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(mxRefreshForceSyncBtn, 1500); else if (window.addEventListener) window.addEventListener('DOMContentLoaded', function () { setTimeout(mxRefreshForceSyncBtn, 1500); }); } catch (e) {}
   /* [badgefix] 记录最近一次同步失败原因（诊断弹窗读取） */
   function mxSyncErr(msg) { try { localStorage.setItem('mx_sync_last_err', new Date().toLocaleString() + ' ' + String(msg || '').slice(0, 120)); } catch (e) {} }
   window.mxSyncErr = mxSyncErr;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
@@ -29512,7 +29760,7 @@ function downloadResourceFromCloud(resId) {
 <script id="mx-rhythm-chars">/**
  * #93 节奏盒子角色原型 —— 20 个 Q 版 3D 角色集成
  *
- * 基于用户提供的手绘参考图（assets/images/rhythm_chars_reference.jpg）
+ * 基于用户提供的手绘参考图（assets/images/rhythm_chars_reference.webp）
  * 20 个角色分 5 行 × 4 列，含 id/name/emoji/color/type/rarity/desc
  *
  * 注入目标：
@@ -29533,30 +29781,30 @@ function downloadResourceFromCloud(resId) {
      ================================================================ */
   window.MX_RHYTHM_CHARS = [
     // ── 第 1 行 ── （img 指向从用户手绘参考图裁剪的真实卡通原图）
-    { id: 'rh_wenda',   name: '温达',    emoji: '⭐', color: '#f5f5f5', bg: '#eceff1', type: 'star',    rarity: '普通', role: '主唱',   desc: '白色星星造型，温和可靠的主唱担当',   img: 'assets/images/characters/rhythm_wenda.png' },
-    { id: 'rh_gelei',   name: '格雷',    emoji: '🔺', color: '#78909c', bg: '#cfd8dc', type: 'guardian', rarity: '普通', role: '贝斯',   desc: '灰色三角造型，沉默稳重的贝斯手',       img: 'assets/images/characters/rhythm_greylei.png' },
-    { id: 'rh_ximeng',  name: '西蒙',    emoji: '🌟', color: '#fdd835', bg: '#fff9c4', type: 'energy',  rarity: '稀有', role: '合成器', desc: '黄色星光带天线，活力四射的合成器乐手',  img: 'assets/images/characters/rhythm_simon.png' },
-    { id: 'rh_brude',   name: '布鲁德',  emoji: '🎩', color: '#8d6e63', bg: '#d7ccc8', type: 'gentleman', rarity: '普通', role: '萨克斯', desc: '棕色绅士礼帽，优雅的萨克斯演奏者',     img: 'assets/images/characters/rhythm_brude.png' },
+    { id: 'rh_wenda',   name: '温达',    emoji: '⭐', color: '#f5f5f5', bg: '#eceff1', type: 'star',    rarity: '普通', role: '主唱',   desc: '白色星星造型，温和可靠的主唱担当',   img: 'assets/images/characters/rhythm_wenda.webp' },
+    { id: 'rh_gelei',   name: '格雷',    emoji: '🔺', color: '#78909c', bg: '#cfd8dc', type: 'guardian', rarity: '普通', role: '贝斯',   desc: '灰色三角造型，沉默稳重的贝斯手',       img: 'assets/images/characters/rhythm_greylei.webp' },
+    { id: 'rh_ximeng',  name: '西蒙',    emoji: '🌟', color: '#fdd835', bg: '#fff9c4', type: 'energy',  rarity: '稀有', role: '合成器', desc: '黄色星光带天线，活力四射的合成器乐手',  img: 'assets/images/characters/rhythm_simon.webp' },
+    { id: 'rh_brude',   name: '布鲁德',  emoji: '🎩', color: '#8d6e63', bg: '#d7ccc8', type: 'gentleman', rarity: '普通', role: '萨克斯', desc: '棕色绅士礼帽，优雅的萨克斯演奏者',     img: 'assets/images/characters/rhythm_brude.webp' },
     // ── 第 2 行 ──
-    { id: 'rh_xiaotian',name: '小天',    emoji: '🐻', color: '#4db6ac', bg: '#b2dfdb', type: 'cute',    rarity: '普通', role: '铃鼓',   desc: '青色小熊抱饼干，可爱治愈的打击乐手',   img: 'assets/images/characters/rhythm_xiaotian.png' },
-    { id: 'rh_tanu',    name: '塔努',    emoji: '🎩', color: '#a1887f', bg: '#d7ccc8', type: 'detective', rarity: '稀有', role: '口琴',   desc: '棕帽侦探风，神秘口琴手',               img: 'assets/images/characters/rhythm_tanu.png' },
-    { id: 'rh_jiewen',  name: '杰文',    emoji: '🔵', color: '#42a5f5', bg: '#bbdefb', type: 'cool',    rarity: '普通', role: '电子琴', desc: '蓝色圆润造型，冷静的键盘手',           img: 'assets/images/characters/rhythm_jiewen.png' },
-    { id: 'rh_ruidi',   name: '瑞迪',    emoji: '😈', color: '#ef5350', bg: '#ffcdd2', type: 'punk',    rarity: '史诗', role: '电吉他', desc: '红色恶魔角，狂野的电吉他独奏',         img: 'assets/images/characters/rhythm_ruidi.png' },
+    { id: 'rh_xiaotian',name: '小天',    emoji: '🐻', color: '#4db6ac', bg: '#b2dfdb', type: 'cute',    rarity: '普通', role: '铃鼓',   desc: '青色小熊抱饼干，可爱治愈的打击乐手',   img: 'assets/images/characters/rhythm_xiaotian.webp' },
+    { id: 'rh_tanu',    name: '塔努',    emoji: '🎩', color: '#a1887f', bg: '#d7ccc8', type: 'detective', rarity: '稀有', role: '口琴',   desc: '棕帽侦探风，神秘口琴手',               img: 'assets/images/characters/rhythm_tanu.webp' },
+    { id: 'rh_jiewen',  name: '杰文',    emoji: '🔵', color: '#42a5f5', bg: '#bbdefb', type: 'cool',    rarity: '普通', role: '电子琴', desc: '蓝色圆润造型，冷静的键盘手',           img: 'assets/images/characters/rhythm_jiewen.webp' },
+    { id: 'rh_ruidi',   name: '瑞迪',    emoji: '😈', color: '#ef5350', bg: '#ffcdd2', type: 'punk',    rarity: '史诗', role: '电吉他', desc: '红色恶魔角，狂野的电吉他独奏',         img: 'assets/images/characters/rhythm_ruidi.webp' },
     // ── 第 3 行 ──
-    { id: 'rh_aomu',    name: '奥姆',    emoji: '🌿', color: '#66bb6a', bg: '#c8e6c9', type: 'nature',  rarity: '普通', role: '长笛',   desc: '绿色叶子精灵，自然系长笛演奏',           img: 'assets/images/characters/rhythm_aomu.png' },
-    { id: 'rh_tengxuan',name: '藤萱妹妹',emoji: '🌸', color: '#26a69a', bg: '#b2dfdb', type: 'flower',  rarity: '稀有', role: '竖琴',   desc: '绿色花仙子妹妹，竖琴仙女',             img: 'assets/images/characters/rhythm_tengxuan.png' },
-    { id: 'rh_aolun',   name: '奥伦',    emoji: '🎧', color: '#ff9800', bg: '#ffe0b2', type: 'dj',      rarity: '史诗', role: 'DJ',     desc: '橙色耳机少年，节奏盒子当家 DJ',        img: 'assets/images/characters/rhythm_aolun.png' },
-    { id: 'rh_shouji',  name: '手基',    emoji: '🐰', color: '#f06292', bg: '#f8bbd0', type: 'bunny',   rarity: '稀有', role: '和声',   desc: '粉色兔耳少女，甜美和声担当',             img: 'assets/images/characters/rhythm_shouji.png' },
+    { id: 'rh_aomu',    name: '奥姆',    emoji: '🌿', color: '#66bb6a', bg: '#c8e6c9', type: 'nature',  rarity: '普通', role: '长笛',   desc: '绿色叶子精灵，自然系长笛演奏',           img: 'assets/images/characters/rhythm_aomu.webp' },
+    { id: 'rh_tengxuan',name: '藤萱妹妹',emoji: '🌸', color: '#26a69a', bg: '#b2dfdb', type: 'flower',  rarity: '稀有', role: '竖琴',   desc: '绿色花仙子妹妹，竖琴仙女',             img: 'assets/images/characters/rhythm_tengxuan.webp' },
+    { id: 'rh_aolun',   name: '奥伦',    emoji: '🎧', color: '#ff9800', bg: '#ffe0b2', type: 'dj',      rarity: '史诗', role: 'DJ',     desc: '橙色耳机少年，节奏盒子当家 DJ',        img: 'assets/images/characters/rhythm_aolun.webp' },
+    { id: 'rh_shouji',  name: '手基',    emoji: '🐰', color: '#f06292', bg: '#f8bbd0', type: 'bunny',   rarity: '稀有', role: '和声',   desc: '粉色兔耳少女，甜美和声担当',             img: 'assets/images/characters/rhythm_shouji.webp' },
     // ── 第 4 行 ──
-    { id: 'rh_sun',     name: '太阳先生', emoji: '☀️',  color: '#ffb300', bg: '#ffecb3', type: 'sun',     rarity: '传奇', role: '指挥',   desc: '太阳光芒造型，乐队灵魂指挥家',         img: 'assets/images/characters/rhythm_sunman.png' },
-    { id: 'rh_ganord',  name: '加诺德',  emoji: '🤖', color: '#fdd835', bg: '#fff9c4', type: 'robot',   rarity: '稀有', role: '打碟机', desc: '黄色 VR 面罩，未来感打碟师',            img: 'assets/images/characters/rhythm_ganuode.png' },
-    { id: 'rh_clark',   name: '克拉克',  emoji: '🔧', color: '#9e9e9e', bg: '#e0e0e0', type: 'mech',    rarity: '普通', role: '鼓手',   desc: '灰帽扳手工匠，稳健节奏鼓手',           img: 'assets/images/characters/rhythm_kelake.png' },
-    { id: 'rh_pc',      name: '电脑先生', emoji: '🖥️', color: '#00897b', bg: '#b2dfdb', type: 'robot',   rarity: '史诗', role: '编曲',   desc: '彩虹帽电脑先生，全能编曲制作人',        img: 'assets/images/characters/rhythm_pcman.png' },
+    { id: 'rh_sun',     name: '太阳先生', emoji: '☀️',  color: '#ffb300', bg: '#ffecb3', type: 'sun',     rarity: '传奇', role: '指挥',   desc: '太阳光芒造型，乐队灵魂指挥家',         img: 'assets/images/characters/rhythm_sunman.webp' },
+    { id: 'rh_ganord',  name: '加诺德',  emoji: '🤖', color: '#fdd835', bg: '#fff9c4', type: 'robot',   rarity: '稀有', role: '打碟机', desc: '黄色 VR 面罩，未来感打碟师',            img: 'assets/images/characters/rhythm_ganuode.webp' },
+    { id: 'rh_clark',   name: '克拉克',  emoji: '🔧', color: '#9e9e9e', bg: '#e0e0e0', type: 'mech',    rarity: '普通', role: '鼓手',   desc: '灰帽扳手工匠，稳健节奏鼓手',           img: 'assets/images/characters/rhythm_kelake.webp' },
+    { id: 'rh_pc',      name: '电脑先生', emoji: '🖥️', color: '#00897b', bg: '#b2dfdb', type: 'robot',   rarity: '史诗', role: '编曲',   desc: '彩虹帽电脑先生，全能编曲制作人',        img: 'assets/images/characters/rhythm_pcman.webp' },
     // ── 第 5 行 ──
-    { id: 'rh_tree',    name: '大树先生', emoji: '🌲', color: '#43a047', bg: '#c8e6c9', type: 'tree',    rarity: '普通', role: '大提琴', desc: '树人造型，深沉大提琴手',                 img: 'assets/images/characters/rhythm_dashu.png' },
-    { id: 'rh_depler',  name: '德普勒',  emoji: '😈', color: '#7e57c2', bg: '#d1c4e9', type: 'demon',   rarity: '史诗', role: '低音炮', desc: '紫色恶魔角，震撼低音炮',                 img: 'assets/images/characters/rhythm_deprule.png' },
-    { id: 'rh_funbot',  name: '有趣机器人',emoji:'🤖', color: '#ff7043', bg: '#ffccbc', type: 'bot',     rarity: '传奇', role: '特效',   desc: '屏幕脸机器人，舞台特效大师',             img: 'assets/images/characters/rhythm_robot.png' },
-    { id: 'rh_blake',   name: '布莱克',  emoji: '🎩', color: '#212121', bg: '#e0e0e0', type: 'shadow',  rarity: '传奇', role: '神秘嘉宾', desc: '黑色礼帽神秘人，特别登场嘉宾',           img: 'assets/images/characters/rhythm_black.png' }
+    { id: 'rh_tree',    name: '大树先生', emoji: '🌲', color: '#43a047', bg: '#c8e6c9', type: 'tree',    rarity: '普通', role: '大提琴', desc: '树人造型，深沉大提琴手',                 img: 'assets/images/characters/rhythm_dashu.webp' },
+    { id: 'rh_depler',  name: '德普勒',  emoji: '😈', color: '#7e57c2', bg: '#d1c4e9', type: 'demon',   rarity: '史诗', role: '低音炮', desc: '紫色恶魔角，震撼低音炮',                 img: 'assets/images/characters/rhythm_deprule.webp' },
+    { id: 'rh_funbot',  name: '有趣机器人',emoji:'🤖', color: '#ff7043', bg: '#ffccbc', type: 'bot',     rarity: '传奇', role: '特效',   desc: '屏幕脸机器人，舞台特效大师',             img: 'assets/images/characters/rhythm_robot.webp' },
+    { id: 'rh_blake',   name: '布莱克',  emoji: '🎩', color: '#212121', bg: '#e0e0e0', type: 'shadow',  rarity: '传奇', role: '神秘嘉宾', desc: '黑色礼帽神秘人，特别登场嘉宾',           img: 'assets/images/characters/rhythm_black.webp' }
   ];
 
   /* 辅助：按 id 查角色 */
@@ -29615,7 +29863,7 @@ function downloadResourceFromCloud(resId) {
       cands.push('sprite_crops/rhythm-v2/' + characterId + '.png');   /* 线上已部署的真实目录 */
     }
     if (ch && ch.img) cands.push(ch.img);                                            /* 角色自带真图 */
-    if (imgTheme && characterId) cands.push('assets/images/characters/' + imgTheme + '_' + characterId + '.png'); /* 运行时素材 */
+    if (imgTheme && characterId) cands.push('assets/images/characters/' + imgTheme + '_' + characterId + '.webp'); /* 运行时素材 */
     if (vq) { for (var vi = 0; vi < cands.length; vi++) cands[vi] += vq; }
     var fb = '<span class="mx-char-fb" style="display:none;font-size:' + Math.round(size * 0.6) + 'px;line-height:1;vertical-align:middle">' + emoji + '</span>';
     if (!cands.length) {
@@ -30124,16 +30372,16 @@ function downloadResourceFromCloud(resId) {
   /* 来源：Incredibox Sprunki 社区创作 / 免费音乐资源 */
   /* 注意：WebAudio合成引擎(MX_SPRUNKI.start)为首选离线方案；MP3作为在线增强备选 */
   window.MX_SPRUNKI_PLAYLIST = [
-    { name: 'Sprunki 趣味电脑',       dur: '2:52',  src: 'assets/audio/sprunki/sprunki_fun_computer.wav',     note: '斯普伦基先生·趣味电脑（爱给网）' },
-    { name: 'Sprunki Phase 1-3',      dur: '5:20',  src: 'assets/audio/sprunki/sprunki_phase123.wav',        note: '经典三阶段旋律' },
-    { name: 'Sprunki Everyone Simon', dur: '8:15',  src: 'assets/audio/sprunki/sprunki_simon.wav',            note: '全员西蒙变奏' },
-    { name: 'Sprunki Pinki Battle',   dur: '6:40',  src: 'assets/audio/sprunki/sprunki_pinki.wav',            note: '皮基对决混音' },
-    { name: 'Sprunki Wenda Journey',  dur: '7:10',  src: 'assets/audio/sprunki/sprunki_wenda.wav',            note: '温达冒险曲' },
-    { name: 'Sprunki Gray Mystery',   dur: '5:55',  src: 'assets/audio/sprunki/sprunki_gray.wav',             note: '格雷悬疑调' },
-    { name: 'Sprunki Fun Bot Remix',  dur: '4:30',  src: 'assets/audio/sprunki/sprunki_funbot.wav',           note: '有趣机器人电音' },
-    { name: 'Sprunki Sun Concerto',   dur: '6:15',  src: 'assets/audio/sprunki/sprunki_sun_concerto.wav',    note: '太阳先生协奏' },
-    { name: 'Sprunki Tree Fantasy',   dur: '5:45',  src: 'assets/audio/sprunki/sprunki_tree_fantasy.wav',    note: '大树幻想曲' },
-    { name: 'Sprunki Full Ensemble',  dur: '10:00', src: 'assets/audio/sprunki/sprunki_ensemble.wav',         note: '全员合奏终章' }
+    { name: 'Sprunki 趣味电脑',       dur: '2:52',  src: 'assets/audio/sprunki/sprunki_fun_computer.mp3',     note: '斯普伦基先生·趣味电脑（爱给网）' },
+    { name: 'Sprunki Phase 1-3',      dur: '5:20',  src: 'assets/audio/sprunki/sprunki_phase123.mp3',        note: '经典三阶段旋律' },
+    { name: 'Sprunki Everyone Simon', dur: '8:15',  src: 'assets/audio/sprunki/sprunki_simon.mp3',            note: '全员西蒙变奏' },
+    { name: 'Sprunki Pinki Battle',   dur: '6:40',  src: 'assets/audio/sprunki/sprunki_pinki.mp3',            note: '皮基对决混音' },
+    { name: 'Sprunki Wenda Journey',  dur: '7:10',  src: 'assets/audio/sprunki/sprunki_wenda.mp3',            note: '温达冒险曲' },
+    { name: 'Sprunki Gray Mystery',   dur: '5:55',  src: 'assets/audio/sprunki/sprunki_gray.mp3',             note: '格雷悬疑调' },
+    { name: 'Sprunki Fun Bot Remix',  dur: '4:30',  src: 'assets/audio/sprunki/sprunki_funbot.mp3',           note: '有趣机器人电音' },
+    { name: 'Sprunki Sun Concerto',   dur: '6:15',  src: 'assets/audio/sprunki/sprunki_sun_concerto.mp3',    note: '太阳先生协奏' },
+    { name: 'Sprunki Tree Fantasy',   dur: '5:45',  src: 'assets/audio/sprunki/sprunki_tree_fantasy.mp3',    note: '大树幻想曲' },
+    { name: 'Sprunki Full Ensemble',  dur: '10:00', src: 'assets/audio/sprunki/sprunki_ensemble.mp3',         note: '全员合奏终章' }
   ];
   /* TODO: 将MP3文件下载到 assets/audio/sprunki/ 填充src字段即可启用MP3播放模式 */
 })();
@@ -30234,54 +30482,54 @@ function downloadResourceFromCloud(resId) {
 </script>
 <script id="mx-sprite-coords">
 window.MX_SPRITE_COORDS = {
-  "rh_wenda": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 0, "y": 0, "w": 440, "h": 512}},
-  "rh_gelei": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 440, "y": 0, "w": 440, "h": 512}},
-  "rh_ximeng": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 880, "y": 0, "w": 440, "h": 512}},
-  "rh_brude": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 1320, "y": 0, "w": 440, "h": 512}},
-  "rh_xiaotian": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 0, "y": 512, "w": 440, "h": 512}},
-  "rh_tanu": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 440, "y": 512, "w": 440, "h": 512}},
-  "rh_jiewen": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 880, "y": 512, "w": 440, "h": 512}},
-  "rh_ruidi": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 1320, "y": 512, "w": 440, "h": 512}},
-  "rh_aomu": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 0, "y": 1024, "w": 440, "h": 512}},
-  "rh_tengxuan": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 440, "y": 1024, "w": 440, "h": 512}},
-  "rh_aolun": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 880, "y": 1024, "w": 440, "h": 512}},
-  "rh_shouji": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 1320, "y": 1024, "w": 440, "h": 512}},
-  "rh_sun": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 0, "y": 1536, "w": 440, "h": 512}},
-  "rh_ganord": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 440, "y": 1536, "w": 440, "h": 512}},
-  "rh_clark": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 880, "y": 1536, "w": 440, "h": 512}},
-  "rh_pc": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 1320, "y": 1536, "w": 440, "h": 512}},
-  "rh_tree": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 0, "y": 2048, "w": 440, "h": 512}},
-  "rh_depler": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 440, "y": 2048, "w": 440, "h": 512}},
-  "rh_funbot": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 880, "y": 2048, "w": 440, "h": 512}},
-  "rh_blake": {"src": "assets/images/characters/节奏盒子.png", "pos": {"x": 1320, "y": 2048, "w": 440, "h": 512}},
-  "sh_shark": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 3, "y": 42, "w": 255, "h": 225}},
-  "sh_banana": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 42, "w": 232, "h": 225}},
-  "sh_teacup": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 880, "y": 42, "w": 182, "h": 225}},
-  "sh_croco": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 42, "w": 262, "h": 225}},
-  "sh_bomber": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1406, "y": 42, "w": 254, "h": 225}},
-  "sh_strawberry": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 3, "y": 402, "w": 255, "h": 245}},
-  "sh_octopus": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 693, "y": 402, "w": 274, "h": 245}},
-  "sh_tire": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1406, "y": 402, "w": 254, "h": 245}},
-  "sh_elephant": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 402, "w": 262, "h": 245}},
-  "sh_ninja": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 880, "y": 402, "w": 182, "h": 245}},
-  "sh_stick": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 3, "y": 785, "w": 255, "h": 247}},
-  "sh_capybara": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 785, "w": 232, "h": 247}},
-  "sh_cow": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 693, "y": 785, "w": 274, "h": 247}},
-  "sh_gorilla": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 785, "w": 262, "h": 247}},
-  "sh_hippo": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 693, "y": 1543, "w": 274, "h": 239}},
-  "sh_bigfoot": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 693, "y": 1162, "w": 274, "h": 243}},
-  "sh_bird": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1406, "y": 1162, "w": 254, "h": 243}},
-  "sh_crocoboy": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 1162, "w": 262, "h": 243}},
-  "sh_melondeer": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 3, "y": 1543, "w": 255, "h": 239}},
-  "sh_fish": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 1162, "w": 232, "h": 243}},
-  "sh_peach": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 1543, "w": 262, "h": 239}},
-  "sh_teapot": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1406, "y": 1543, "w": 254, "h": 239}},
-  "sh_camel": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 3, "y": 1924, "w": 255, "h": 240}},
-  "sh_salt": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 1924, "w": 232, "h": 240}},
-  "sh_honey": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 693, "y": 1924, "w": 274, "h": 240}},
-  "sh_pig": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 1062, "y": 1924, "w": 262, "h": 240}},
-  "sh_catfish": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 402, "w": 232, "h": 245}},
-  "sh_mouse": {"src": "assets/images/characters/ai山海经2.png", "pos": {"x": 413, "y": 1543, "w": 232, "h": 239}}
+  "rh_wenda": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 0, "y": 0, "w": 440, "h": 512}},
+  "rh_gelei": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 440, "y": 0, "w": 440, "h": 512}},
+  "rh_ximeng": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 880, "y": 0, "w": 440, "h": 512}},
+  "rh_brude": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 1320, "y": 0, "w": 440, "h": 512}},
+  "rh_xiaotian": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 0, "y": 512, "w": 440, "h": 512}},
+  "rh_tanu": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 440, "y": 512, "w": 440, "h": 512}},
+  "rh_jiewen": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 880, "y": 512, "w": 440, "h": 512}},
+  "rh_ruidi": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 1320, "y": 512, "w": 440, "h": 512}},
+  "rh_aomu": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 0, "y": 1024, "w": 440, "h": 512}},
+  "rh_tengxuan": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 440, "y": 1024, "w": 440, "h": 512}},
+  "rh_aolun": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 880, "y": 1024, "w": 440, "h": 512}},
+  "rh_shouji": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 1320, "y": 1024, "w": 440, "h": 512}},
+  "rh_sun": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 0, "y": 1536, "w": 440, "h": 512}},
+  "rh_ganord": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 440, "y": 1536, "w": 440, "h": 512}},
+  "rh_clark": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 880, "y": 1536, "w": 440, "h": 512}},
+  "rh_pc": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 1320, "y": 1536, "w": 440, "h": 512}},
+  "rh_tree": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 0, "y": 2048, "w": 440, "h": 512}},
+  "rh_depler": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 440, "y": 2048, "w": 440, "h": 512}},
+  "rh_funbot": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 880, "y": 2048, "w": 440, "h": 512}},
+  "rh_blake": {"src": "assets/images/characters/节奏盒子.webp", "pos": {"x": 1320, "y": 2048, "w": 440, "h": 512}},
+  "sh_shark": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 3, "y": 42, "w": 255, "h": 225}},
+  "sh_banana": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 42, "w": 232, "h": 225}},
+  "sh_teacup": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 880, "y": 42, "w": 182, "h": 225}},
+  "sh_croco": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 42, "w": 262, "h": 225}},
+  "sh_bomber": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1406, "y": 42, "w": 254, "h": 225}},
+  "sh_strawberry": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 3, "y": 402, "w": 255, "h": 245}},
+  "sh_octopus": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 693, "y": 402, "w": 274, "h": 245}},
+  "sh_tire": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1406, "y": 402, "w": 254, "h": 245}},
+  "sh_elephant": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 402, "w": 262, "h": 245}},
+  "sh_ninja": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 880, "y": 402, "w": 182, "h": 245}},
+  "sh_stick": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 3, "y": 785, "w": 255, "h": 247}},
+  "sh_capybara": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 785, "w": 232, "h": 247}},
+  "sh_cow": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 693, "y": 785, "w": 274, "h": 247}},
+  "sh_gorilla": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 785, "w": 262, "h": 247}},
+  "sh_hippo": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 693, "y": 1543, "w": 274, "h": 239}},
+  "sh_bigfoot": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 693, "y": 1162, "w": 274, "h": 243}},
+  "sh_bird": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1406, "y": 1162, "w": 254, "h": 243}},
+  "sh_crocoboy": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 1162, "w": 262, "h": 243}},
+  "sh_melondeer": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 3, "y": 1543, "w": 255, "h": 239}},
+  "sh_fish": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 1162, "w": 232, "h": 243}},
+  "sh_peach": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 1543, "w": 262, "h": 239}},
+  "sh_teapot": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1406, "y": 1543, "w": 254, "h": 239}},
+  "sh_camel": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 3, "y": 1924, "w": 255, "h": 240}},
+  "sh_salt": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 1924, "w": 232, "h": 240}},
+  "sh_honey": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 693, "y": 1924, "w": 274, "h": 240}},
+  "sh_pig": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 1062, "y": 1924, "w": 262, "h": 240}},
+  "sh_catfish": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 402, "w": 232, "h": 245}},
+  "sh_mouse": {"src": "assets/images/characters/ai山海经2.webp", "pos": {"x": 413, "y": 1543, "w": 232, "h": 239}}
 };
 </script>
 <script>
@@ -30671,4 +30919,5 @@ window.MX_SPRITE_COORDS = {
   if (window.console) console.log('[mx-pwa] SW / 版本更新 / 同步提醒模块加载完成 (http=' + IS_HTTP + ')');
 })();
 </script>
+<script id="mx-pool-index-data" type="application/json">{"ver":1,"ts":1789294175814,"base":"assets/","poolBase":"assets/pool/","count":124,"bytes":135404177,"items":[{"p":"audio/sprunki/sprunki_ensemble.mp3","n":"sprunki_ensemble.mp3","k":"sprunkiensemble","s":101189,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_fun_computer.mp3","n":"sprunki_fun_computer.mp3","k":"sprunkifuncomputer","s":65244,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_funbot.mp3","n":"sprunki_funbot.mp3","k":"sprunkifunbot","s":58139,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_gray.mp3","n":"sprunki_gray.mp3","k":"sprunkigray","s":114145,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_phase123.mp3","n":"sprunki_phase123.mp3","k":"sprunkiphase123","s":116235,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_pinki.mp3","n":"sprunki_pinki.mp3","k":"sprunkipinki","s":56049,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_simon.mp3","n":"sprunki_simon.mp3","k":"sprunkisimon","s":61065,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_sun_concerto.mp3","n":"sprunki_sun_concerto.mp3","k":"sprunkisunconcerto","s":88232,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_tree_fantasy.mp3","n":"sprunki_tree_fantasy.mp3","k":"sprunkitreefantasy","s":110384,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_wenda.mp3","n":"sprunki_wenda.mp3","k":"sprunkiwenda","s":102025,"t":"audio","z":"A"},{"p":"icons/apple-touch-icon.png","n":"apple-touch-icon.png","k":"appletouchicon","s":1646,"t":"image","z":"A"},{"p":"icons/icon-192.png","n":"icon-192.png","k":"icon192","s":1758,"t":"image","z":"A"},{"p":"icons/icon-512.png","n":"icon-512.png","k":"icon512","s":4532,"t":"image","z":"A"},{"p":"images/rhythm_chars_reference.webp","n":"rhythm_chars_reference.webp","k":"rhythmcharsreference","s":137570,"t":"image","z":"A"},{"p":"images/characters/ai山海经1.webp","n":"ai山海经1.webp","k":"ai山海经1","s":62210,"t":"image","z":"A"},{"p":"images/characters/ai山海经2.webp","n":"ai山海经2.webp","k":"ai山海经2","s":199726,"t":"image","z":"A"},{"p":"images/characters/rhythm_aolun.webp","n":"rhythm_aolun.webp","k":"rhythmaolun","s":55012,"t":"image","z":"A"},{"p":"images/characters/rhythm_aomu.webp","n":"rhythm_aomu.webp","k":"rhythmaomu","s":47928,"t":"image","z":"A"},{"p":"images/characters/rhythm_black.webp","n":"rhythm_black.webp","k":"rhythmblack","s":42338,"t":"image","z":"A"},{"p":"images/characters/rhythm_brude.webp","n":"rhythm_brude.webp","k":"rhythmbrude","s":58048,"t":"image","z":"A"},{"p":"images/characters/rhythm_dashu.webp","n":"rhythm_dashu.webp","k":"rhythmdashu","s":53808,"t":"image","z":"A"},{"p":"images/characters/rhythm_deprule.webp","n":"rhythm_deprule.webp","k":"rhythmdeprule","s":52396,"t":"image","z":"A"},{"p":"images/characters/rhythm_ganuode.webp","n":"rhythm_ganuode.webp","k":"rhythmganuode","s":5236,"t":"image","z":"A"},{"p":"images/characters/rhythm_greylei.webp","n":"rhythm_greylei.webp","k":"rhythmgreylei","s":39112,"t":"image","z":"A"},{"p":"images/characters/rhythm_jiewen.webp","n":"rhythm_jiewen.webp","k":"rhythmjiewen","s":46634,"t":"image","z":"A"},{"p":"images/characters/rhythm_kelake.webp","n":"rhythm_kelake.webp","k":"rhythmkelake","s":51240,"t":"image","z":"A"},{"p":"images/characters/rhythm_pcman.webp","n":"rhythm_pcman.webp","k":"rhythmpcman","s":54366,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_aolun.webp","n":"rhythm_rh_aolun.webp","k":"rhythmrhaolun","s":92824,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_aomu.webp","n":"rhythm_rh_aomu.webp","k":"rhythmrhaomu","s":66724,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_blake.webp","n":"rhythm_rh_blake.webp","k":"rhythmrhblake","s":63168,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_brude.webp","n":"rhythm_rh_brude.webp","k":"rhythmrhbrude","s":75658,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_clark.webp","n":"rhythm_rh_clark.webp","k":"rhythmrhclark","s":86472,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_depler.webp","n":"rhythm_rh_depler.webp","k":"rhythmrhdepler","s":79922,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_funbot.webp","n":"rhythm_rh_funbot.webp","k":"rhythmrhfunbot","s":108580,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ganord.webp","n":"rhythm_rh_ganord.webp","k":"rhythmrhganord","s":75610,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_gelei.webp","n":"rhythm_rh_gelei.webp","k":"rhythmrhgelei","s":72152,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_jiewen.webp","n":"rhythm_rh_jiewen.webp","k":"rhythmrhjiewen","s":72528,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_pc.webp","n":"rhythm_rh_pc.webp","k":"rhythmrhpc","s":89002,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ruidi.webp","n":"rhythm_rh_ruidi.webp","k":"rhythmrhruidi","s":71660,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_shouji.webp","n":"rhythm_rh_shouji.webp","k":"rhythmrhshouji","s":8108,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_sun.webp","n":"rhythm_rh_sun.webp","k":"rhythmrhsun","s":86528,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tanu.webp","n":"rhythm_rh_tanu.webp","k":"rhythmrhtanu","s":80628,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tengxuan.webp","n":"rhythm_rh_tengxuan.webp","k":"rhythmrhtengxuan","s":117626,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tree.webp","n":"rhythm_rh_tree.webp","k":"rhythmrhtree","s":75646,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_wenda.webp","n":"rhythm_rh_wenda.webp","k":"rhythmrhwenda","s":72334,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_xiaotian.webp","n":"rhythm_rh_xiaotian.webp","k":"rhythmrhxiaotian","s":86868,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ximeng.webp","n":"rhythm_rh_ximeng.webp","k":"rhythmrhximeng","s":93868,"t":"image","z":"A"},{"p":"images/characters/rhythm_robot.webp","n":"rhythm_robot.webp","k":"rhythmrobot","s":66354,"t":"image","z":"A"},{"p":"images/characters/rhythm_ruidi.webp","n":"rhythm_ruidi.webp","k":"rhythmruidi","s":44700,"t":"image","z":"A"},{"p":"images/characters/rhythm_shouji.webp","n":"rhythm_shouji.webp","k":"rhythmshouji","s":46240,"t":"image","z":"A"},{"p":"images/characters/rhythm_simon.webp","n":"rhythm_simon.webp","k":"rhythmsimon","s":42800,"t":"image","z":"A"},{"p":"images/characters/rhythm_sunman.webp","n":"rhythm_sunman.webp","k":"rhythmsunman","s":50128,"t":"image","z":"A"},{"p":"images/characters/rhythm_tanu.webp","n":"rhythm_tanu.webp","k":"rhythmtanu","s":51298,"t":"image","z":"A"},{"p":"images/characters/rhythm_tengxuan.webp","n":"rhythm_tengxuan.webp","k":"rhythmtengxuan","s":75082,"t":"image","z":"A"},{"p":"images/characters/rhythm_wenda.webp","n":"rhythm_wenda.webp","k":"rhythmwenda","s":37796,"t":"image","z":"A"},{"p":"images/characters/rhythm_xiaotian.webp","n":"rhythm_xiaotian.webp","k":"rhythmxiaotian","s":46584,"t":"image","z":"A"},{"p":"images/characters/sprite_coords.json","n":"sprite_coords.json","k":"spritecoords","s":9368,"t":"json","z":"A"},{"p":"images/characters/节奏盒子.webp","n":"节奏盒子.webp","k":"节奏盒子","s":190616,"t":"image","z":"A"},{"p":"images/literacy/识字启蒙200字_p05.png","n":"识字启蒙200字_p05.png","k":"识字启蒙200字p05","s":111446,"t":"image","z":"A"},{"p":"images/shanhai/sh_banana.webp","n":"sh_banana.webp","k":"shbanana","s":37728,"t":"image","z":"A"},{"p":"images/shanhai/sh_bigfoot.webp","n":"sh_bigfoot.webp","k":"shbigfoot","s":9334,"t":"image","z":"A"},{"p":"images/shanhai/sh_bird.webp","n":"sh_bird.webp","k":"shbird","s":9648,"t":"image","z":"A"},{"p":"images/shanhai/sh_bomber.webp","n":"sh_bomber.webp","k":"shbomber","s":10746,"t":"image","z":"A"},{"p":"images/shanhai/sh_camel.webp","n":"sh_camel.webp","k":"shcamel","s":9594,"t":"image","z":"A"},{"p":"images/shanhai/sh_capybara.webp","n":"sh_capybara.webp","k":"shcapybara","s":84444,"t":"image","z":"A"},{"p":"images/shanhai/sh_catfish.webp","n":"sh_catfish.webp","k":"shcatfish","s":9660,"t":"image","z":"A"},{"p":"images/shanhai/sh_cow.webp","n":"sh_cow.webp","k":"shcow","s":9722,"t":"image","z":"A"},{"p":"images/shanhai/sh_croco.webp","n":"sh_croco.webp","k":"shcroco","s":12874,"t":"image","z":"A"},{"p":"images/shanhai/sh_crocoboy.webp","n":"sh_crocoboy.webp","k":"shcrocoboy","s":9544,"t":"image","z":"A"},{"p":"images/shanhai/sh_deer.webp","n":"sh_deer.webp","k":"shdeer","s":9582,"t":"image","z":"A"},{"p":"images/shanhai/sh_elephant.webp","n":"sh_elephant.webp","k":"shelephant","s":11728,"t":"image","z":"A"},{"p":"images/shanhai/sh_fish.webp","n":"sh_fish.webp","k":"shfish","s":8898,"t":"image","z":"A"},{"p":"images/shanhai/sh_gorilla.webp","n":"sh_gorilla.webp","k":"shgorilla","s":12650,"t":"image","z":"A"},{"p":"images/shanhai/sh_gorilla3.webp","n":"sh_gorilla3.webp","k":"shgorilla3","s":12980,"t":"image","z":"A"},{"p":"images/shanhai/sh_hippo.webp","n":"sh_hippo.webp","k":"shhippo","s":9408,"t":"image","z":"A"},{"p":"images/shanhai/sh_honey.webp","n":"sh_honey.webp","k":"shhoney","s":10154,"t":"image","z":"A"},{"p":"images/shanhai/sh_melondeer.webp","n":"sh_melondeer.webp","k":"shmelondeer","s":11662,"t":"image","z":"A"},{"p":"images/shanhai/sh_mouse.webp","n":"sh_mouse.webp","k":"shmouse","s":10470,"t":"image","z":"A"},{"p":"images/shanhai/sh_ninja.webp","n":"sh_ninja.webp","k":"shninja","s":10472,"t":"image","z":"A"},{"p":"images/shanhai/sh_octopus.webp","n":"sh_octopus.webp","k":"shoctopus","s":11524,"t":"image","z":"A"},{"p":"images/shanhai/sh_peach.webp","n":"sh_peach.webp","k":"shpeach","s":9686,"t":"image","z":"A"},{"p":"images/shanhai/sh_pig.webp","n":"sh_pig.webp","k":"shpig","s":12876,"t":"image","z":"A"},{"p":"images/shanhai/sh_salt.webp","n":"sh_salt.webp","k":"shsalt","s":9592,"t":"image","z":"A"},{"p":"images/shanhai/sh_shark.webp","n":"sh_shark.webp","k":"shshark","s":12444,"t":"image","z":"A"},{"p":"images/shanhai/sh_stick.webp","n":"sh_stick.webp","k":"shstick","s":6958,"t":"image","z":"A"},{"p":"images/shanhai/sh_strawberry.webp","n":"sh_strawberry.webp","k":"shstrawberry","s":9756,"t":"image","z":"A"},{"p":"images/shanhai/sh_teacup.webp","n":"sh_teacup.webp","k":"shteacup","s":8906,"t":"image","z":"A"},{"p":"images/shanhai/sh_teapot.webp","n":"sh_teapot.webp","k":"shteapot","s":10428,"t":"image","z":"A"},{"p":"images/shanhai/sh_tire.webp","n":"sh_tire.webp","k":"shtire","s":9166,"t":"image","z":"A"},{"p":"images/shanhai/sh_zebra.webp","n":"sh_zebra.webp","k":"shzebra","s":14144,"t":"image","z":"A"},{"p":"images/stage/rhythm_stage_bg.svg","n":"rhythm_stage_bg.svg","k":"rhythmstagebg","s":3432,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0001.webp","n":"IMAG0001.webp","k":"imag0001","s":530640,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0002.webp","n":"IMAG0002.webp","k":"imag0002","s":143582,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0004.webp","n":"IMAG0004.webp","k":"imag0004","s":2332994,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0005.webp","n":"IMAG0005.webp","k":"imag0005","s":2444282,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0006.webp","n":"IMAG0006.webp","k":"imag0006","s":2777522,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0007.webp","n":"IMAG0007.webp","k":"imag0007","s":2080450,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0008.webp","n":"IMAG0008.webp","k":"imag0008","s":1792410,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0009.webp","n":"IMAG0009.webp","k":"imag0009","s":2333012,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0010.webp","n":"IMAG0010.webp","k":"imag0010","s":2119552,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0011.webp","n":"IMAG0011.webp","k":"imag0011","s":2126102,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0012.webp","n":"IMAG0012.webp","k":"imag0012","s":1759798,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0013.webp","n":"IMAG0013.webp","k":"imag0013","s":2837552,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0014.webp","n":"IMAG0014.webp","k":"imag0014","s":2870038,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0015.webp","n":"IMAG0015.webp","k":"imag0015","s":2026956,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0016.webp","n":"IMAG0016.webp","k":"imag0016","s":2049494,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0017.webp","n":"IMAG0017.webp","k":"imag0017","s":1078218,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0018.webp","n":"IMAG0018.webp","k":"imag0018","s":1180546,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0019.webp","n":"IMAG0019.webp","k":"imag0019","s":242022,"t":"image","z":"A"},{"p":"pdf/english/level10.pdf","n":"level10.pdf","k":"level10","s":1229439,"t":"pdf","z":"A"},{"p":"pdf/english/自然拼读学习法_游戏10.pdf","n":"自然拼读学习法_游戏10.pdf","k":"自然拼读学习法游戏10","s":1104898,"t":"pdf","z":"A"},{"p":"pdf/lchinese/理解240句小古文.pdf","n":"理解240句小古文.pdf","k":"理解240句小古文","s":1245354,"t":"pdf","z":"A"},{"p":"pdf/literacy/转盘部首.pdf","n":"转盘部首.pdf","k":"转盘部首","s":447766,"t":"pdf","z":"A"},{"p":"pdf/math/摩比爱数学_萌芽篇1.pdf","n":"摩比爱数学_萌芽篇1.pdf","k":"摩比爱数学萌芽篇1","s":32444279,"t":"pdf","z":"A"},{"p":"pdf/math/第三关_破十法.pdf","n":"第三关_破十法.pdf","k":"第三关破十法","s":1352902,"t":"pdf","z":"A"},{"p":"pdf/pinyin/前鼻韵母.pdf","n":"前鼻韵母.pdf","k":"前鼻韵母","s":1571626,"t":"pdf","z":"A"},{"p":"pdf/pinyin/单韵母.pdf","n":"单韵母.pdf","k":"单韵母","s":1779421,"t":"pdf","z":"A"},{"p":"pdf/pinyin/后鼻韵母.pdf","n":"后鼻韵母.pdf","k":"后鼻韵母","s":1174406,"t":"pdf","z":"A"},{"p":"pdf/pinyin/复韵母.pdf","n":"复韵母.pdf","k":"复韵母","s":2444887,"t":"pdf","z":"A"},{"p":"pdf/pinyin/幼小衔接拼音专项汇总.pdf","n":"幼小衔接拼音专项汇总.pdf","k":"幼小衔接拼音专项汇总","s":1571180,"t":"pdf","z":"A"},{"p":"pdf/pinyin/拼音77首.pdf","n":"拼音77首.pdf","k":"拼音77首","s":27734599,"t":"pdf","z":"A"},{"p":"pdf/pinyin/拼音复韵母+鼻韵母+整体认读拼音.pdf","n":"拼音复韵母+鼻韵母+整体认读拼音.pdf","k":"拼音复韵母鼻韵母整体认读拼音","s":5964031,"t":"pdf","z":"A"},{"p":"pdf/story/保罗大叔分比萨绘本.ppt","n":"保罗大叔分比萨绘本.ppt","k":"保罗大叔分比萨绘本","s":17714688,"t":"ppt","z":"A"},{"p":"pdf/workbook/练习1_回答问题找不同_p4.webp","n":"练习1_回答问题找不同_p4.webp","k":"练习1回答问题找不同p4","s":334736,"t":"image","z":"A"}]}</script>
 </body>
