@@ -7276,7 +7276,8 @@ html, body {
         <span class="mode-badge" id="mode-badge" data-page-node-id="p0cBADwFBDyZ8A4OGHONtb">🧒 儿童模式</span>
         <button type="button" class="header-parent-btn no-print" id="header-parent-btn" title="进入家长工作台（需验证）" data-page-node-id="zkCAChkAFfRyXh3OVpVX4g">👨‍👩‍👧 家长</button>
         <span class="mx-sync-badge" id="mx-sync-badge" title="云端同步状态" data-page-node-id="FzTE7G6cWDbqbQsh0Egsxk">💾 仅本地</span>
-        <button type="button" class="mx-force-sync-btn no-print" id="mx-force-sync-btn" title="VIP 多端强制同步：拉取云端最新并回推本机，双向对齐所有设备" style="display:none">🔄 强制同步</button>
+        <!-- [2026-09-14 迁移] 「🔄 强制同步」按钮已移入「云端同步诊断」弹窗（点右上角同步徽标打开），
+             与「🌐 测网关连通」同区，仅 VIP 显示；顶栏不再占位。 -->
 
         <!-- 预留：阳光/星星积分面板（阶段二实现） -->
 
@@ -16222,6 +16223,31 @@ window.MX_SEED = data;
      ================================================== */
   var _gachaTheme = 'pvz'; var _drawing = false; var _owned = {};
 
+  /* [#442] 免费抽卡机会（券类商品兑换发放）：存 settings.gacha:free:<cid>
+     —— 兑换「盲盒抽奖券」后自动 +1，抽卡时优先消耗（有券不扣积分）。 */
+  function gachaFreeKey(cid) { return 'gacha:free:' + (cid || 'default'); }
+  function gachaFreeGet(cid) {
+    try {
+      return Promise.resolve(DB.getSetting(gachaFreeKey(cid), 0)).then(function (v) {
+        var n = parseInt(v, 10); return (isNaN(n) || n < 0) ? 0 : n;
+      }).catch(function () { return 0; });
+    } catch (e) { return Promise.resolve(0); }
+  }
+  function gachaFreeAdd(cid, n) {
+    n = parseInt(n, 10); if (isNaN(n) || n <= 0) n = 1;
+    return gachaFreeGet(cid).then(function (cur) {
+      var tot = cur + n;
+      return Promise.resolve(DB.setSetting(gachaFreeKey(cid), String(tot))).then(function () { return tot; });
+    });
+  }
+  function gachaFreeUse(cid) {
+    return gachaFreeGet(cid).then(function (cur) {
+      if (cur <= 0) return 0;
+      var tot = cur - 1;
+      return Promise.resolve(DB.setSetting(gachaFreeKey(cid), String(tot))).then(function () { return tot; });
+    });
+  }
+
   /* 从 IndexedDB 回填已收集角色，避免刷新后「已收集 0」 */
   async function loadOwnedFromDB(cid) {
     try {
@@ -16241,6 +16267,7 @@ window.MX_SEED = data;
     if (!page) return;
     var cid = await child();
     var pts = await getPoints(cid);
+    var _free = await gachaFreeGet(cid);
     await loadOwnedFromDB(cid);
     var totalChars = THEME_KEYS.reduce(function (s, k) { return s + (THEMES[k].chars || []).length; }, 0);
     var tabs = THEME_KEYS.map(function (k) {
@@ -16251,15 +16278,17 @@ window.MX_SEED = data;
       '<div class="mx-balance-bar" style="margin-bottom:10px">🎴 收集进度：<b>' + Object.keys(_owned).length + '</b> / ' + totalChars +
         ' &nbsp;·&nbsp; <a href="javascript:void(0)" id="gx-go-book" style="color:var(--accent-primary,#7ec850);font-weight:900">📚 打开我的卡册 →</a></div>' +
       '<div class="dash-stats"><div class="dash-stat"><div class="stat-num">⭐ ' + pts + '</div><div class="stat-label">我的积分</div></div>' +
-      '<div class="dash-stat"><div class="stat-num">' + Object.keys(_owned).length + '</div><div class="stat-label">已收集角色</div></div></div>' +
+      '<div class="dash-stat"><div class="stat-num">' + Object.keys(_owned).length + '</div><div class="stat-label">已收集角色</div></div>' +
+      '<div class="dash-stat"><div class="stat-num" id="gx-free-num">' + _free + '</div><div class="stat-label">免费抽卡券</div></div></div>' +
       '<div class="dash-block">' +
         '<div class="dash-block-title">🎴 选择卡池</div>' +
         '<div class="gx-pool-tabs" id="gx-gacha-tabs">' + tabs + '</div>' +
-        '<div style="text-align:center;padding:8px 0 4px;"><button type="button" class="btn gx-draw" id="gx-draw-btn" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;font-size:16px;padding:10px 26px;">✨ 抽一张（' + GACHA_COST + ' 积分）</button></div>' +
+        '<div style="text-align:center;padding:8px 0 4px;"><button type="button" class="btn gx-draw" id="gx-draw-btn" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;font-size:16px;padding:10px 26px;">' +
+          (_free > 0 ? ('🎟️ 用免费券抽一张（剩 ' + _free + ' 张）') : ('✨ 抽一张（' + GACHA_COST + ' 积分）')) + '</button></div>' +
         '<div id="gx-reveal"></div>' +
       '</div>' +
       '<div style="text-align:center;margin:12px 0 4px"><button type="button" class="btn" id="gx-book-btn" style="background:var(--accent-tertiary,#4a9e2f);color:#fff;border:none;padding:9px 22px;font-size:15px;">📚 我的卡册 · 图鉴</button></div>' +
-      '<div class="empty-tip">抽到的角色自动进入「我的卡册」；点击「领养为宠物」可设为首页宠物。</div>';
+      '<div class="empty-tip">抽到的角色自动进入「我的卡册」；点击「领养为宠物」可设为首页宠物。<br>🎟️ 免费抽卡券可用「积分商城 → 盲盒抽奖券」兑换获得，抽卡时自动优先使用。</div>';
     bindGacha(page, cid);
   }
 
@@ -16291,10 +16320,17 @@ window.MX_SEED = data;
     // cid 每次实时取，避免切换宝宝后用了过期 id
     try { cid = (await child()) || cid; } catch (e) {}
     if (!cid) { if (window.showToast) window.showToast('还没有宝宝档案，请先在「系统设置」添加宝宝'); return; }
-    var pts = await getPoints(cid);
-    if (pts < GACHA_COST) { if (window.showToast) window.showToast('积分不足（需 ' + GACHA_COST + '，当前 ' + pts + '）⭐'); return; }
-    var left = await spendPoints(cid, GACHA_COST, '盲盒抽卡');
-    if (left === -1) { if (window.showToast) window.showToast('积分不足（需 ' + GACHA_COST + '）⭐'); return; }
+    /* [#442] 券类商品发放的「免费抽卡机会」优先消耗：有券不扣积分 */
+    var _freeN = await gachaFreeGet(cid);
+    if (_freeN > 0) {
+      var _freeLeft = await gachaFreeUse(cid);
+      if (window.showToast) window.showToast('🎟️ 使用 1 张免费抽卡券（剩余 ' + _freeLeft + ' 张）');
+    } else {
+      var pts = await getPoints(cid);
+      if (pts < GACHA_COST) { if (window.showToast) window.showToast('积分不足（需 ' + GACHA_COST + '，当前 ' + pts + '）⭐'); return; }
+      var left = await spendPoints(cid, GACHA_COST, '盲盒抽卡');
+      if (left === -1) { if (window.showToast) window.showToast('积分不足（需 ' + GACHA_COST + '）⭐'); return; }
+    }
     var theme = THEMES[_gachaTheme];
     var ch = theme.chars[Math.floor(Math.random() * theme.chars.length)];
     _owned[ch.id] = { themeKey: _gachaTheme, name: ch.name, emoji: ch.emoji, rarity: ch.rarity||'普通', img: ch.img, at: Date.now() };
@@ -16334,6 +16370,9 @@ window.MX_SEED = data;
       var st = page.querySelectorAll('.dash-stat .stat-num');
       if (st[0]) st[0].textContent = '⭐ ' + (await getPoints(cid));
       if (st[1]) st[1].textContent = String(Object.keys(_owned).length);
+      if (st[2]) st[2].textContent = String(await gachaFreeGet(cid));
+      var _db = page.querySelector('#gx-draw-btn');
+      if (_db) { var _f2 = await gachaFreeGet(cid); _db.textContent = (_f2 > 0) ? ('🎟️ 用免费券抽一张（剩 ' + _f2 + ' 张）') : ('✨ 抽一张（' + GACHA_COST + ' 积分）'); }
     } catch (e) {}
   }
 
@@ -16395,6 +16434,8 @@ window.MX_SEED = data;
   window.renderGames = renderGames;
   window.MX_GACHA_THEMES = THEMES;   /* 盲盒卡池主题（区别于皮肤 window.THEMES） */
   window.renderGacha = renderGacha;
+  /* [#442] 免费抽卡券对外接口（积分商城兑换券类商品时调用；跨 IIFE 必须显式导出） */
+  window.MX_GACHA = { freeKey: gachaFreeKey, freeCount: gachaFreeGet, freeAdd: gachaFreeAdd, freeUse: gachaFreeUse };
 })();
 </script>
 
@@ -16967,9 +17008,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     } catch (e) {}
   }
   function loadConfigTables() {
+    var _cfgP = null;
     try {
       if (window.mxApiProxy) {
-        window.mxApiProxy('getConfig', { key: 'linkage_config' }).then(function (r) {
+        _cfgP = window.mxApiProxy('getConfig', { key: 'linkage_config' }).then(function (r) {
           if (r && r.ok && r.linkage) {
             window.MX_LINKAGE = r.linkage;
             /* [#421-d] 云端「商品配置」：管理后台 → 🛍️ 商品配置 写入 linkage_config.goods（{shop,mall}），
@@ -16997,6 +17039,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         }).catch(function () {});
       }
     } catch (e) {}
+    return _cfgP || Promise.resolve(null);
   }
   /* [#378 公告准实时] 定时 + 回前台时重拉配置：管理后台发布公告后，用户端最长 3 分钟内自动可见；
      切回前台立即刷新一次（60s 节流），无需重启页面。 */
@@ -17011,6 +17054,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     setInterval(refreshCfg, 3 * 60 * 1000);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshCfg(); });
     window.addEventListener('focus', refreshCfg);
+    /* [#445 商品配置即时同步] 进「积分兑换 / 萌星好物」时强制重拉一次配置（不受 60s 节流），
+       拉到后由导航钩子比对变化决定是否重渲染 —— 修「后台已发布、用户端已开页面看不到新商品」。 */
+    window.mxRefreshCfgNow = function () { _lastCfgFetch = Date.now(); try { return loadConfigTables(); } catch (e) { return Promise.resolve(null); } };
   })();
   /* [#412 版本自愈哨兵] 长驻页面（手机/平板长期不刷新）自动检测线上新版：
      仅在页面不可见时每 5 分钟抓自身 HTML 头部比对 MX_BUILD_TS（流式读前 20KB 即断，省流量），
@@ -17299,13 +17345,21 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       return Math.max(0, Math.round((_p(b).getTime() - _p(a).getTime()) / 86400000));
     } catch (e) { return 0; }
   }
+  /* [pvzcdfix 2026-09-14] 日期串平移 n 天（本地时区数字构造，跨月/跨年安全；解析失败回退今天） */
+  function pvzDayShift(dayStr, n) {
+    var x = String(dayStr || '').split('-');
+    var d = new Date(+x[0], (+x[1]) - 1, +x[2]);
+    if (isNaN(d.getTime())) return pvzToday();
+    d.setDate(d.getDate() + (n || 0));
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
   function pvzSave() {
     try {
       if (!pvz.cid) return;
       localStorage.setItem('mxg_pvz_state_' + pvz.cid, JSON.stringify({
         ts: Date.now(),
         lawn: pvz.lawn, zombies: pvz.zombies, zpos: pvz.zpos, day: pvz.day,
-        sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), lastDay: pvz._lastDay || pvzToday(), battleStarted: !!pvz.battleStarted
+        sunMap: pvz.sunMap || {}, sunPending: pvz.sunPending || 0, sunDay: pvz._sunDay || pvzToday(), lastDay: pvz._lastDay || pvzToday(), settledTo: pvz._settledTo || '', battleStarted: !!pvz.battleStarted
       }));
     } catch (e) {}
   }
@@ -17317,6 +17371,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     for (var r = 0; r < 5; r++) { pvz.lawn.push([]); for (var c = 0; c < 9; c++) pvz.lawn[r].push(null); }
     pvz.zombies = [pvzMkZombie(Math.floor(Math.random() * 5))];
     pvz.selected = null; pvz.zpos = 9; pvz.day = 1; pvz.sunMap = {}; pvz.battleStarted = false; pvz._lastDay = pvzToday(); _roundAwarded['pvz'] = false;
+    /* [pvzcdfix] 结算水位 = 已结算到的自然日（含）。新局从「昨天」起算 → 今天尚未结束，不结算 */
+    pvz._settledTo = pvzDayShift(pvzToday(), -1);
     pvz.sunPending = 0;
     pvz._sunDay = pvzToday();   /* [pvzfix] 新局从今天起算配额 */
     try { if (pvz.cid) localStorage.removeItem('mxg_pvz_state_' + pvz.cid); } catch (e) {}   /* 开新一轮 = 清档 */
@@ -17334,6 +17390,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         pvz.zpos = (typeof _saved.zpos === 'number') ? _saved.zpos : 9;
         pvz.day = _saved.day || 1;
         pvz._lastDay = _saved.lastDay || _saved.sunDay || pvzToday();
+        /* [pvzcdfix 2026-09-14] 结算水位迁移：新档用 settledTo；旧档只有 lastDay（= 上次进入日），
+           按「那次进入当天尚未结算」迁移为 lastDay-1，避免把昨天漏掉、也避免重复结算。 */
+        pvz._settledTo = _saved.settledTo || pvzDayShift(_saved.lastDay || _saved.sunDay || pvzToday(), -1);
         pvz.sunMap = _saved.sunMap || {};
         /* [pvzfix] 阳光配额按真实日历日重置：跨天（或旧存档无日期戳）→ 先把昨天未收集的阳光自动入账，再清零 */
         pvz.sunPending = (typeof _saved.sunPending === 'number') ? _saved.sunPending : 0;
@@ -17352,14 +17411,21 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
          收集被吃植物，进入后弹跨日战报汇总窗。复用 pvzStepOnce / pvzRunCrossDays / pvzShowCrossDayPopup。 */
       var _crossP = Promise.resolve();
       if (!pvz.battleStarted && pvz.day < 7) {
-        var _ld = pvz._lastDay || pvz._sunDay || pvzToday();
-        var _ed = pvzDayDiff(_ld, pvzToday());
-        if (_ed >= 1) {
-          var _steps = Math.min(_ed, 7 - pvz.day);
-          _crossP = pvzRunCrossDays(cid, _ld, _steps).then(function (_eaten) {
+        /* [pvzcdfix 2026-09-14] 只结算「已经结束的自然日」= settledTo+1 .. 昨天。
+           旧实现按 lastDay+1..今天 结算 → 查的是**今天**的任务；而今天排期常为空/未生成，
+           被 pvzDayDoneRatio 的「空日程视为已完成」兜底 → 昨天没完成任务也不吃植物、不弹窗
+           （用户实测：「昨天没完成任务，今天进来什么都没发生」）。 */
+        var _st = pvz._settledTo || pvzDayShift(pvzToday(), -1);
+        var _elapsed = pvzDayDiff(_st, pvzToday()) - 1;
+        if (_elapsed >= 1) {
+          var _steps = Math.max(1, Math.min(_elapsed, 7 - pvz.day, 7));
+          /* 累积多天时只结算「最近 N 天」（更贴近玩家的当下记忆），其余视为已过期 */
+          var _from = (_elapsed > _steps) ? pvzDayShift(pvzToday(), -(_steps + 1)) : _st;
+          _crossP = pvzRunCrossDays(cid, _from, _steps).then(function (_rep) {
+            pvz._settledTo = pvzDayShift(pvzToday(), -1);
             pvz._lastDay = pvzToday();
             pvzSave();
-            pvz._crossEaten = _eaten || [];
+            pvz._crossRep = _rep || null;
           });
         }
       }
@@ -17377,7 +17443,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           syncPvzPlants().then(function () {
             if (container.querySelector('#mxg-pvz-lawn')) { buildPVZ(container); startPVZTimers(container); }
           }).catch(function () {});
-          if (pvz._crossEaten && pvz._crossEaten.length) { pvzShowCrossDayPopup(container, pvz._crossEaten); pvz._crossEaten = []; }
+          if (pvz._crossRep) { pvzShowCrossDayPopup(container, pvz._crossRep); pvz._crossRep = null; }
         });
       });
     });
@@ -17540,33 +17606,51 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).catch(function () { return { total: 0, done: 0, allDone: true }; });
   }
   /* 跨自然日：逐日推进（封顶第7天），每天按那天任务完成情况判定；收集被吃植物 */
-  function pvzRunCrossDays(cid, lastDay, steps) {
+  function pvzRunCrossDays(cid, fromDay, steps) {
     var keys = [];
     /* [pvzfix 2026-09-12] 跨引擎安全解析：lastDay 是 pvzToday() 产出的「YYYY-M-D」不补零格式，
        Safari/iOS/微信 WebKit 对非 ISO 日期串返回 Invalid Date → 日期键退化成 "NaN-NaN-NaN"
        → 查不到当天排期 → 被 pvzDayDoneRatio 的「空日程视为已完成」兜底吞掉 → 不吃植物、不弹跨日战报。
        改用数字构造 new Date(+y, +m-1, +d)（与 #351 pvzDayDiff 同款写法），补零/不补零都能正确解析。
        lastDay 仍无法解析时保守跳过（不推进、不吃植物），绝不产生 NaN 日期键。 */
-    var _lp = String(lastDay || '').split('-');
+    var _lp = String(fromDay || '').split('-');
     var _pvdBase = new Date(+_lp[0], (+_lp[1]) - 1, +_lp[2]);
     if (!isNaN(_pvdBase.getTime())) {
       for (var i = 1; i <= steps; i++) { var d = new Date(_pvdBase.getTime()); d.setDate(d.getDate() + i); keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
     } else {
-      try { console.warn('[PVZ] 跨日结算跳过：lastDay 无法解析 =', lastDay); } catch (_e) {}
+      try { console.warn('[PVZ] 跨日结算跳过：fromDay 无法解析 =', fromDay); } catch (_e) {}
     }
-    var eatenAll = [];
+    var eatenAll = [], missedDays = 0;
     var chain = Promise.resolve();
     keys.forEach(function (key) {
-      chain = chain.then(function () { return pvzDayDoneRatio(cid, key).then(function (tc) { var done = !!(tc && tc.allDone); var eaten = pvzStepOnce(done); if (eaten) eatenAll.push(eaten); }); });
+      chain = chain.then(function () {
+        return pvzDayDoneRatio(cid, key).then(function (tc) {
+          var done = !!(tc && tc.allDone);
+          if (!done) missedDays++;
+          var eaten = pvzStepOnce(done);
+          if (eaten) eatenAll.push(eaten);
+        });
+      });
     });
-    return chain.then(function () { return eatenAll; });
+    /* [pvzcdfix] 返回完整战报（不只是被吃植物）：missedDays 用于「花园里没有植物」时的说明文案 */
+    return chain.then(function () { return { eaten: eatenAll, missedDays: missedDays, days: keys.length, from: fromDay }; });
   }
   /* 进入游戏后弹跨日战报：说明为什么被吃、消掉的是谁 */
-  function pvzShowCrossDayPopup(container, eaten) {
-    if (!eaten || !eaten.length) return;
-    var lines = eaten.map(function (e) { return '· ' + (e.emoji || '🌱') + (e.name ? ' ' + e.name : ''); });
-    var body = '你离开的日子里，有 <b>' + eaten.length + '</b> 天没完成全部基础任务，僵尸趁机吃掉了花园里的植物：<br><br>' + lines.join('<br>') + '<br><br>💡 每天完成全部基础任务就能保护花园，僵尸也只前进半格哦~';
-    modal(container, '🧟 跨日战报·花园失守', body);
+  function pvzShowCrossDayPopup(container, rep) {
+    if (!rep || typeof rep !== 'object') return;
+    var eaten = rep.eaten || [], missed = rep.missedDays || 0;
+    if (!eaten.length && !missed) return;
+    if (eaten.length) {
+      var lines = eaten.map(function (e) { return '· ' + (e.emoji || '🌱') + (e.name ? ' ' + e.name : ''); });
+      var body = '你离开的日子里，有 <b>' + missed + '</b> 天没完成全部基础任务，僵尸趁机吃掉了花园里的植物：<br><br>' + lines.join('<br>') + '<br><br>💡 每天完成全部基础任务就能保护花园，僵尸也只前进半格哦~';
+      modal(container, '🧟 跨日战报·花园失守', body);
+      return;
+    }
+    /* [pvzcdfix] 有未完成的日子、但花园里还没种植物 → 明说「为什么什么都没发生」，
+       避免用户误以为规则失效（此前静默无提示）。 */
+    modal(container, '🧟 跨日战报·花园保卫战',
+      '你离开的日子里，有 <b>' + missed + '</b> 天没完成全部基础任务，僵尸向前推进了。<br><br>' +
+      '🪴 不过花园里还没有植物，这次没有植物被吃掉——快去种上植物，并记得每天完成「全部基础任务」哦~');
   }
   /* 白天阶段：推进 1 天（应用每日规则）。返回 Promise，便于跳天时链式调用。 */
   function pvzAdvanceDay(container) {
@@ -17575,6 +17659,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return todayDoneRatio(pvz.cid).then(function (tc) {
       var done = !!(tc && tc.allDone);
       var eaten = pvzStepOnce(done);
+      /* [pvzcdfix] 手动「推进一天」= 当场结算「今天」→ 水位推到今天，跨日时不再重复结算今天 */
+      pvz._settledTo = pvzToday();
       beep(300);
       buildPVZ(container);
       publishHome('pvz', pvz.day);
@@ -22664,9 +22750,61 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   function refreshCoin(){ if(window.refreshCoinBanner) try{window.refreshCoinBanner();}catch(e){} }
 
+  /* ===== [#442] 商品权益映射（grant）=====
+     后台「🛍️ 商品配置 → 权益」字段格式：'gacha:1' = 兑换后送 1 次盲盒抽卡机会；
+     省略数量则默认 1（'gacha'）；留空 = 仅记录订单，不发放站内权益。
+     新增权益类型只需在此注册：{ label:'显示名', unit:'单位', apply:function(cid,n)->Promise<{msg}> } */
+  var GRANT_KINDS = {
+    gacha: {
+      label: '盲盒抽卡机会', unit: '次',
+      apply: function (cid, n) {
+        if (!(window.MX_GACHA && window.MX_GACHA.freeAdd)) {
+          return Promise.reject(new Error('抽卡模块未就绪，未发放'));
+        }
+        return window.MX_GACHA.freeAdd(cid, n).then(function (total) {
+          return { msg: '已发放 ' + n + ' 次' + GRANT_KINDS.gacha.label + '（当前共 ' + total + ' 次）', total: total };
+        });
+      }
+    }
+  };
+  function parseGrant(s){
+    var v = String(s == null ? '' : s).trim();
+    if (!v) return null;
+    var p = v.split(':');
+    var kind = String(p[0] || '').trim().toLowerCase();
+    if (!kind) return null;
+    var n = parseInt(p[1], 10); if (isNaN(n) || n <= 0) n = 1;
+    return { kind: kind, n: n, known: !!GRANT_KINDS[kind] };
+  }
+  /* 权益文案（商品卡上展示，如「🎟️ 兑换后送 1 次盲盒抽卡机会」） */
+  function grantLabel(s){
+    var gr = parseGrant(s); if (!gr) return '';
+    if (!gr.known) return '🎁 权益：' + gr.kind;
+    var k = GRANT_KINDS[gr.kind];
+    return '🎟️ 兑换后送 ' + gr.n + ' ' + k.unit + k.label;
+  }
+  /* 发放权益：返回 Promise，绝不 reject（兑换已扣分，发放失败不能连带报错） */
+  function applyGrant(cid, s){
+    var gr = parseGrant(s);
+    if (!gr) return Promise.resolve({ ok: true, none: true, msg: '' });
+    if (!gr.known) {
+      try { console.warn('[mx-mall] 未知权益类型：' + gr.kind + '（仅记录订单）'); } catch (e) {}
+      return Promise.resolve({ ok: false, unknown: true, msg: '权益类型未实现：' + gr.kind });
+    }
+    try {
+      return Promise.resolve(GRANT_KINDS[gr.kind].apply(cid, gr.n)).then(function (r) {
+        return { ok: true, kind: gr.kind, n: gr.n, msg: (r && r.msg) || ('已发放 ' + gr.n + ' ' + GRANT_KINDS[gr.kind].unit + GRANT_KINDS[gr.kind].label) };
+      }).catch(function (e) {
+        return { ok: false, msg: (e && e.message) || '权益发放失败' };
+      });
+    } catch (e) {
+      return Promise.resolve({ ok: false, msg: (e && e.message) || '权益发放异常' });
+    }
+  }
+
   /* ---------- 数据：积分商城虚拟商品 ---------- */
   var SHOP_GOODS=[
-    {id:'gacha_ticket', name:'盲盒抽奖券', emoji:'🎟️', cost:50, tag:'热门', desc:'兑换1张盲盒抽卡券，集齐6大主题角色'},
+    {id:'gacha_ticket', name:'盲盒抽奖券', emoji:'🎟️', cost:50, tag:'热门', desc:'兑换1张盲盒抽卡券，集齐6大主题角色', grant:'gacha:1'},
     {id:'hint_card',    name:'智慧提示卡×5', emoji:'💡', cost:40, tag:'学习', desc:'做题遇到困难时使用提示，轻松过关'},
     {id:'pet_food',     name:'宠物粮食×10', emoji:'🍖', cost:30, tag:'宠物', desc:'喂养宠物，提升好感度'},
     {id:'badge_star',   name:'闪亮勋章', emoji:'🏅', cost:80, tag:'荣誉', desc:'个人主页展示专属成就勋章'},
@@ -22788,11 +22926,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           var orders=((arr[1])||[]).filter(function(o){return o&&o.kind==='points'&&o.cid===cid;}).sort(function(a,b){return (b.at||0)-(a.at||0);});
           var cards=MX_SHOP_GOODS().map(function(g){
             var can=pts>=g.cost;
+            var _gl = grantLabel(g.grant);
+            var _lk = g.url ? ('<a href="'+esc(g.url)+'" target="_blank" rel="noopener" style="display:block;font-size:11px;color:var(--accent-primary,#7ec850);margin:2px 0 4px">🔗 商品链接</a>') : '';
             return '<div class="mx-goods-card">'+
               '<div class="mx-goods-emoji">'+g.emoji+'</div>'+
               '<div class="mx-goods-tag">'+esc(g.tag)+'</div>'+
               '<div class="mx-goods-name">'+esc(g.name)+'</div>'+
               '<div class="mx-goods-desc">'+esc(g.desc)+'</div>'+
+              (_gl?'<div style="font-size:11px;color:#e65100;font-weight:700;margin:2px 0">'+esc(_gl)+'</div>':'')+
+              _lk+
               '<div class="mx-goods-cost">⭐ '+g.cost+'</div>'+
               '<button type="button" class="btn mx-goods-buy'+(can?'':' is-disabled')+'" data-id="'+g.id+'"'+(can?'':' disabled')+'>'+(can?'兑换':'积分不足')+'</button>'+
             '</div>';
@@ -22806,7 +22948,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             '</div>';
           }).join('') : '<div class="empty-tip">暂无积分变动记录，完成任务即可获得积分</div>';
           var ordHtml = orders.length ? orders.map(function(o){
-            return '<div class="mx-order-row">🎁 '+esc(o.goods||'')+' · ⭐'+o.cost+' <span class="sub">'+new Date(o.at||Date.now()).toLocaleString()+'</span></div>';
+            var _ogl = grantLabel(o.grant);
+            return '<div class="mx-order-row">🎁 '+esc(o.goods||'')+' · ⭐'+o.cost+
+              (_ogl?' <span class="sub" style="color:#e65100">'+esc(_ogl)+'</span>':'')+
+              ' <span class="sub">'+new Date(o.at||Date.now()).toLocaleString()+'</span></div>';
           }).join('') : '<div class="empty-tip">还没有兑换记录，挑一件心仪好物吧</div>';
           page.innerHTML='<div class="content-section-title">🛍️ 积分兑换商城 <span class="sub">用学习积分兑换好物（积分消耗出口）</span></div>'+
             '<div class="mx-balance-bar">💰 我的积分：<b id="mx-shop-pts">'+pts+'</b> ⭐ &nbsp;<span class="sub">完成任务 / 玩游戏可获得积分</span></div>'+
@@ -22822,9 +22967,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
               childId().then(function(c){
                 spend(c,g.cost,'积分兑换·'+g.name).then(function(tot){
                   if(tot<0){ T('⭐ 积分不足，先去完成任务吧'); return; }
-                  DB.put('virtualOrders',{id:Date.now(),cid:c,goods:g.name,cost:g.cost,kind:'points',at:Date.now()}).catch(function(){});
-                  T('🎉 已兑换：'+g.name);
-                  refreshCoin(); renderShop();
+                  /* [#442] 先记录订单（含权益快照），再自动发放站内权益 */
+                  DB.put('virtualOrders',{id:Date.now(),cid:c,goods:g.name,goodsId:g.id,cost:g.cost,kind:'points',
+                    grant:String(g.grant||''),at:Date.now()}).catch(function(){});
+                  if(g.url){ try{ window.open(g.url,'_blank'); }catch(e){} }
+                  return applyGrant(c, g.grant).then(function(gr){
+                    if(gr && gr.ok){
+                      T('🎉 已兑换：'+g.name+'；'+gr.msg);
+                    } else if(gr && gr.unknown){
+                      T('🎉 已兑换：'+g.name+'（权益待开通：'+gr.msg+'）');
+                    } else {
+                      T('🎉 已兑换：'+g.name);
+                    }
+                    refreshCoin(); renderShop();
+                  });
                 });
               });
             };
@@ -22962,8 +23118,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* ============ 导航分发 ============ */
   document.addEventListener('navigation', function(e){
     var p=e.detail&&e.detail.page;
-    if(p==='page-shop') setTimeout(renderShop,60);
-    else if(p==='page-mall') setTimeout(renderMall,60);
+    /* [#445] 兑换/好物页：先按缓存渲染，再强制拉新配置；配置确有变化才二次渲染（避免闪烁） */
+    if(p==='page-shop') {
+      setTimeout(renderShop,60);
+      try { var _gb=window.MX_GOODS_SHOP?JSON.stringify(window.MX_GOODS_SHOP):'';
+        if(window.mxRefreshCfgNow) window.mxRefreshCfgNow().then(function(){ var _ga=window.MX_GOODS_SHOP?JSON.stringify(window.MX_GOODS_SHOP):''; if(_ga!==_gb) setTimeout(renderShop,30); });
+      } catch(e) {}
+    }
+    else if(p==='page-mall') {
+      setTimeout(renderMall,60);
+      try { var _mb=window.MX_GOODS_MALL?JSON.stringify(window.MX_GOODS_MALL):'';
+        if(window.mxRefreshCfgNow) window.mxRefreshCfgNow().then(function(){ var _ma=window.MX_GOODS_MALL?JSON.stringify(window.MX_GOODS_MALL):''; if(_ma!==_mb) setTimeout(renderMall,30); });
+      } catch(e) {}
+    }
     else if(p==='page-tool-resources') setTimeout(renderResources,60);
     else if(p==='page-resource-center') setTimeout(renderResourceCenter,60);
   });
@@ -25919,6 +26086,122 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.mxPackSnapshot = mxPackSnapshot;
   window.mxUnpackSnapshot = mxUnpackSnapshot;
   window.mxSyncLog = mxSyncLog;
+
+  /* ===== [#443 / 待办[9] 2026-09-14] 超大快照分片传输（上行 + 下行）=====
+     网关请求体硬上限 ≈100KB：信封（gzip+base64）超过 ~70KB 时，改由后端分片通道承载
+     （snapBegin/snapPart/snapCommit 上行；snapInfo/snapChunk 下行），彻底解除「快照越大越传不上去」。
+     仅当信封本身超阈值才启用；普通小快照仍走一次 push/pull，零额外开销。 */
+  var MX_SNAP_CHUNK_AT = 70000;   /* 信封字符数超过此值 → 走分片（网关 100KB，留足 JSON 外壳 + token 余量） */
+  var MX_SNAP_PART = 56000;       /* 单片字符数（服务端 PART_MAX=80KB，60KB 基线） */
+  var MX_SNAP_CHUNK_FLAG = 'mx_snap_chunked';
+  function _mxChunkFlagOn() { try { return localStorage.getItem(MX_SNAP_CHUNK_FLAG) === '1'; } catch (e) { return false; } }
+  function _mxChunkFlagSet() { try { localStorage.setItem(MX_SNAP_CHUNK_FLAG, '1'); } catch (e) {} }
+  /* 上行：把 {__mxgz:1,__d} 信封切片上传 → 服务端拼接落库。kind: 'vip' | 'light' */
+  function mxPushEnvelopeChunked(kind, envelope, code) {
+    var d = (envelope && envelope.__mxgz === 1 && typeof envelope.__d === 'string') ? envelope.__d : '';
+    if (!d) return Promise.resolve({ ok: false, fallback: true, msg: '非信封数据，走常规通道' });
+    var n = Math.max(1, Math.ceil(d.length / MX_SNAP_PART));
+    var sid = '';
+    var sendPart = function (i) {
+      return mxApiSync('snapPart', { sid: sid, i: i, part: d.substr(i * MX_SNAP_PART, MX_SNAP_PART) })
+        .then(function (r) { if (!r || !r.ok) throw new Error((r && r.msg) || '分片上传失败'); return r; });
+    };
+    var withRetry = function (i) { return sendPart(i).catch(function () { return sendPart(i); }); };
+    var i = 0;
+    var run = function () {
+      return Promise.resolve().then(function () {
+        if (i >= n) return null;
+        var cur = i; i++;
+        return withRetry(cur).then(run);
+      });
+    };
+    return mxApiSync('snapBegin', { n: n, target: kind }).then(function (bg) {
+      if (!bg || !bg.ok) throw new Error((bg && bg.msg) || '开启分片上传失败');
+      sid = bg.sid;
+      return run();
+    }).then(function () {
+      return mxApiSync('snapCommit', { sid: sid, code: code || '' });
+    }).then(function (r) {
+      if (r && r.ok) _mxChunkFlagSet();
+      return r;
+    }).catch(function (e) {
+      try { if (sid) mxApiSync('snapAbort', { sid: sid }); } catch (e2) {}
+      return { ok: false, msg: (e && e.message) || '分片上传失败' };
+    });
+  }
+  /* 下行：先问 snapInfo；信封 + 超阈值则分段取回并重组为 {__mxgz:1,__d} */
+  function mxPullEnvelopeChunked(kind) {
+    return mxApiSync('snapInfo', { target: kind }).then(function (info) {
+      if (!info || !info.ok || !info.exists) return { ok: false, code: 'FALLBACK', msg: '无云端快照' };
+      if (info.mode !== 'envelope') return { ok: false, code: 'FALLBACK', msg: '云端快照非分片信封' };
+      if (!(info.total > MX_SNAP_CHUNK_AT)) return { ok: false, code: 'FALLBACK', msg: '云端快照未超阈值' };
+      var size = MX_SNAP_PART, total = info.total;
+      var n = Math.ceil(total / size), parts = [], i = 0;
+      var one = function () {
+        if (i >= n) return Promise.resolve();
+        var cur = i; i++;
+        return mxApiSync('snapChunk', { i: cur, size: size, target: kind }).then(function (r) {
+          if (!r || !r.ok) throw new Error((r && r.msg) || ('取回第 ' + (cur + 1) + ' 段失败'));
+          parts.push(r.part || '');
+          return one();
+        });
+      };
+      return one().then(function () {
+        var joined = parts.join('');
+        if (!joined) return { ok: false, code: 'FALLBACK', msg: '分片内容为空' };
+        return { ok: true, snapshot: { __mxgz: 1, __d: joined }, updated_at: info.updated_at, parts: n };
+      }).catch(function (e) { return { ok: false, code: 'FALLBACK', msg: (e && e.message) || '分片取回失败' }; });
+    }).catch(function () { return { ok: false, code: 'FALLBACK', msg: 'snapInfo 不可用' }; });
+  }
+  window.MX_SNAP_CHUNK_AT = MX_SNAP_CHUNK_AT;
+  window.mxPushEnvelopeChunked = mxPushEnvelopeChunked;
+  window.mxPullEnvelopeChunked = mxPullEnvelopeChunked;
+  /* ===== [#444 / 待办[3] 2026-09-14] 大文件 COS 真分片直传 =====
+     预签名单次 PUT 虽已绕开网关 100KB，但**单请求无法重试** —— 大文件一次抖动就整体重传。
+     超过 5MB 的资源改走标准 COS multipart：逐片取签名 → 浏览器直传 → 用 ETag 收口。
+     单片 5MB（COS 分片下限 1MB）：片数少、弱网重试代价低；每片自带 1 次重试。 */
+  var MX_MPU_AT = 5 * 1024 * 1024;     /* 超过 5MB 走真分片 */
+  var MX_MPU_PART = 5 * 1024 * 1024;   /* 每片 5MB */
+  function mxUploadResourceMpu(resId, row, fp, ext, blob) {
+    var size = blob.size, n = Math.max(1, Math.ceil(size / MX_MPU_PART));
+    var uploadId = '';
+    var putOne = function (i) {
+      return mxApiSync('cloudResMpu', { op: 'part', fp: fp, ext: ext, uploadId: uploadId, partNumber: i })
+        .then(function (sg) {
+          if (!sg || !sg.ok || !sg.url) throw new Error((sg && sg.msg) || ('第 ' + i + ' 片签名失败'));
+          var slice = blob.slice((i - 1) * MX_MPU_PART, Math.min(i * MX_MPU_PART, size));
+          return fetch(sg.url, { method: 'PUT', body: slice }).then(function (r) {
+            if (!r.ok) throw new Error('第 ' + i + ' 片上传失败 HTTP ' + r.status);
+            var et = r.headers.get('ETag') || r.headers.get('etag') || '';
+            if (!et) throw new Error('第 ' + i + ' 片未返回 ETag（请确认桶 CORS 已 ExposeHeaders: ETag）');
+            return { PartNumber: i, ETag: et };
+          });
+        });
+    };
+    var putRetry = function (i) { return putOne(i).catch(function () { return putOne(i); }); };
+    return mxApiSync('cloudResMpu', { op: 'init', fp: fp, ext: ext, size: size }).then(function (r) {
+      if (!r || !r.ok) throw new Error((r && r.msg) || '初始化分片失败');
+      uploadId = r.uploadId;
+      var out = [], i = 1;
+      var step = function () {
+        if (i > n) return Promise.resolve();
+        var cur = i; i++;
+        return putRetry(cur).then(function (p) { out.push(p); return step(); });
+      };
+      return step().then(function () {
+        return mxApiSync('cloudResMpu', { op: 'complete', fp: fp, ext: ext, uploadId: uploadId, parts: out, size: size, id: resId });
+      });
+    }).then(function (cm) {
+      if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '分片收口失败');
+      return { ok: true, via: 'multipart', size: size, parts: n, msg: '已分片直传云端（' + n + ' 片）' };
+    }).catch(function (e) {
+      try { if (uploadId) mxApiSync('cloudResMpu', { op: 'abort', fp: fp, ext: ext, uploadId: uploadId }); } catch (e2) {}
+      throw e;
+    });
+  }
+  window.MX_MPU_AT = MX_MPU_AT;
+  window.mxUploadResourceMpu = mxUploadResourceMpu;
+
   /* [#436fix 2026-09-14] 补漏导出：下面两个函数定义在本 IIFE 内，却被「资源中心」块（另一个 <script>）跨块调用；未导出会 ReferenceError，导致文件夹导入时 VIP 自动上云整体失效。 */
   window.uploadResourceToCloud = uploadResourceToCloud;
   window.downloadResourceFromCloud = downloadResourceFromCloud;
@@ -25940,6 +26223,7 @@ function uploadResourceToCloud(resId) {
       return window.DB.getResourceBlob(resId).then(function(rb) {
         if (!rb || !rb.blob) return { ok: false, msg: '本地文件缺失' };
         /* 直传：取预签名 URL → PUT 裸 Blob（清空 type，避免触发 CORS 预检） */
+        var _singlePut = function () {
         return mxApiSync('cloudResSign', { mode: 'put', fp: fp, ext: ext, size: rb.blob.size }).then(function(sg) {
           if (!sg || !sg.ok || !sg.url) throw new Error((sg && sg.msg) || '获取上传签名失败');
           var body = rb.blob;
@@ -25951,7 +26235,16 @@ function uploadResourceToCloud(resId) {
             if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '元数据登记失败');
             mark(); return { ok: true, via: 'direct', size: rb.blob.size, msg: '已直传云端' };
           });
-        }).catch(function(e1) {
+        });
+        };
+        /* [#444 / 待办[3]] >5MB 走 COS 真分片直传（逐片可重试）；分片失败自动落回单请求直传 */
+        var _putChain = (rb.blob.size > MX_MPU_AT && typeof mxUploadResourceMpu === 'function')
+          ? mxUploadResourceMpu(resId, row, fp, ext, rb.blob).then(function (mr) {
+              if (mr && mr.ok) { mark(); return mr; }
+              return _singlePut();
+            })
+          : _singlePut();
+        return _putChain.catch(function(e1) {
           /* 降级：base64 经网关（仅小文件可用） */
           return new Promise(function(resolve, reject) {
             var fr = new FileReader();
@@ -26814,6 +27107,13 @@ function downloadResourceFromCloud(resId) {
     var lastErr = ''; try { lastErr = localStorage.getItem('mx_sync_last_err') || '（无）'; } catch (e) {}
     var m = document.createElement('div');
     m.className = 'mxg-overlay';
+    /* [2026-09-14 迁移] 顶栏「🔄 强制同步」移入本弹窗（与「🌐 测网关连通」同区），仅 VIP 展示 */
+    var _vipForceBtn = function () {
+      try {
+        if (!(window.isVip && window.isVip())) return '';
+        return '<button id="mx-diag-force" style="flex:1;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#7b5cff,#a06bff);color:#fff;font-weight:800;cursor:pointer" title="VIP 多端强制同步：拉取云端最新并回推本机，双向对齐所有设备">🔄 强制同步</button>';
+      } catch (e) { return ''; }
+    };
     m.innerHTML = '<div class="mxg-modal" style="text-align:left;max-width:420px">' +
       '<h3 style="text-align:center">🔍 云端同步诊断</h3>' +
       '<div style="font-size:13.5px;line-height:2;color:#444">' +
@@ -26846,10 +27146,16 @@ function downloadResourceFromCloud(resId) {
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button id="mx-diag-retry" style="flex:1;padding:11px;border:none;border-radius:12px;background:#2e9e5b;color:#fff;font-weight:800;cursor:pointer">🔄 立即重试同步</button>' +
       '<button id="mx-diag-ping" style="flex:1;padding:11px;border:none;border-radius:12px;background:#8a6ff0;color:#fff;font-weight:800;cursor:pointer">🌐 测网关连通</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px">' +
+      _vipForceBtn() +
       '<button id="mx-diag-ok" style="flex:1;padding:11px;border:none;border-radius:12px;background:#4facfe;color:#fff;font-weight:800;cursor:pointer">知道了</button></div></div>';
     document.body.appendChild(m);
     m.querySelector('#mx-diag-ok').onclick = function () { if (m.parentNode) m.remove(); };
     m.querySelector('#mx-diag-retry').onclick = function () { if (m.parentNode) m.remove(); try { if (window.pushCloud) window.pushCloud(); } catch (e) {} };
+    /* [2026-09-14] 强制同步（VIP）：本弹窗内的新入口，保留原 mxForceSyncAll 行为 */
+    var _fBtn = m.querySelector('#mx-diag-force');
+    if (_fBtn) _fBtn.onclick = function () { try { if (window.mxForceSyncAll) window.mxForceSyncAll(); } catch (e) {} };
     /* [#415] 网关连通自检：区分「手机到网关网络不通」vs「网关通但大响应传输失败」 */
     var _pingBtn = m.querySelector('#mx-diag-ping');
     if (_pingBtn) _pingBtn.onclick = function () {
@@ -26869,7 +27175,7 @@ function downloadResourceFromCloud(resId) {
   /* #420 VIP 多端强制同步：先 pull 云端最新合并到本机，再 push 本机增量回传，达成双向对齐。仅 VIP 用（非 VIP 云端配额受限）。 */
   function mxForceSyncAll() {
     try {
-      var btn = document.getElementById('mx-force-sync-btn');
+      var btn = document.getElementById('mx-diag-force') || document.getElementById('mx-force-sync-btn');
       if (btn) { btn.disabled = true; btn.textContent = '🔄 同步中…'; }
       var done = function () { if (btn) { btn.disabled = false; btn.textContent = '🔄 强制同步'; } };
       var pull = window.pullCloud ? window.pullCloud(false) : Promise.resolve();
@@ -26882,7 +27188,9 @@ function downloadResourceFromCloud(resId) {
     } catch (e) { try { if (window.mxSyncErr) window.mxSyncErr((e && e.message) ? e.message : String(e)); } catch (e2) {} }
   }
   window.mxForceSyncAll = mxForceSyncAll;
-  /* #420 刷新「🔄 强制同步」按钮可见性：仅 VIP 显示；延迟兜底以应对首屏 VIP 令牌未就绪 */
+  /* #420（2026-09-14 迁移）刷新「🔄 强制同步」按钮可见性：仅 VIP 显示。
+     按钮已移入「云端同步诊断」弹窗（#mx-diag-force，每次开弹窗按 isVip() 现算 → 天然只对 VIP 出现）；
+     此处仅为兼容保留：若顶栏按钮日后加回（#mx-force-sync-btn），显示逻辑仍自动生效。 */
   function mxRefreshForceSyncBtn() {
     try {
       var _fsb = document.getElementById('mx-force-sync-btn');
@@ -26955,6 +27263,11 @@ function downloadResourceFromCloud(resId) {
           window.__mx_last_push__ = meta;
           try { localStorage.setItem('mx_last_push', JSON.stringify(meta)); } catch (e0) {}
           try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'push', mode: pk.mode, raw: pk.rawLen, packed: pk.packedLen }); } catch (e1) {}
+          /* [#443] 信封超分片阈值 → 走后端分片（绕开 100KB 请求体上限） */
+          if (pk.value && pk.value.__mxgz === 1 && pk.packedLen > MX_SNAP_CHUNK_AT && typeof window.mxPushEnvelopeChunked === 'function') {
+            try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'push-chunk', mode: pk.mode, raw: pk.rawLen, packed: pk.packedLen }); } catch (e2b) {}
+            return window.mxPushEnvelopeChunked('vip', pk.value, code);
+          }
           return _scg('push', { code: code, snapshot: pk.value });
         });
       }).then(function (res) {
@@ -26982,7 +27295,17 @@ function downloadResourceFromCloud(resId) {
     return ensureUid().then(function (uid) {
       if (!uid) { mxSyncErr(window.__mx_uid_none__ === 'expired' ? '登录令牌已过期，需重新登录' : '未登录'); _ss(window.__mx_uid_none__ === 'expired' ? 'expired' : 'local'); return 'BAILED'; }
       var _scg = (typeof syncCloudGuarded === 'function') ? syncCloudGuarded : (window.syncCloudGuarded || window.mxApiSync);
-      return _scg('pull', { code: code }).then(function (res) {
+      /* [#443] 本机曾走分片上行 → 云端信封可能超阈值，优先分片下行；非分片则回退常规 pull */
+      var _pull;
+      if (_mxChunkFlagOn() && typeof window.mxPullEnvelopeChunked === 'function') {
+        _pull = window.mxPullEnvelopeChunked('vip').then(function (cr) {
+          if (cr && cr.ok) { try { if (window.mxSyncLog) window.mxSyncLog({ t: Date.now(), act: 'pull-chunk', ok: true, parts: cr.parts }); } catch (e0c) {} return cr; }
+          return _scg('pull', { code: code });
+        });
+      } else {
+        _pull = _scg('pull', { code: code });
+      }
+      return _pull.then(function (res) {
         if (res && res.ok) {
           /* 记录本机已与云端一致（供多端同步提醒比对） */
           try { if (window.mxMarkSynced) window.mxMarkSynced(res.updated_at); } catch (e9) {}
@@ -27028,6 +27351,13 @@ function downloadResourceFromCloud(resId) {
           ? window.mxPackSnapshot(snap).then(function (p) { return p.value; })
           : Promise.resolve(snap);
         return _pk.then(function (val) {
+          /* [#443] 轻量快照同样可能超 100KB → 超阈值走分片（target='light'，落 mx_snapshots） */
+          if (val && val.__mxgz === 1 && typeof val.__d === 'string' && val.__d.length > MX_SNAP_CHUNK_AT && typeof window.mxPushEnvelopeChunked === 'function') {
+            return window.mxPushEnvelopeChunked('light', val, '').then(function (r) {
+              if (r && r.ok) { try { lsSet('mx_last_snapshot', String(Date.now())); } catch (e) {} }
+              return r;
+            });
+          }
           return mxApiSync('snapshot', { snapshot: val }).then(function (r) {
             if (r && r.ok) { try { lsSet('mx_last_snapshot', String(Date.now())); } catch (e) {} }
             return r;

@@ -270,7 +270,9 @@
           <button class="btn ghost sm" onclick="loadGoods()">↺ 刷新</button>
         </span>
       </div>
-      <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>id</b> 需唯一；<b>积分</b>填大于 0 的整数。</div>
+      <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>id</b> 需唯一；<b>积分</b>填大于 0 的整数。<br>
+        <b>权益</b>：兑换后自动发放的站内功能，格式 <code>类型:数量</code>。目前支持 <code>gacha:1</code>（送 1 次盲盒抽卡机会）；省略数量默认 1（<code>gacha</code>）；<b>留空 = 只记录订单不发放</b>。<br>
+        <b>链接</b>：实物/外部商品页地址，留空不展示。</div>
       <div class="scroll"><table class="gt" id="gtShop"><thead id="gtShopHead"></thead><tbody id="gtShopBody"></tbody></table></div>
       <div class="row"><button class="btn ghost sm" onclick="goodsAdd('shop')">＋ 新增一行</button><span class="hint" style="margin:0">共 <b id="gtShopCount">0</b> 个</span></div>
 
@@ -896,7 +898,7 @@ async function doSetSecQ(){
 
 /* [#421-d 商品配置] 默认数组（与 index.html SHOP_GOODS/MALL_PRODUCTS 对齐；首次无云端配置时回填编辑器） */
 const DEFAULT_SHOP_GOODS = [
-  {id:'gacha_ticket', name:'盲盒抽奖券', emoji:'🎟️', cost:50, tag:'热门', desc:'兑换1张盲盒抽卡券，集齐6大主题角色'},
+  {id:'gacha_ticket', name:'盲盒抽奖券', emoji:'🎟️', cost:50, tag:'热门', desc:'兑换1张盲盒抽卡券，集齐6大主题角色', grant:'gacha:1'},
   {id:'hint_card', name:'智慧提示卡×5', emoji:'💡', cost:40, tag:'学习', desc:'做题遇到困难时使用提示，轻松过关'},
   {id:'pet_food', name:'宠物粮食×10', emoji:'🍖', cost:30, tag:'宠物', desc:'喂养宠物，提升好感度'},
   {id:'badge_star', name:'闪亮勋章', emoji:'🏅', cost:80, tag:'荣誉', desc:'个人主页展示专属成就勋章'},
@@ -922,7 +924,9 @@ const GOODS_FIELDS = {
     {k:'emoji', t:'图标', cls:'c-emo', w:'56px',  ph:'🎟️'},
     {k:'cost',  t:'积分', cls:'c-num', w:'70px',  ph:'50', num:true},
     {k:'tag',   t:'标签', cls:'',      w:'80px',  ph:'热门'},
-    {k:'desc',  t:'说明', cls:'',      w:'',      ph:'兑换说明'}
+    {k:'desc',  t:'说明', cls:'',      w:'',      ph:'兑换说明'},
+    {k:'grant', t:'权益', cls:'c-id',  w:'110px', ph:'gacha:1'},
+    {k:'url',   t:'链接', cls:'c-id',  w:'130px', ph:'https://...'}
   ],
   mall: [
     {k:'id',      t:'id',    cls:'c-id',  w:'74px',  ph:'p1'},
@@ -935,6 +939,19 @@ const GOODS_FIELDS = {
     {k:'url',     t:'链接',  cls:'c-id',  w:'150px', ph:'https://...'}
   ]
 };
+/* [#442] 权益类型白名单（与孩子端 index.html GRANT_KINDS 对齐；此处仅用于发布前提示） */
+const GRANT_KINDS_ADMIN = {
+  gacha: { label:'盲盒抽卡机会', unit:'次' }
+};
+function goodsGrantHint(s){
+  const v = String(s==null?'':s).trim();
+  if (!v) return '';
+  const p = v.split(':');
+  const kind = String(p[0]||'').trim().toLowerCase();
+  let n = parseInt(p[1],10); if (isNaN(n)||n<=0) n = 1;
+  if (!GRANT_KINDS_ADMIN[kind]) return '⚠ 未知权益「'+kind+'」孩子端不会发放';
+  return '✓ '+n+' '+GRANT_KINDS_ADMIN[kind].unit+GRANT_KINDS_ADMIN[kind].label;
+}
 function goodsEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function goodsIds(which){
   return which==='shop' ? {head:'gtShopHead', body:'gtShopBody', cnt:'gtShopCount', json:'goodsShop'}
@@ -1014,7 +1031,7 @@ function goodsMove(which, i, d){
 /* 出参前清洗：必填校验 + 空的可选字段直接删键（保持与旧数据同构） */
 function goodsBuild(which){
   const errs = [], out = [], seen = {};
-  const optStr = which==='shop' ? ['emoji','tag','desc'] : ['emoji','vipPrice','tag','desc','url'];
+  const optStr = which==='shop' ? ['emoji','tag','desc','grant','url'] : ['emoji','vipPrice','tag','desc','url'];
   GOODS[which].forEach(function(o,i){
     const label = (which==='shop'?'积分商品 ':'好物 ')+'第'+(i+1)+'行';
     const rec = {};
@@ -1038,6 +1055,9 @@ function goodsBuild(which){
       const v = String(o[k]==null?'':o[k]).trim();
       if (v) rec[k] = v; else delete rec[k];
     });
+    if (which==='shop' && rec.grant && goodsGrantHint(rec.grant).indexOf('⚠') === 0){
+      errs.push(label+'：权益「'+rec.grant+'」类型未知（孩子端不会发放，请检查写法）');
+    }
     out.push(rec);
   });
   return { list: out, errs: errs };
@@ -1196,6 +1216,42 @@ async function roFp(file){
   return 'nf'+Math.abs(h1).toString(16).padStart(8,'0');
 }
 
+/* [#444 / 待办[3] 2026-09-14] 大文件真分片直传（>5MB）：逐片取签名 → PUT → 用 ETag 收口
+   与客户端同一套后端动作，走 mxAdmin 的 officialRes 分支（adminKey 鉴权）。 */
+const MX_MPU_AT = 5*1024*1024;
+const MX_MPU_PART = 5*1024*1024;
+async function adminMpuUpload(f, fp, ext, title, module){
+  const n = Math.max(1, Math.ceil(f.size / MX_MPU_PART));
+  const ini = await proxy('mxAdmin', { action:'officialRes', op:'mpuInit', fp:fp, ext:ext, size:f.size, adminKey:ADMIN_KEY });
+  if (!ini || !ini.ok) throw new Error((ini && ini.msg) || '初始化分片失败');
+  const uploadId = ini.uploadId;
+  const putOne = async (i) => {
+    const sg = await proxy('mxAdmin', { action:'officialRes', op:'mpuPart', fp:fp, ext:ext, uploadId, partNumber:i, adminKey:ADMIN_KEY });
+    if (!sg || !sg.ok || !sg.url) throw new Error((sg && sg.msg) || ('第 '+i+' 片签名失败'));
+    const slice = f.slice((i-1)*MX_MPU_PART, Math.min(i*MX_MPU_PART, f.size));
+    const r = await fetch(sg.url, { method:'PUT', body:slice });
+    if (!r.ok) throw new Error('第 '+i+' 片上传失败 HTTP '+r.status);
+    const et = r.headers.get('ETag') || r.headers.get('etag') || '';
+    if (!et) throw new Error('第 '+i+' 片未返回 ETag（请确认桶 CORS 已 ExposeHeaders: ETag）');
+    return { PartNumber:i, ETag:et };
+  };
+  const putRetry = async (i) => { try { return await putOne(i); } catch(_) { return await putOne(i); } };
+  try{
+    const parts = [];
+    for (let i=1;i<=n;i++){
+      setMsg('roMsg','分片直传 '+i+'/'+n+'…（'+roBytes(f.size)+'）','sub');
+      parts.push(await putRetry(i));
+    }
+    const cm = await proxy('mxAdmin', { action:'officialRes', op:'mpuComplete', fp:fp, ext:ext, uploadId, parts, size:f.size,
+      title:title||'', module:module||'', adminKey:ADMIN_KEY });
+    if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '分片收口失败');
+    return cm;
+  }catch(e){
+    try { await proxy('mxAdmin', { action:'officialRes', op:'mpuAbort', fp:fp, ext:ext, uploadId, adminKey:ADMIN_KEY }); } catch(_){}
+    throw e;
+  }
+}
+
 async function officialUpload(){
   const inp = $('roFile');
   const f = inp && inp.files && inp.files[0];
@@ -1204,15 +1260,21 @@ async function officialUpload(){
   try{
     setMsg('roMsg','计算指纹…','sub');
     const fp = await roFp(f);
-    setMsg('roMsg','取直传签名…','sub');
-    const sg = await proxy('mxAdmin', { action:'officialRes', op:'sign', mode:'put', fp:fp, ext:ext, adminKey:ADMIN_KEY });
-    if (!sg || !sg.ok) throw new Error((sg && sg.msg) || '签名失败');
-    setMsg('roMsg','直传中…（'+roBytes(f.size)+'）','sub');
-    /* 不设 Content-Type，避免触发 CORS 预检（与客户端直传策略一致） */
-    const put = await fetch(sg.url, { method:'PUT', body:f });
-    if (!put.ok) throw new Error('COS PUT 失败 HTTP '+put.status);
-    const cm = await proxy('mxAdmin', { action:'officialRes', op:'commit', fp:fp, ext:ext, size:f.size,
-      title:($('roTitle')||{}).value || '', module:($('roModule')||{}).value || '', adminKey:ADMIN_KEY });
+    const _title = ($('roTitle')||{}).value || '', _mod = ($('roModule')||{}).value || '';
+    let cm;
+    if (f.size > MX_MPU_AT){
+      /* [#444 / 待办[3]] >5MB 走真分片直传：逐片重试，弱网/大文件不再整体重传 */
+      cm = await adminMpuUpload(f, fp, ext, _title, _mod);
+    } else {
+      setMsg('roMsg','取直传签名…','sub');
+      const sg = await proxy('mxAdmin', { action:'officialRes', op:'sign', mode:'put', fp:fp, ext:ext, adminKey:ADMIN_KEY });
+      if (!sg || !sg.ok) throw new Error((sg && sg.msg) || '签名失败');
+      setMsg('roMsg','直传中…（'+roBytes(f.size)+'）','sub');
+      /* 不设 Content-Type，避免触发 CORS 预检（与客户端直传策略一致） */
+      const put = await fetch(sg.url, { method:'PUT', body:f });
+      if (!put.ok) throw new Error('COS PUT 失败 HTTP '+put.status);
+      cm = await proxy('mxAdmin', { action:'officialRes', op:'commit', fp:fp, ext:ext, size:f.size, title:_title, module:_mod, adminKey:ADMIN_KEY });
+    }
     if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '登记失败');
     setMsg('roMsg','✅ 已直传并登记：'+f.name+'（'+fp+'.'+ext+'）','ok');
     inp.value = '';
