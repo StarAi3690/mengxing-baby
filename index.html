@@ -20167,7 +20167,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try { devList = JSON.parse(lsGet(STORAGE.devices) || '[]'); } catch (e) { devList = []; }
     var isVipNow = lsGet(STORAGE.vip) === '1';
     var curDev = deviceId();
-    var devHtml = '<div class="dash-block"><div class="dash-block-title">📱 设备管理 <span class="sub">'+(isVipNow?'VIP · ':'')+devList.length+'/5 台本机记录</span></div>';
+    var devHtml = '<div class="dash-block"><div class="dash-block-title">📱 设备管理 <span class="sub">'+(isVipNow?'VIP · ':'')+devList.length+'/6 个指纹（账号级）</span></div>';
     if (!devList.length) {
       devHtml += '<div class="empty-tip" style="font-size:12px;padding:8px">暂未记录绑定设备</div>';
     } else {
@@ -20290,7 +20290,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       lsSet(STORAGE.activated, '1'); lsSet(STORAGE.code, code);
       mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
       mxRegisterDevice();
-      toast('✅ 卡密激活成功');
+      /* [#447] 叠加提示：在原有有效期上追加 N 天 → 明确告知累计到期日，避免"续卡没感觉" */
+      var _okMsg = '✅ 卡密激活成功';
+      try {
+        if (res.vip && res.expire_at) {
+          var _ed = new Date(res.expire_at);
+          if (!isNaN(_ed.getTime())) {
+            _okMsg = (res.stacked && res.days_added)
+              ? ('✅ 激活成功：本次 +' + res.days_added + ' 天，累计有效期至 ' + _ed.toLocaleDateString())
+              : ('✅ 激活成功：有效期至 ' + _ed.toLocaleDateString());
+          }
+        }
+      } catch (e) {}
+      toast(_okMsg);
       var uid = mxCurrentUid() || window.__mx_uid__;
       if (res.vip && uid) bindCardToUser(code, uid);
       checkVipExpiry(); renderAccount();
@@ -25556,9 +25568,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var list = [];
     try { list = JSON.parse(lsGet(STORAGE.devices) || '[]'); } catch (e) {}
     if (list.indexOf(devId) < 0) list.push(devId);
-    if (list.length > 5) return { ok: false, msg: '已达多端同步上限，请解绑后再试' };
+    /* [#447] 账号级指纹上限 5 → 6（与云端 MX_DEV_LIMIT 保持一致） */
+    if (list.length > 6) return { ok: false, msg: '已达多端同步上限，请解绑后再试（同一账号最多 6 个浏览器指纹）' };
     lsSet(STORAGE.devices, JSON.stringify(list));
-    return { ok: true, msg: '绑定成功(' + list.length + '/5)' };
+    return { ok: true, msg: '绑定成功(' + list.length + '/6)' };
   }
 
   /* ================= 激活拦截层(首页强制) ================= */
@@ -25858,7 +25871,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         return {
           ok: !!res.ok,
           vip: res.vip ? 1 : 0,
+          /* [#447] 原包装器把新增字段全吞了 → 叠加提示/限制标记传不到 UI，这里补齐 */
+          vip_level: res.vip_level || '1',
           expire_at: res.expire_at || null,
+          valid_days: res.valid_days || 0,
+          days_added: res.days_added || 0,
+          prev_expire_at: res.prev_expire_at || null,
+          stacked: !!res.stacked,
+          merged_cards: res.merged_cards || 0,
+          new_device: !!res.new_device,
+          limit: !!res.limit,
+          has_vip: !!res.has_vip,
           already_bound: !!res.already_bound,
           bound_account_masked: res.bound_account_masked || '',
           msg: res.msg || (res.ok ? '激活成功' : '激活失败')

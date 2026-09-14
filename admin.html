@@ -219,7 +219,7 @@
       <h3 style="margin:0">🧾 一户一行表 <code>激活码 → 账号 → 设备</code></h3>
       <button class="btn ghost sm" onclick="exportCSV('acctTable','一户一行表')">⬇ 导出 CSV</button>
     </div>
-    <div class="sub">一行 = 一张已激活卡密。设备明细来自 <code>card_activation.devices[]</code>（每张卡最多 5 台，满 5 台标红）；「该账号持卡」= 同一 UID 名下的卡密张数，&gt;1 说明一号多卡。</div>
+    <div class="sub">一行 = 一张已激活卡密。设备明细来自 <code>card_activation.devices[]</code>（<b>账号级并集：同一账号最多 6 个浏览器指纹</b>，满 6 标红）；「该账号持卡」= 同一 UID 名下的卡密张数，&gt;1 说明该账号有<b>已续期合并</b>的历史卡（有效期已叠加到当前生效卡）。</div>
     <div class="scroll"><table id="acctTable"><thead><tr><th>激活码(脱敏)</th><th>类型</th><th>状态</th><th>账号</th><th>UID</th><th>设备数</th><th>设备明细</th><th>该账号持卡</th><th>激活时间</th><th>有效期</th></tr></thead><tbody></tbody></table></div>
   </div>
   </div>
@@ -803,13 +803,14 @@ function renderUsage(list){
   }).join('');
 }
 /* #435(c) 一户一行表：一张激活码 → 账号 → 绑定设备数 → 设备明细
-   设备明细来自 card_activation.devices[]（sync.bindCard 维护，每张卡上限 5 台） */
+   [#447] 设备明细来自 card_activation.devices[]（sync.bindCard / checkCard 维护，
+   上限已改为**账号级并集 6 个浏览器指纹**，不再按卡各算 5 台） */
 function renderAccounts(list){
   const tb = $('acctTable').querySelector('tbody');
   if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已激活卡密</td></tr>'; return; }
   tb.innerHTML = list.map(function(a){
     const n = Number(a.deviceCount) || 0;
-    const tone = n >= 5 ? 'background:#fdecee;color:var(--bad)' : (n >= 3 ? 'background:#fff6e5;color:var(--warn)' : 'background:#eef6ff;color:var(--pri)');
+    const tone = n >= 6 ? 'background:#fdecee;color:var(--bad)' : (n >= 3 ? 'background:#fff6e5;color:var(--warn)' : 'background:#eef6ff;color:var(--pri)');
     const devs = (a.devices || []).map(function(d){
       return '<code style="font-size:11px;background:#f4f7fb;border-radius:4px;padding:1px 4px;margin-right:4px">'+esc(String(d).slice(0,12))+'…</code>';
     }).join('');
