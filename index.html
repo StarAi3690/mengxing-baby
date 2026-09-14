@@ -7873,6 +7873,47 @@ function openDB() {
 
 
 
+/* ===== [墓碑机制 #441] 同步删除传播 =====
+   背景：A 端删除某行后，B 端仍持有该行，下次 push 又把该行推回云端 → 删除被「复活」。
+   方案：本地删除同步表记录时写墓碑（store|id → {t}）；快照携带 __tomb；落地时墓碑比行新
+         → 删除本机该行 / 拒绝写回云端旧行。墓碑 120 天过期，上限 600 条（快照体积可控）。
+   注意：同步落地内部的删除走 delRaw（不记墓碑），避免「删除本机旧行」被误标为新删除。 */
+var MX_TOMB_KEY = '__mx_tomb_v1';
+var MX_TOMB_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders', 'resources'];
+var MX_TOMB_TTL = 120 * 24 * 3600 * 1000, MX_TOMB_MAX = 600;
+function _mxTombLoad() { try { return JSON.parse(localStorage.getItem(MX_TOMB_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function _mxTombStore(o) {
+  try {
+    var ks = Object.keys(o);
+    if (ks.length > MX_TOMB_MAX) { ks.sort(function (a, b) { return ((o[b] && o[b].t) || 0) - ((o[a] && o[a].t) || 0); }); var n = {}; ks.slice(0, MX_TOMB_MAX).forEach(function (k) { n[k] = o[k]; }); o = n; }
+    localStorage.setItem(MX_TOMB_KEY, JSON.stringify(o));
+  } catch (e) {}
+  return o;
+}
+function mxTombMark(store, id) {
+  if (!store || !id || MX_TOMB_STORES.indexOf(store) < 0) return;
+  var o = _mxTombLoad(); o[store + '|' + id] = { t: Date.now() }; _mxTombStore(o);
+}
+function mxTombMarkAt(store, id, t) {
+  if (!store || !id || !t || MX_TOMB_STORES.indexOf(store) < 0) return;
+  var o = _mxTombLoad(), k = store + '|' + id;
+  var cur = (o[k] && typeof o[k].t === 'number') ? o[k].t : 0;
+  if (t <= cur) return;
+  o[k] = { t: t }; _mxTombStore(o);
+}
+function mxTombClear(store, id) {
+  if (!store || !id) return;
+  var o = _mxTombLoad(), k = store + '|' + id;
+  if (o[k]) { delete o[k]; _mxTombStore(o); }
+}
+function mxTombGet() {
+  var o = _mxTombLoad(), now = Date.now(), ch = false;
+  Object.keys(o).forEach(function (k) { if (!o[k] || !o[k].t || (now - o[k].t) > MX_TOMB_TTL) { delete o[k]; ch = true; } });
+  if (ch) o = _mxTombStore(o);
+  return o;
+}
+window.mxTombMark = mxTombMark; window.mxTombClear = mxTombClear; window.mxTombGet = mxTombGet;
+window.mxTombMarkAt = mxTombMarkAt;
 /* ---------- 通用 CRUD 辅助 ---------- */
 
 
@@ -7908,6 +7949,7 @@ function tx(storeName, mode, fn) {
 /** 写入/更新单个记录 */
 
 async function put(storeName, value) {
+  try { mxTombClear(storeName, value && value.id); } catch (e) {}
 
   await tx(storeName, 'readwrite', (store) => {
 
@@ -7922,6 +7964,7 @@ async function put(storeName, value) {
 /** 批量写入 */
 
 async function bulkPut(storeName, values) {
+  try { (values || []).forEach(function (v) { if (v && v.id) mxTombClear(storeName, v.id); }); } catch (e) {}
 
   await tx(storeName, 'readwrite', (store) => {
 
@@ -7990,6 +8033,7 @@ function getAll(storeName) {
 /** 删除单条 */
 
 async function del(storeName, key) {
+  try { mxTombMark(storeName, key); } catch (e) {}
 
   await tx(storeName, 'readwrite', (store) => {
 
@@ -8000,6 +8044,11 @@ async function del(storeName, key) {
 }
 
 
+
+/** 删除单条（不记墓碑：供同步落地内部使用，避免把他端新数据误删） */
+async function delRaw(storeName, key) {
+  await tx(storeName, 'readwrite', (store) => { store.delete(key); });
+}
 
 /** 清空整个 store */
 
@@ -9341,6 +9390,14 @@ function inferResourceMeta(original_filename) {
 
   if (/raz|牛津树|oxford|海尼曼|分级|level\s*\d|reading/.test(name)) { meta.module = 'listen-en'; meta.category = '熏听·英文分级'; meta.tags.push('英文分级'); }
 
+  /* [#358-阶段三] 窄关键字分支：必须在 /儿歌/ 之前，「数学儿歌」才不会被判成 listen-music；
+     也必须在 /绘本/ 之前，避免「绘本熏听」落回 story。 */
+  else if (/十万个为什么|科普|百科|science\s*kid/.test(name)) { meta.module = 'lsci'; meta.category = '熏听·科普'; meta.tags.push('科普'); }
+
+  else if (/儿童新闻|每日新闻|时事|实事/.test(name)) { meta.module = 'lnews'; meta.category = '熏听·实事'; meta.tags.push('实事'); }
+
+  else if (/数学儿歌|数感|数字歌/.test(name)) { meta.module = 'lmath'; meta.category = '熏听·数学'; meta.tags.push('数学'); }
+
   else if (/sss|儿歌|童谣|twinkle|nursery|rhyme|\bsong\b/.test(name)) { meta.module = 'listen-music'; meta.category = '熏听·SSS儿歌'; meta.tags.push('儿歌'); }
 
   else if (/古诗|静夜思|春晓|登鹳雀楼|咏鹅|悯农|绝句|望庐山|山行|赋得/.test(name)) { meta.module = 'poem'; meta.category = '语文·古诗'; meta.tags.push('古诗'); }
@@ -9414,6 +9471,14 @@ const FOLDER_RULES = [
   { folder: '数学-四大算法',      module: 'algo',        category: '数学·四大算法',    localDir: 'assets/audio/algo/',          note: '凑十/破十等音频或视频' },
 
   { folder: '数学-练习册',        module: 'workbook',    category: '数学·练习册',      localDir: 'assets/pdf/math/',            note: '练习册PDF' },
+
+  { folder: '熏听-数学',          module: 'lmath',       category: '熏听·数学',        localDir: 'assets/audio/lmath/',         note: '数感儿歌/数学磨耳朵音频' },
+
+  { folder: '熏听-科普',          module: 'lsci',        category: '熏听·科普',        localDir: 'assets/audio/lsci/',          note: '十万个为什么/自然百科音频' },
+
+  { folder: '熏听-实事',          module: 'lnews',       category: '熏听·实事',        localDir: 'assets/audio/lnews/',         note: '儿童新闻/时事启蒙音频' },
+
+  { folder: '熏听-绘本',          module: 'lstory',      category: '熏听·绘本',        localDir: 'assets/audio/lstory/',        note: '睡前故事/绘本音频' },
 
   { folder: '免费资源-点读包',    module: 'pointread',   category: '免费资源·点读包',  localDir: 'assets/audio/',               note: '点读包音频' },
 
@@ -9868,6 +9933,8 @@ function mxWriteVipInfo(res) {
       setVip(false);
     }
   } catch (e) {}
+  /* [#418 2026-09-14] VIP 状态刚刚就绪（登录/复核/激活写入）→ 补一次同步提醒检查 */
+  try { if (window.isVip && window.isVip() && typeof window.mxCheckSyncReminder === 'function') setTimeout(window.mxCheckSyncReminder, 1200); } catch (e2) {}
 }
 /* [rootfix 2026-09-07] 跨 IIFE 导出：VIP 自愈闸门在另一个 script 块调用 */
 window.mxWriteVipInfo = mxWriteVipInfo;
@@ -9991,7 +10058,7 @@ window.DB = {
 
   openDB,
 
-  put, bulkPut, get, getAll, del, clearStore,
+  put, bulkPut, get, getAll, del, delRaw, clearStore,
 
   getByChild, getSetting, setSetting,
 
@@ -22923,7 +22990,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     { key:'workbook',    label:'练习册',     icon:'📓' },
     { key:'listen-en',   label:'熏听·英文',  icon:'🎧' },
     { key:'listen-music',label:'熏听·儿歌',  icon:'🎵' },
-    { key:'lchinese',    label:'熏听·国学',  icon:'🀄' }
+    { key:'lchinese',    label:'熏听·国学',  icon:'🀄' },
+    /* [#358-阶段三] 2026-09-14 补齐熏听 7 子页：此前仅 3 个熏听 key，
+       page-listen-math/science/news/story 四页无法接入导入资源 */
+    { key:'lmath',       label:'熏听·数学',  icon:'🔢' },
+    { key:'lsci',        label:'熏听·科普',  icon:'🔬' },
+    { key:'lnews',       label:'熏听·实事',  icon:'📰' },
+    { key:'lstory',      label:'熏听·绘本',  icon:'📚' }
   ];
   function resModLabel(k){ for (var i=0;i<RES_MODULES.length;i++) if (RES_MODULES[i].key===k) return RES_MODULES[i]; return { key:k||'other', label:k||'其他', icon:'📁' }; }
 
@@ -23213,6 +23286,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var t = String(type || '');
     /* [#379] 先查标准别名表（支持「熏听-英语」「语文-古诗」等模板标准写法，精确优先） */
     try { if (RES_MODULE_ALIAS[t.trim()]) return RES_MODULE_ALIAS[t.trim()]; } catch (e) {}
+    /* [#358-阶段三] 必须放在最前：下方 /数学/、/绘本/、/熏听/ 都会把这些词抢走 */
+    if (/科普|百科|十万个为什么|lsci/i.test(t)) return 'lsci';
+    if (/实事|儿童新闻|lnews/i.test(t)) return 'lnews';
+    if (/数学熏听|数学儿歌|数感|lmath/i.test(t)) return 'lmath';
+    if (/绘本熏听|睡前故事|lstory/i.test(t)) return 'lstory';
     if (/古诗|诗词|poem/i.test(t)) return 'poem';
     if (/识字|认字|literacy/i.test(t)) return 'literacy';
     if (/拼音|pinyin/i.test(t)) return 'pinyin';
@@ -23251,7 +23329,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }).filter(function(r){ return r.title && !/^（?示例/.test(r.title); });
   }
 
-  /* [#403] 模板示例行：13 个模块各一行，与 RES_MODULES 顺序一致。
+  /* [#403] 模板示例行：17 个模块各一行，与 RES_MODULES 顺序一致。
      模块名取「模块列可选值」里的标准写法，家长直接用示例行改文件名即可，不会被误判。 */
   var RES_TPL_ROWS = [
     ['poem',         '语文-古诗',     '静夜思·跟读'],
@@ -23266,7 +23344,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     ['workbook',     '数学-练习册',   '幼小衔接·练习册'],
     ['listen-en',    '熏听-英语',     '英文儿歌·磨耳朵'],
     ['listen-music', '熏听-儿歌',     '中文儿歌·磨耳朵'],
-    ['lchinese',     '熏听-国学',     '三字经·国学熏听']
+    ['lchinese',     '熏听-国学',     '三字经·国学熏听'],
+    ['lmath',        '熏听-数学',     '数感儿歌·磨耳朵'],
+    ['lsci',         '熏听-科普',     '十万个为什么·科普音频'],
+    ['lnews',        '熏听-实事',     '儿童新闻·每日一听'],
+    ['lstory',       '熏听-绘本',     '睡前故事·绘本音频']
   ];
   /* mediaType → 家长看得懂的中文格式说明 */
   var RES_TYPE_LABEL = { audio: '音频 mp3/wav/m4a/aac', pdf: 'PDF', image: '图片 jpg/png/webp', video: '视频 mp4' };
@@ -23274,7 +23356,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* CSV 模板下载（UTF-8 BOM，Excel/WPS 双击可编辑） */
   function resDownloadCsvTemplate(){
     /* [#403] 表头按家长最直观的三列：资源名称 / 模块 / 文件路径及文件名；
-       1 行标题 + 13 行（每个模块一行，并在资源名称里注明该模块支持的文件格式）。 */
+       1 行标题 + 17 行（每个模块一行，并在资源名称里注明该模块支持的文件格式）。 */
     function typesOf(key){
       var t = RES_MODULE_TYPES[key] || [];
       return t.map(function (x) { return RES_TYPE_LABEL[x] || x; }).join(' / ') || '不限';
@@ -23284,11 +23366,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       lines.push('（示例）' + r[2] + '【支持：' + typesOf(r[0]) + '】,' + r[1] + ',https://pan.baidu.com/s/请替换为你的分享链接');
     });
     lines.push('');
-    lines.push('【模块列可选值（13 类）】');
+    lines.push('【模块列可选值（17 类）】');
     lines.push(RES_TPL_ROWS.map(function (r) { return r[1]; }).join('｜'));
     lines.push('【填写说明】');
-    lines.push('1. 第 1 行表头请勿修改；第 2～14 行是示例，直接改成你自己的内容即可（整行覆盖，别只改半行）。');
-    lines.push('2. 「模块」列必须填上面 13 个标准值之一，写错会归入「其他」，导入后可用「手动归类」改回来。');
+    lines.push('1. 第 1 行表头请勿修改；第 2～18 行是示例，直接改成你自己的内容即可（整行覆盖，别只改半行）。');
+    lines.push('2. 「模块」列必须填上面 17 个标准值之一，写错会归入「其他」，导入后可用「手动归类」改回来。');
     lines.push('3. 「文件路径及文件名」列填网盘分享链接（https 开头）；电脑里的本地文件请回到「模式一·上传文件夹」。');
     lines.push('4. 每行「【支持：…】」是该模块能收的文件格式，熏听类只收音频，绘本类可收视频。');
     var content = '\uFEFF' + lines.join('\n') + '\n';
@@ -23296,7 +23378,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '资源导入模板.csv'; a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（14 行，13 个模块各一行，Excel/WPS 可直接编辑）');
+      if (window.showToast) window.showToast('⬇️ 已下载：资源导入模板.csv（18 行，17 个模块各一行，Excel/WPS 可直接编辑）');
     } catch (e) { if (window.showToast) window.showToast('模板下载失败：' + (e && e.message || e)); }
   }
   /* [#379] 模块列别名表：兼容「熏听-英语」/「熏听英文」/「listen-en」等写法 → 标准 key */
@@ -23316,6 +23398,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     reg(['熏听-英语','熏听英文','listen-en','listen'], 'listen-en');
     reg(['熏听-儿歌','儿歌','listen-music'], 'listen-music');
     reg(['熏听-语文','国学','熏听-国学','lchinese'], 'lchinese');
+    reg(['熏听-数学','数学熏听','lmath'], 'lmath');
+    reg(['熏听-科普','科普','lsci'], 'lsci');
+    reg(['熏听-实事','实事','lnews'], 'lnews');
+    reg(['熏听-绘本','睡前故事','lstory'], 'lstory');
     return m;
   })();
   /* [#379] 各模块允许的文件类型白名单（mediaType 级）：熏听仅音频；绘本放行视频口子 */
@@ -23332,7 +23418,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     'workbook':    ['pdf','image','video'],
     'listen-en':   ['audio'],
     'listen-music':['audio'],
-    'lchinese':    ['audio']
+    'lchinese':    ['audio'],
+    'lmath':       ['audio'],
+    'lsci':        ['audio'],
+    'lnews':       ['audio'],
+    'lstory':      ['audio']
   };
 
   /* CSV 行导入：链接 → 跳转型资源；本地路径 → 引导用模式一 */
@@ -23770,7 +23860,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     'page-phonics':         ['phonics', 'words'],
     'page-algo':            ['algo', 'workbook'],
     'page-listen-chinese':  ['lchinese'],
-    'page-listen-english':  ['listen-en', 'listen-music']
+    'page-listen-english':  ['listen-en', 'listen-music'],
+    /* [#358-阶段三] 补齐剩余 4 个熏听子页（schedule 是排期页，非内容页，不接） */
+    'page-listen-math':     ['lmath'],
+    'page-listen-science':  ['lsci'],
+    'page-listen-news':     ['lnews'],
+    'page-listen-story':    ['lstory']
   };
   var _modResBusy = {}, _modResDeb = {}, _modResObs = {};
   function resMediaIcon(r){
@@ -23933,7 +24028,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var html = '';
       rows.forEach(function(r){
         var isLink = r.mediaType === 'link' && (r.externalLink || r.linkUrl);
-        var isXt = /^(listen-en|listen-music|lchinese)$/.test(r.module || '');   /* [#365] 熏听类可一键排期 */
+        var isXt = /^(listen-en|listen-music|lchinese|lmath|lsci|lnews|lstory)$/.test(r.module || '');   /* [#365] 熏听类可一键排期（[#358-阶段三] 已补 4 个熏听模块） */
         html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid #f2f4f8">'
           + '<span data-mrp="' + resEsc(r.id) + '" style="flex:1;font-size:13px;cursor:pointer;color:#1f3a5f">' + resMediaIcon(r) + ' ' + resEsc(r.title || r.original_filename || '未命名资源') + '</span>'
           + (isXt ? '<button class="btn" data-mrs="' + resEsc(r.id) + '" title="创建熏听排期任务" style="font-size:11px;padding:2px 8px;border:1px solid #c9d8f0;color:#1f3a5f;background:#f7faff;border-radius:6px;white-space:nowrap">📅 排期</button>' : '')
@@ -25824,6 +25919,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   window.mxPackSnapshot = mxPackSnapshot;
   window.mxUnpackSnapshot = mxUnpackSnapshot;
   window.mxSyncLog = mxSyncLog;
+  /* [#436fix 2026-09-14] 补漏导出：下面两个函数定义在本 IIFE 内，却被「资源中心」块（另一个 <script>）跨块调用；未导出会 ReferenceError，导致文件夹导入时 VIP 自动上云整体失效。 */
+  window.uploadResourceToCloud = uploadResourceToCloud;
+  window.downloadResourceFromCloud = downloadResourceFromCloud;
+
 
 /* [#421] VIP 资源文件上云：优先 COS 预签名直传（绕开网关约100KB限制），失败自动降级 base64 通道 */
 function uploadResourceToCloud(resId) {
@@ -26404,6 +26503,8 @@ function downloadResourceFromCloud(resId) {
           out.settings = out.settings.filter(function (r) { return !(r && r.key === 'theme'); });
         }
       } catch (e) {}
+      /* [墓碑机制 #441] 随快照携带墓碑表（KB 级），供对端删除本机对应行，杜绝「删除被复活」 */
+      try { var _tb = mxTombGet(); if (_tb && Object.keys(_tb).length) out.__tomb = _tb; } catch (e) {}
       /* VIP 才把家长密码加密进快照；普通/游客不上云 PIN */
       if (lsGet(STORAGE.vip) === '1') {
         return ensureUid().then(function (uid) {
@@ -26471,6 +26572,32 @@ function downloadResourceFromCloud(resId) {
   }
   function applySnapshot(snap) {
     if (!snap) return Promise.resolve();
+    /* [墓碑机制 #441] 解析云端墓碑 + 通用版本号取值（与行内 _rowVer 同口径） */
+    /* [墓碑机制 #441] 本机墓碑 ∪ 云端墓碑（谁新听谁）：本机墓碑保证「本机删了、对端不知情仍推旧行」
+       时不复活；云端墓碑保证跨端删除生效并继续向第三端传播。 */
+    var _tomb = {};
+    try { var _lt = (typeof mxTombGet === 'function') ? mxTombGet() : {}; Object.keys(_lt).forEach(function (k) { _tomb[k] = _lt[k]; }); } catch (e) {}
+    try {
+      if (snap.__tomb && typeof snap.__tomb === 'object') {
+        Object.keys(snap.__tomb).forEach(function (k) {
+          var _e2 = snap.__tomb[k], _t2 = (typeof _e2 === 'number') ? _e2 : (_e2 && typeof _e2.t === 'number' ? _e2.t : 0);
+          var _e1 = _tomb[k], _t1 = (typeof _e1 === 'number') ? _e1 : (_e1 && typeof _e1.t === 'number' ? _e1.t : 0);
+          if (_t2 > _t1) _tomb[k] = { t: _t2 };
+        });
+      }
+    } catch (e) {}
+    function _rev(x) {
+      if (!x) return 0;
+      if (typeof x.updatedAt === 'number') return x.updatedAt;
+      try { var h = x.history; if (Array.isArray(h) && h.length && typeof h[h.length - 1].time === 'number') return h[h.length - 1].time; } catch (e) {}
+      return 0;
+    }
+    function _tombNewer(store, id, ver) {
+      var e = _tomb[store + '|' + id];
+      if (!e) return false;
+      var t = (typeof e === 'number') ? e : (e && typeof e.t === 'number' ? e.t : 0);
+      return t > (ver || 0);
+    }
     /* 以 __ 开头的字段为元数据（如加密 PIN），不走 DB 存储循环 */
     var dbTasks = Object.keys(snap).filter(function (s) { return s.indexOf('__') !== 0; }).map(function (s) {
       var rows = snap[s] || [];
@@ -26492,12 +26619,34 @@ function downloadResourceFromCloud(resId) {
           return 0;
         }
         var rv = _rowVer(r);
+        /* [墓碑机制 #441] 该行已被某端删除（墓碑更新）→ 拒绝写回，防复活 */
+        if (_tombNewer(s, key, rv)) return Promise.resolve();
         return window.DB.get(s, key).then(function (local) {
           if (_rowVer(local) > rv) return null;
           return window.DB.put(s, r);
         }).catch(function () { return window.DB.put(s, r); });
       }));
     });
+    /* [墓碑机制 #441] 应用墓碑：某端已删除、本机仍存在的行 → 删除本机（本机更新则保留待推送） */
+    var tombTask = Promise.resolve();
+    try {
+      var _tks = Object.keys(_tomb);
+      if (_tks.length && window.DB && window.DB.delRaw) {
+        tombTask = Promise.all(_tks.map(function (tk) {
+          var _i = tk.indexOf('|'); if (_i < 0) return Promise.resolve();
+          var _st = tk.slice(0, _i), _id = tk.slice(_i + 1);
+          var _e = _tomb[tk], _tt = (typeof _e === 'number') ? _e : (_e && typeof _e.t === 'number' ? _e.t : 0);
+          if (!_st || !_id || !_tt) return Promise.resolve();
+          try { mxTombMarkAt(_st, _id, _tt); } catch (e) {}   /* 按原时间持久化 → 继续向第三端传播 */
+          var _g = window.DB.get ? window.DB.get(_st, _id) : Promise.resolve(null);
+          return Promise.resolve(_g).then(function (local) {
+            if (!local) return null;
+            if (_rev(local) > _tt) return null;
+            return window.DB.delRaw(_st, _id);
+          }).catch(function () {});
+        }));
+      }
+    } catch (e) {}
     var pinTask = Promise.resolve();
     if (snap.__parentPinEnc && lsGet(STORAGE.vip) === '1') {
       try { window.__mxParentPinEnc = snap.__parentPinEnc; } catch (e) {} /* 缓存供「忘记密码」离线填回 */
@@ -26531,7 +26680,8 @@ function downloadResourceFromCloud(resId) {
           _man.forEach(function (m) {
             if (!m) return;
             if (m.fp && byFp[m.fp]) return;
-            if (m.id && byId[m.id]) return;
+            if (m.id && byId[m.id]) return;            if (m.id && _tombNewer('resources', m.id, m.createdAt || 0)) return;
+
             var row = { id: m.id || ('res_c_' + (m.fp || '')), module: m.module || 'community', category: m.category || '其他', title: m.title || m.original_filename || '', original_filename: m.original_filename || m.title || '', size: m.size || 0, mediaType: m.mediaType || 'audio', localPath: m.localPath || '', audioUrl: m.audioUrl || '', externalLink: m.externalLink || '', tags: [], source: m.source || 'folder-import', fp: m.fp || '', fromCloud: 1, localMissing: 1, cloud: m.cloud || 0, createdAt: m.createdAt || Date.now() };
             tasks.push(window.DB.put('resources', row).catch(function () {}));
           });
@@ -26540,6 +26690,8 @@ function downloadResourceFromCloud(resId) {
       }
     } catch (e) {}
     return Promise.all(dbTasks.concat([pinTask, resManTask])).then(function () {
+      return tombTask;   /* [#441] 串行化：墓碑删除排在云端写入之后，避免竞态误删 */
+    }).then(function () {
       /* [#399 PVZ 多端同步] 提到主链路：只要云端快照带了 PVZ 存档就合并，
          不再依赖 ensureUid/VIP 分支成功（否则 uid 获取失败时同步整体失效） */
       try { if (snap.__pvzStates && typeof snap.__pvzStates === 'object') mxMergePvzStates(snap.__pvzStates); } catch (e) {}
@@ -26636,6 +26788,7 @@ function downloadResourceFromCloud(resId) {
   }
   window.setSyncStatus = setSyncStatus;   /* [rootfix] 跨 IIFE 导出，供 VIP 复核链路使用 */
   window.applySnapshot = applySnapshot;     /* [syncfix #400] 跨块导出：回归测试与诊断可直接驱动合并逻辑 */
+  window.buildSnapshot = buildSnapshot;   /* [#441] 跨块导出：回归测试可验证 __tomb 随快照上云 */
   /* [badgefix] 登录过期恢复：清激活标记刷新出登录门，重新登录即续 30 天令牌并自动恢复同步 */
   function mxForceRelogin() {
     if (!window.confirm('云端同步的登录凭证已过期（约 30 天需重新登录一次，数据不会丢失）。\n\n点击「确定」前往重新登录；登录成功后右上角会变回「☁️ 云端已同步」。')) return;
@@ -26857,6 +27010,8 @@ function downloadResourceFromCloud(resId) {
     document.addEventListener('visibilitychange', function () { if (!document.hidden) { setTimeout(function () { if (!document.hidden) pullCloud(true).then(pushCloud).catch(function () {}); }, 1200); } });   /* [syncfix#413] 前台恢复延迟1.2s再同步，避开 iOS WebKit 恢复期 fetch 必败窗口 */
     pullCloud().then(function () { pushCloud(); });
     setInterval(function () { if (navigator.onLine !== false) pullCloud(true).then(pushCloud).catch(function () {}); }, 60000);
+    /* [#418 2026-09-14] 同步链启动 = 登录/VIP 已就绪 → 补一次同步提醒检查 */
+    try { if (typeof window.mxCheckSyncReminder === 'function') setTimeout(window.mxCheckSyncReminder, 1500); } catch (e) {}
   }
 
   /* ================= 普通用户轻量快照（L3-1：每周自动存云，供管理员紧急恢复） ================= */
@@ -30711,6 +30866,7 @@ window.MX_SPRITE_COORDS = {
   var IS_HTTP = /^https?:$/.test(location.protocol);
   var swReloading = false;
   var updatePromptShown = false;
+  var _remindTries = 0;                     /* [#418] VIP 未就绪时的有限次重试计数 */
 
   function LS(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function LSSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -30939,7 +31095,13 @@ window.MX_SPRITE_COORDS = {
   /* ---------------- 三、VIP 多端数据同步提醒（轻量 meta + 5 分钟冷却） ---------------- */
   function checkSyncReminder() {
     if (!IS_HTTP) return;
-    if (!isVipNow()) return;                                   /* 仅 VIP 用户 */
+    if (!isVipNow()) {                                         /* 仅 VIP 用户；但状态可能尚未就绪 */
+      /* [#418] 鸿蒙桌面实例存储隔离 / 异步鉴权：此刻读不到 VIP 不代表真不是 VIP，
+         做有限次退避重试（3/6/9/12/15s）。真非 VIP 时只是几次廉价本地判断，无副作用。 */
+      if (_remindTries < 5) { _remindTries++; setTimeout(checkSyncReminder, 3000 * _remindTries); }
+      return;
+    }
+    _remindTries = 0;
     if (typeof window.mxApiSync !== 'function') return;
 
     var uid = curUid() || 'anon';
@@ -30985,9 +31147,13 @@ window.MX_SPRITE_COORDS = {
   };
 
   /* --------------------------------- 启动调度 --------------------------------- */
+  /* [#418 2026-09-14] 导出：供 VIP 就绪 / 卡密激活 / 登录链路回调，实现「激活后即时提醒」 */
+  window.mxCheckSyncReminder = checkSyncReminder;
+
   function boot() {
     registerSW();
     checkAppVersion();
+    try { window.addEventListener('focus', function () { setTimeout(checkSyncReminder, 1500); }); } catch (e) {}   /* [#418] 移动端从桌面恢复时补一次 */
     setTimeout(function () { checkSyncReminder(); }, REMIND_DELAY);
     try {
       document.addEventListener('visibilitychange', function () {

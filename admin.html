@@ -77,6 +77,7 @@
     <div class="tab" id="tab-data" onclick="switchTab('data')" data-page-node-id="2Vt2j8HyzhM0J9P7PUhA8H">📋 数据明细</div>
     <div class="tab" id="tab-sec" onclick="switchTab('sec')" data-page-node-id="J0dqbNKoDJq6GcIyTyOGFb">⚙️ 账号安全</div>
     <div class="tab" id="tab-goods" onclick="switchTab('goods')">🛍️ 商品配置</div>
+    <div class="tab" id="tab-resops" onclick="switchTab('resops')">🩺 资源运维</div>
   </div>
 
   <!-- 公告编辑 -->
@@ -299,6 +300,49 @@
       </div>
     </div>
   </div>
+
+  <!-- 资源运维（#421-b / #432 / #421-c） -->
+  <div id="pane-resops" hidden>
+    <div class="card">
+      <h3 style="margin:0 0 4px">🩺 资源运维（体检 · 官方资源直传 · 云端流量）</h3>
+      <div class="sub">体检读云端资源表 <code>mx_cloud_res</code>；直传写 COS <code>official/</code>；流量只统计<b>走腾讯云的下载</b>——站内资源走 GitHub Pages，免费、不限额、不计入。</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="loadResOps()">🔄 刷新</button>
+        <button class="btn ghost" onclick="exportResCsv()">⬇ 导出体检 CSV</button>
+        <span id="roMsg" class="msg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px">📶 云端下载流量月限额</h3>
+      <div class="sub" style="margin:0 0 8px">只有 COS 直下与网关中转两条云通道计入；按自然月（东八区）计量，跨月自动归零。</div>
+      <div id="roEgress"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px">🗂️ 官方资源直传（COS <code>official/</code>）</h3>
+      <div class="sub" style="margin:0 0 8px">选文件 → 预签名 PUT 直传（绕开网关约 100KB 限制）→ 自动登记元数据，全站可用。单文件建议 ≤100MB。</div>
+      <div class="row" style="margin-top:4px">
+        <input type="file" id="roFile" style="font-size:13px">
+        <input id="roTitle" placeholder="资源名（可选）" style="width:170px">
+        <input id="roModule" placeholder="归属模块（可选，如 poem）" style="width:190px">
+        <button class="btn" onclick="officialUpload()">⬆ 直传为官方资源</button>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table class="gt">
+        <thead><tr><th>文件</th><th>大小</th><th>模块</th><th>上传时间</th><th style="width:70px">操作</th></tr></thead>
+        <tbody id="roOffBody"></tbody></table></div>
+      <div class="hint" style="margin-top:6px">共 <b id="roOffCount">0</b> 个官方资源；删除会同时清理 COS 对象与元数据。</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px">📊 用户云端占用 · Top 50 大文件</h3>
+      <div class="sub" style="margin:0 0 8px">用于判断「谁占了多少」「哪些文件最大」——大文件优先考虑压缩或转用 GitHub Pages 静态池。</div>
+      <div id="roUsers"></div>
+      <div class="scroll" style="margin-top:10px"><table class="gt">
+        <thead><tr><th style="width:34px">#</th><th>指纹</th><th>用户</th><th>大小</th><th>模块</th><th>时间</th></tr></thead>
+        <tbody id="roTopBody"></tbody></table></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -369,7 +413,7 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','nav','mon','fb','data','sec','goods'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec','goods','resops'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
@@ -378,6 +422,7 @@ function switchTab(t){
   if (t==='sec') loadSecQ();
   if (t==='nav') loadNavOrder();
   if (t==='goods') loadGoods();
+  if (t==='resops') loadResOps();
 }
 
 async function loadAnnounce(){
@@ -1027,6 +1072,162 @@ async function saveGoods(){
   const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'set', goods:{ shop: a.list, mall: b.list } });
   if (r && r.ok) setMsg('goodsMsg','✅ 已发布（'+a.list.length+' 个积分商品 / '+b.list.length+' 个好物），全端用户刷新后生效','ok');
   else setMsg('goodsMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
+}
+
+/* ===== [#421-b / #432 / #421-c] 资源运维：体检 · 官方资源直传 · 云端流量月限额 ===== */
+const RESOPS = { report: null, official: [] };
+
+function roBytes(n){
+  n = Number(n)||0;
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n/1048576).toFixed(2) + ' MB';
+  return (n/1073741824).toFixed(2) + ' GB';
+}
+function roBar(pct){
+  const w = Math.min(100, Math.max(0, Number(pct)||0));
+  const c = w>=100 ? '#e53935' : (w>=75 ? '#fb8c00' : '#43a047');
+  return '<div style="background:#eef;border-radius:6px;height:10px;overflow:hidden">'
+       + '<div style="height:100%;width:'+w.toFixed(1)+'%;background:'+c+'"></div></div>';
+}
+function roTime(s){
+  s = String(s||'');
+  return s ? esc(s.slice(0,19).replace('T',' ')) : '—';
+}
+
+async function loadResOps(){
+  setMsg('roMsg','加载中…','sub');
+  try{
+    const rep = await proxy('mxAdmin', { action:'resReport', adminKey: ADMIN_KEY });
+    const off = await proxy('mxAdmin', { action:'officialRes', op:'list', adminKey: ADMIN_KEY });
+    RESOPS.report = (rep && rep.ok) ? rep : null;
+    RESOPS.official = (off && off.files) || [];
+    renderResOps();
+    if (rep && rep.ok) setMsg('roMsg','✅ 已刷新','ok');
+    else setMsg('roMsg','❌ '+((rep&&rep.msg)||'读取失败'),'bad');
+  }catch(e){ setMsg('roMsg','❌ 读取失败：'+String(e.message||e),'bad'); }
+}
+
+function renderResOps(){
+  const r = RESOPS.report || {};
+
+  /* —— 云端流量月限额看板 —— */
+  const m = r.month || { month:'—', globalBytes:0, users:[] };
+  const gqMB = (r.quota && r.quota.globalMB) || 3072;
+  const uqMB = (r.quota && r.quota.userMB) || 300;
+  const gp = gqMB ? (m.globalBytes||0)/(gqMB*1048576)*100 : 0;
+  const uRows = (m.users||[]).map(function(u){
+    const p = uqMB ? (u.bytes||0)/(uqMB*1048576)*100 : 0;
+    const over = p >= 100;
+    return '<tr><td class="c-id">'+esc(u.uid)+'</td><td>'+roBytes(u.bytes)+'</td>'
+         + '<td class="c-num"'+(over?' style="color:#e53935;font-weight:700"':'')+'>'+p.toFixed(1)+'%</td>'
+         + '<td style="min-width:150px">'+roBar(p)+'</td></tr>';
+  }).join('');
+  const eg = $('roEgress');
+  if (eg) eg.innerHTML =
+    '<div class="row" style="justify-content:space-between"><b>全站当月</b>'
+      + '<span>'+roBytes(m.globalBytes)+' / '+gqMB+' MB ｜ 统计月 '+(m.month||'—')+'</span></div>'
+    + roBar(gp)
+    + '<div class="hint" style="margin:2px 0 10px">'+gp.toFixed(2)+'% ｜ 免费额度约 5GB/月，超出 0.21 元/GB；阈值 '+gqMB+'MB 即保「不花钱」，≥75% 本条标黄、≥100% 云通道自动暂停（站内不受影响）</div>'
+    + '<table class="gt"><thead><tr><th>用户</th><th>本月下载</th><th>占比</th><th>进度</th></tr></thead><tbody>'
+    + (uRows || '<tr><td colspan="4" style="padding:10px;color:#9aa">本月暂无云通道下载记录</td></tr>')
+    + '</tbody></table>';
+
+  /* —— 官方资源列表 —— */
+  const off = RESOPS.official || [];
+  const cnt = $('roOffCount'); if (cnt) cnt.textContent = off.length;
+  const ob = $('roOffBody');
+  if (ob) ob.innerHTML = off.length ? off.map(function(o){
+    return '<tr><td>'+esc(o.title||o.fp)+'<div class="hint" style="margin:0">'+esc(o.fp)+'.'+esc(o.ext)+'</div></td>'
+      + '<td>'+roBytes(o.size)+'</td><td>'+esc(o.module||'—')+'</td><td>'+roTime(o.at)+'</td>'
+      + '<td><button class="ico del" title="删除" onclick="officialDel('
+      + JSON.stringify(String(o.fp)).replace(/"/g,'&quot;') + ','
+      + JSON.stringify(String(o.ext)).replace(/"/g,'&quot;') + ')">✕</button></td></tr>';
+  }).join('') : '<tr><td colspan="5" style="padding:10px;color:#9aa">还没有官方资源，用上方直传添加</td></tr>';
+
+  /* —— 占用概览 + Top50 —— */
+  const us = r.users || [];
+  const ur = $('roUsers');
+  if (ur) ur.innerHTML =
+    '<div class="hint" style="margin:0 0 6px">云端共 <b>'+(r.files||0)+'</b> 个文件 / <b>'+roBytes(r.totalBytes)+'</b>'
+      + '；其中官方资源 <b>'+(r.officialFiles||0)+'</b> 个 / '+roBytes(r.officialBytes)+'</div>'
+    + '<table class="gt"><thead><tr><th>用户</th><th>文件数</th><th>占用</th><th>最近上传</th></tr></thead><tbody>'
+    + (us.length ? us.map(function(u){
+        return '<tr><td class="c-id">'+esc(u.uid)+'</td><td class="c-num">'+u.files+'</td><td>'+roBytes(u.bytes)+'</td><td>'+roTime(u.lastAt?new Date(u.lastAt).toISOString():'')+'</td></tr>';
+      }).join('') : '<tr><td colspan="4" style="padding:10px;color:#9aa">暂无云端文件</td></tr>')
+    + '</tbody></table>';
+  const top = r.top || [];
+  const tb = $('roTopBody');
+  if (tb) tb.innerHTML = top.length ? top.map(function(t,i){
+    return '<tr><td style="color:#9aa">'+(i+1)+'</td><td class="c-id">'+esc(t.fp)+(t.ext?'.'+esc(t.ext):'')+'</td>'
+      + '<td class="c-id">'+esc(t.uid)+'</td><td>'+roBytes(t.size)+'</td><td>'+esc(t.module||'—')+'</td><td>'+roTime(t.at)+'</td></tr>';
+  }).join('') : '<tr><td colspan="6" style="padding:10px;color:#9aa">暂无数据</td></tr>';
+
+  if (r.msg) setMsg('roMsg','⚠ '+r.msg,'warn');
+}
+
+function exportResCsv(){
+  const r = RESOPS.report;
+  if (!r){ setMsg('roMsg','请先点「刷新」','bad'); return; }
+  const L = ['类型,指纹或用户,字节,说明'];
+  (r.users||[]).forEach(function(u){ L.push('用户占用,'+u.uid+','+(u.bytes||0)+','+u.files+' 个文件'); });
+  (r.top||[]).forEach(function(t){ L.push('大文件,'+t.fp+','+(t.size||0)+','+(t.uid||'')+' / '+(t.module||'')+' / '+(t.title||'')); });
+  const m = r.month || {};
+  L.push('全站月流量,'+((m.month)||'')+','+((m.globalBytes)||0)+',限额 '+((r.quota&&r.quota.globalMB)||3072)+'MB');
+  (m.users||[]).forEach(function(u){ L.push('用户月流量,'+u.uid+','+(u.bytes||0)+',限额 '+((r.quota&&r.quota.userMB)||300)+'MB'); });
+  const blob = new Blob(['\ufeff'+L.join('\r\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mx_resource_report_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* 指纹：优先真内容 SHA-256（与客户端 mxResFp 同口径），失败退化为特征串哈希 */
+async function roFp(file){
+  try{
+    if (window.crypto && window.crypto.subtle && file.arrayBuffer){
+      const h = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      return Array.from(new Uint8Array(h)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('').slice(0,32);
+    }
+  }catch(e){}
+  const s = (file.name||'')+'|'+file.size+'|'+(file.lastModified||0);
+  let h1 = 0;
+  for (let i=0;i<s.length;i++){ h1 = ((h1<<5)-h1+s.charCodeAt(i))|0; }
+  return 'nf'+Math.abs(h1).toString(16).padStart(8,'0');
+}
+
+async function officialUpload(){
+  const inp = $('roFile');
+  const f = inp && inp.files && inp.files[0];
+  if (!f){ setMsg('roMsg','请先选择文件','bad'); return; }
+  const ext = (String(f.name).split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+  try{
+    setMsg('roMsg','计算指纹…','sub');
+    const fp = await roFp(f);
+    setMsg('roMsg','取直传签名…','sub');
+    const sg = await proxy('mxAdmin', { action:'officialRes', op:'sign', mode:'put', fp:fp, ext:ext, adminKey:ADMIN_KEY });
+    if (!sg || !sg.ok) throw new Error((sg && sg.msg) || '签名失败');
+    setMsg('roMsg','直传中…（'+roBytes(f.size)+'）','sub');
+    /* 不设 Content-Type，避免触发 CORS 预检（与客户端直传策略一致） */
+    const put = await fetch(sg.url, { method:'PUT', body:f });
+    if (!put.ok) throw new Error('COS PUT 失败 HTTP '+put.status);
+    const cm = await proxy('mxAdmin', { action:'officialRes', op:'commit', fp:fp, ext:ext, size:f.size,
+      title:($('roTitle')||{}).value || '', module:($('roModule')||{}).value || '', adminKey:ADMIN_KEY });
+    if (!cm || !cm.ok) throw new Error((cm && cm.msg) || '登记失败');
+    setMsg('roMsg','✅ 已直传并登记：'+f.name+'（'+fp+'.'+ext+'）','ok');
+    inp.value = '';
+    await loadResOps();
+  }catch(e){ setMsg('roMsg','❌ '+String(e.message||e),'bad'); }
+}
+
+async function officialDel(fp, ext){
+  if (!confirm('确认删除官方资源「'+fp+'」？\n将同时删除 COS 对象与元数据，引用它的用户会失效。')) return;
+  try{
+    const r = await proxy('mxAdmin', { action:'officialRes', op:'del', fp:fp, ext:ext||'', adminKey:ADMIN_KEY });
+    if (r && r.ok) setMsg('roMsg','✅ 已删除 '+fp,'ok');
+    else setMsg('roMsg','❌ '+((r&&r.msg)||'删除失败'),'bad');
+    await loadResOps();
+  }catch(e){ setMsg('roMsg','❌ '+String(e.message||e),'bad'); }
 }
 </script>
 </body>

@@ -7,3 +7,6 @@ temp/
 # 本地备份文件不进仓库
 index.html.bak*
 *.bak_*
+
+# 改动前快照目录（仅本机回滚用，避免撑大仓库——软限 1GB）
+Backups/
