@@ -27051,8 +27051,26 @@ function downloadResourceFromCloud(resId) {
     if (!code || !uid) return Promise.resolve(null);
     /* uid 由后端从 JWT token 取出；此处只需传 code + deviceId */
     return mxApiSync('bindCard', { code: code, deviceId: deviceId() })
-      .then(function (r) { return (r && r.ok) ? r : null; })
-      .catch(function () { return null; });
+      .then(function (r) {
+        /* [#446] 禁吞错：原实现把 ok:false 静默丢成 null → 后端「已达多端同步上限」等
+           拦截原因永远传不到用户眼前（红线 4）。现在透传后端 msg 并 console.error；
+           上限类错误（r.limit）直接弹提示，引导用户去账号中心解绑设备。 */
+        if (r && r.ok === false) {
+          try { console.error('[MX bindCard] 绑定失败: ' + (r.msg || '(无 msg)') + (r.code ? (' code=' + r.code) : '')); } catch (e) {}
+          if (r.limit) {
+            try {
+              var _lm = '⚠️ ' + (r.msg || '已达多端同步上限，请解绑后重试');
+              if (window.showToast) window.showToast(_lm);
+              else if (typeof toastSafe === 'function') toastSafe(_lm);
+            } catch (e2) {}
+          }
+        }
+        return r || null;
+      })
+      .catch(function (e) {
+        try { console.error('[MX bindCard] 请求异常: ' + ((e && e.message) || e)); } catch (e2) {}
+        return null;
+      });
   }
   /* #207·反馈云/本地：更新右上角同步状态徽章 */
   function setSyncStatus(s) {

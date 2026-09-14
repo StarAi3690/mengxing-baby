@@ -615,36 +615,53 @@ async function loadStats(){
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
   $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+esc(r.securityLogs)+' 条。';
 
-  /* #435(a) 同账号多终端登录：同一 uid 在 ≥2 台设备出现过即列出（账号可能外泄/多人共用）。
-     数据口径：mx_track（pv/login 埋点，带 uid+deviceId）∪ mx_events（模块点击，带 uid+deviceId）。 */
+  /* [#446] 同账号多终端登录：同一 uid 在 ≥2 个**真实**浏览器指纹上出现过才列出。
+     去噪口径（见 mxAdmin #446）：
+       ① dev-legacy-* = [8] 回填脚本按 UA 字符串派生的历史占位指纹，**不是设备** → 标灰、不计入终端数、不触发告警
+       ② uid 直接写成邮箱/账号名的历史脏数据 → 已在服务端归并到真实 uid（哈希）名下
+     另：本页「终端数」= 浏览器指纹数，不是物理设备数（纯 Web 拿不到 OS 级设备 ID）。 */
   const acctAbuse = r.accountAbuse || [];
+  const legacyOnly = Number(r.abuseLegacyOnly) || 0;
+  const abuseHint = '判定依据：<code>card_activation.devices[]</code>（绑卡设备，真实）+ <code>mx_track</code> / <code>mx_events</code> 中同一 uid 的去重<b>真实</b>指纹。'
+    + ' ⓘ <code>dev-legacy-*</code> 是历史回填按 UA 派生的占位指纹（不是设备），已标灰且不计入终端数。';
+  const legacyNote = legacyOnly ? ('<div class="hint" style="margin:6px 0 0">另有 ' + esc(String(legacyOnly)) + ' 个账号仅有历史占位指纹（已忽略，不计入告警）。</div>') : '';
   const abox = $('acctAbuseBox');
   if (abox) {
     if (!acctAbuse.length) {
       abox.innerHTML = '<h3 style="margin:12px 0 6px">📱 同账号多终端登录</h3>'
-        + '<div class="hint" style="margin:0">✅ 未发现同一账号在 2 台以上终端登录。判定依据：<code>card_activation.devices[]</code>（绑卡设备，存量真实数据）+ <code>mx_track</code> / <code>mx_events</code> 中同一 uid 的去重 deviceId。</div>';
+        + '<div class="hint" style="margin:0">✅ 未发现同一账号在 2 台以上终端登录。' + abuseHint + '</div>'
+        + legacyNote;
     } else {
       let h2 = '<h3 style="margin:12px 0 6px;color:var(--bad)">📱 同账号多终端登录（' + acctAbuse.length + ' 个账号）</h3>'
-        + '<div class="sub" style="margin:0 0 6px">一个账号正常只在自己 1~2 台设备上用；出现 3 台以上请核实是否账号外泄。点设备按钮可直接关闭它的激活通道。</div>'
-        + '<div class="scroll"><table><thead><tr><th>账号</th><th>UID</th><th>终端数</th><th>设备明细（可点封锁）</th><th>来源</th><th>最近活跃</th></tr></thead><tbody>';
+        + '<div class="sub" style="margin:0 0 6px">一个账号正常只在自己 1~2 台设备上用；出现 3 台以上请核实是否账号外泄。点设备按钮可直接关闭它的激活通道（灰色为历史占位，不可封锁）。</div>'
+        + '<div class="scroll"><table><thead><tr><th>账号</th><th>UID</th><th>真实终端数</th><th>设备明细（可点封锁）</th><th>来源</th><th>最近活跃</th></tr></thead><tbody>';
       acctAbuse.forEach(function (a) {
         const n = Number(a.deviceCount) || 0;
+        const lg = Number(a.legacyCount) || 0;
         const tone = n >= 4 ? 'background:#fdecee;color:var(--bad)' : (n >= 3 ? 'background:#fff6e5;color:var(--warn)' : 'background:#eef6ff;color:var(--pri)');
         const srcSet = {};
         (a.devices || []).forEach(function (d) { String(d.src || '').split('+').forEach(function (s) { if (s) srcSet[s] = 1; }); });
         const srcStr = Object.keys(srcSet).join(' / ') || '—';
         const devs = (a.devices || []).map(function (d) {
+          if (d.legacy) {
+            return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:3px 7px;border-radius:6px;background:#f1efe8;color:#888780;'
+              + 'font-family:ui-monospace,Consolas,monospace;font-size:11px" '
+              + 'title="历史回填按 UA 派生的占位指纹，不是物理设备，不计入终端数">'
+              + esc(String(d.deviceId).slice(0, 19)) + '… · 历史占位</span>';
+          }
           return '<button class="btn ghost sm" style="margin:2px 4px 2px 0;font-family:ui-monospace,Consolas,monospace;font-size:11px" '
             + 'title="关闭该设备的激活通道" onclick="blockDevicePrompt(\'' + esc(d.deviceId) + '\')">📵 ' + esc(String(d.deviceId).slice(0, 12)) + '…</button>';
         }).join('');
         h2 += '<tr><td><b>' + esc(a.account || '（无账号名）') + '</b></td>'
           + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + esc((a.uid || '').slice(0, 18)) + '</td>'
-          + '<td><span class="pill" style="' + tone + '">' + esc(n) + ' 台</span></td>'
+          + '<td><span class="pill" style="' + tone + '">' + esc(n) + ' 台</span>'
+          + (lg ? ' <span class="pill" style="background:#f1efe8;color:#888780" title="dev-legacy-* 历史占位，不计入">+' + esc(String(lg)) + ' 忽略</span>' : '')
+          + '</td>'
           + '<td style="max-width:420px">' + (devs || '<span class="sub">—</span>') + '</td>'
           + '<td style="white-space:nowrap"><span class="sub">' + esc(srcStr) + '</span></td>'
           + '<td style="white-space:nowrap">' + esc(a.lastSeen || '—') + '</td></tr>';
       });
-      h2 += '</tbody></table></div>';
+      h2 += '</tbody></table></div>' + legacyNote;
       abox.innerHTML = h2;
     }
   }
