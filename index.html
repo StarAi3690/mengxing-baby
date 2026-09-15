@@ -21030,6 +21030,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
        元素只有 {l, m} 两个字段、没有 done -> undefined 累加得 NaN，页面显示「NaN 完成任务」。
        改从 calcPeriod 的真实统计 ps.totalDone 取。 */
     var totalDone = ps.totalDone || 0;
+    /* [#450 番茄钟] 真实计时（各模块停留时长）汇总，与「计划时长」分开统计 */
+    var _fsum = null;
+    try { if (window.MXPomo && window.MXPomo.summaryFor) _fsum = await window.MXPomo.summaryFor(c, ptRange); } catch (eF) {}
 
     var h = '';
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div>' +
@@ -21060,6 +21063,26 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-chart-x">' + w.l + '</span></div>';
     });
     h += '</div></div>';
+    /* [#450 番茄钟] 真实学习时长卡（按模块实测停留，非计划时长） */
+    if (_fsum) {
+      h += '<div class="mx-card"><div class="mx-card-t">🍅 番茄钟·真实学习时长 <span style="font-size:12px;color:#9aa;font-weight:400">（进入模块自动计时）</span></div>';
+      var _fk = Object.keys(_fsum.byMod);
+      if (!_fk.length) {
+        h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有实测学习时长，孩子进入任意学习/游戏模块即自动累计～</div>';
+      } else {
+        _fk.sort(function (a, b) { return _fsum.byMod[b] - _fsum.byMod[a]; });
+        var _fmax = Math.max.apply(null, _fk.map(function (k) { return _fsum.byMod[k]; })) || 1;
+        h += '<div style="font-size:12px;color:#789;margin:2px 0 8px">' + RANGE_LABEL[ptRange] + '合计 <b style="color:#e67e22">' + _fsum.totalMin + '</b> 分钟 · 完成番茄 <b>' + (_fsum.po || 0) + '</b> 个 🍅</div>';
+        _fk.forEach(function (k) {
+          var _w = Math.max(6, Math.round(_fsum.byMod[k] / _fmax * 100));
+          h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">' +
+            '<span style="flex:0 0 108px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + k + '</span>' +
+            '<span style="flex:1;height:10px;border-radius:5px;background:#eef2ec;overflow:hidden"><i style="display:block;height:100%;width:' + _w + '%;background:linear-gradient(90deg,#ff9f43,#e67e22)"></i></span>' +
+            '<span style="flex:0 0 64px;font-size:12px;color:#789;text-align:right">' + _fsum.byMod[k] + ' 分钟</span></div>';
+        });
+      }
+      h += '</div>';
+    }
 
     // 各模块学习明细（按当前周期）
     var modKeys = Object.keys(ps.byMod);
@@ -26797,6 +26820,13 @@ function downloadResourceFromCloud(resId) {
           out.settings = out.settings.filter(function (r) { return !(r && r.key === 'theme'); });
         }
       } catch (e) {}
+      /* [#450 首页进度不拉锯] home:* 为本机派生展示态（游戏打开时自动重发布），
+         无 updatedAt 会被云端旧快照整行回灌 → 首页进度在真值与旧值间闪烁（PVZ 3/7↔6/7）。上行剔除。 */
+      try {
+        if (out.settings && out.settings.length) {
+          out.settings = out.settings.filter(function (r) { return !(r && /^home:/.test(String(r.key || ''))); });
+        }
+      } catch (e) {}
       /* [墓碑机制 #441] 随快照携带墓碑表（KB 级），供对端删除本机对应行，杜绝「删除被复活」 */
       try { var _tb = mxTombGet(); if (_tb && Object.keys(_tb).length) out.__tomb = _tb; } catch (e) {}
       /* VIP 才把家长密码加密进快照；普通/游客不上云 PIN */
@@ -26896,7 +26926,8 @@ function downloadResourceFromCloud(resId) {
     var dbTasks = Object.keys(snap).filter(function (s) { return s.indexOf('__') !== 0; }).map(function (s) {
       var rows = snap[s] || [];
       /* [#409] 云端历史快照里若仍带 theme 行，落地时跳过，避免覆盖本机主题 */
-      if (s === 'settings') rows = rows.filter(function (r) { return !(r && r.key === 'theme'); });
+      /* [#450] home:* 同 theme：本机派生展示态，拒云端回灌（防首页进度 3/7↔6/7 拉锯） */
+      if (s === 'settings') rows = rows.filter(function (r) { return !(r && (r.key === 'theme' || /^home:/.test(String(r.key || '')))); });
       return Promise.all(rows.map(function (r) {
         if (!window.DB || !window.DB.put) return Promise.resolve();
         /* [syncfix #400 行级新者胜] 手机+电脑同时开着时，旧快照整行覆盖会把本地较新的修改
@@ -31517,4 +31548,303 @@ window.MX_SPRITE_COORDS = {
 })();
 </script>
 <script id="mx-pool-index-data" type="application/json">{"ver":1,"ts":1789294175814,"base":"assets/","poolBase":"assets/pool/","count":124,"bytes":135404177,"items":[{"p":"audio/sprunki/sprunki_ensemble.mp3","n":"sprunki_ensemble.mp3","k":"sprunkiensemble","s":101189,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_fun_computer.mp3","n":"sprunki_fun_computer.mp3","k":"sprunkifuncomputer","s":65244,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_funbot.mp3","n":"sprunki_funbot.mp3","k":"sprunkifunbot","s":58139,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_gray.mp3","n":"sprunki_gray.mp3","k":"sprunkigray","s":114145,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_phase123.mp3","n":"sprunki_phase123.mp3","k":"sprunkiphase123","s":116235,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_pinki.mp3","n":"sprunki_pinki.mp3","k":"sprunkipinki","s":56049,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_simon.mp3","n":"sprunki_simon.mp3","k":"sprunkisimon","s":61065,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_sun_concerto.mp3","n":"sprunki_sun_concerto.mp3","k":"sprunkisunconcerto","s":88232,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_tree_fantasy.mp3","n":"sprunki_tree_fantasy.mp3","k":"sprunkitreefantasy","s":110384,"t":"audio","z":"A"},{"p":"audio/sprunki/sprunki_wenda.mp3","n":"sprunki_wenda.mp3","k":"sprunkiwenda","s":102025,"t":"audio","z":"A"},{"p":"icons/apple-touch-icon.png","n":"apple-touch-icon.png","k":"appletouchicon","s":1646,"t":"image","z":"A"},{"p":"icons/icon-192.png","n":"icon-192.png","k":"icon192","s":1758,"t":"image","z":"A"},{"p":"icons/icon-512.png","n":"icon-512.png","k":"icon512","s":4532,"t":"image","z":"A"},{"p":"images/rhythm_chars_reference.webp","n":"rhythm_chars_reference.webp","k":"rhythmcharsreference","s":137570,"t":"image","z":"A"},{"p":"images/characters/ai山海经1.webp","n":"ai山海经1.webp","k":"ai山海经1","s":62210,"t":"image","z":"A"},{"p":"images/characters/ai山海经2.webp","n":"ai山海经2.webp","k":"ai山海经2","s":199726,"t":"image","z":"A"},{"p":"images/characters/rhythm_aolun.webp","n":"rhythm_aolun.webp","k":"rhythmaolun","s":55012,"t":"image","z":"A"},{"p":"images/characters/rhythm_aomu.webp","n":"rhythm_aomu.webp","k":"rhythmaomu","s":47928,"t":"image","z":"A"},{"p":"images/characters/rhythm_black.webp","n":"rhythm_black.webp","k":"rhythmblack","s":42338,"t":"image","z":"A"},{"p":"images/characters/rhythm_brude.webp","n":"rhythm_brude.webp","k":"rhythmbrude","s":58048,"t":"image","z":"A"},{"p":"images/characters/rhythm_dashu.webp","n":"rhythm_dashu.webp","k":"rhythmdashu","s":53808,"t":"image","z":"A"},{"p":"images/characters/rhythm_deprule.webp","n":"rhythm_deprule.webp","k":"rhythmdeprule","s":52396,"t":"image","z":"A"},{"p":"images/characters/rhythm_ganuode.webp","n":"rhythm_ganuode.webp","k":"rhythmganuode","s":5236,"t":"image","z":"A"},{"p":"images/characters/rhythm_greylei.webp","n":"rhythm_greylei.webp","k":"rhythmgreylei","s":39112,"t":"image","z":"A"},{"p":"images/characters/rhythm_jiewen.webp","n":"rhythm_jiewen.webp","k":"rhythmjiewen","s":46634,"t":"image","z":"A"},{"p":"images/characters/rhythm_kelake.webp","n":"rhythm_kelake.webp","k":"rhythmkelake","s":51240,"t":"image","z":"A"},{"p":"images/characters/rhythm_pcman.webp","n":"rhythm_pcman.webp","k":"rhythmpcman","s":54366,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_aolun.webp","n":"rhythm_rh_aolun.webp","k":"rhythmrhaolun","s":92824,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_aomu.webp","n":"rhythm_rh_aomu.webp","k":"rhythmrhaomu","s":66724,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_blake.webp","n":"rhythm_rh_blake.webp","k":"rhythmrhblake","s":63168,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_brude.webp","n":"rhythm_rh_brude.webp","k":"rhythmrhbrude","s":75658,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_clark.webp","n":"rhythm_rh_clark.webp","k":"rhythmrhclark","s":86472,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_depler.webp","n":"rhythm_rh_depler.webp","k":"rhythmrhdepler","s":79922,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_funbot.webp","n":"rhythm_rh_funbot.webp","k":"rhythmrhfunbot","s":108580,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ganord.webp","n":"rhythm_rh_ganord.webp","k":"rhythmrhganord","s":75610,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_gelei.webp","n":"rhythm_rh_gelei.webp","k":"rhythmrhgelei","s":72152,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_jiewen.webp","n":"rhythm_rh_jiewen.webp","k":"rhythmrhjiewen","s":72528,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_pc.webp","n":"rhythm_rh_pc.webp","k":"rhythmrhpc","s":89002,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ruidi.webp","n":"rhythm_rh_ruidi.webp","k":"rhythmrhruidi","s":71660,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_shouji.webp","n":"rhythm_rh_shouji.webp","k":"rhythmrhshouji","s":8108,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_sun.webp","n":"rhythm_rh_sun.webp","k":"rhythmrhsun","s":86528,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tanu.webp","n":"rhythm_rh_tanu.webp","k":"rhythmrhtanu","s":80628,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tengxuan.webp","n":"rhythm_rh_tengxuan.webp","k":"rhythmrhtengxuan","s":117626,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_tree.webp","n":"rhythm_rh_tree.webp","k":"rhythmrhtree","s":75646,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_wenda.webp","n":"rhythm_rh_wenda.webp","k":"rhythmrhwenda","s":72334,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_xiaotian.webp","n":"rhythm_rh_xiaotian.webp","k":"rhythmrhxiaotian","s":86868,"t":"image","z":"A"},{"p":"images/characters/rhythm_rh_ximeng.webp","n":"rhythm_rh_ximeng.webp","k":"rhythmrhximeng","s":93868,"t":"image","z":"A"},{"p":"images/characters/rhythm_robot.webp","n":"rhythm_robot.webp","k":"rhythmrobot","s":66354,"t":"image","z":"A"},{"p":"images/characters/rhythm_ruidi.webp","n":"rhythm_ruidi.webp","k":"rhythmruidi","s":44700,"t":"image","z":"A"},{"p":"images/characters/rhythm_shouji.webp","n":"rhythm_shouji.webp","k":"rhythmshouji","s":46240,"t":"image","z":"A"},{"p":"images/characters/rhythm_simon.webp","n":"rhythm_simon.webp","k":"rhythmsimon","s":42800,"t":"image","z":"A"},{"p":"images/characters/rhythm_sunman.webp","n":"rhythm_sunman.webp","k":"rhythmsunman","s":50128,"t":"image","z":"A"},{"p":"images/characters/rhythm_tanu.webp","n":"rhythm_tanu.webp","k":"rhythmtanu","s":51298,"t":"image","z":"A"},{"p":"images/characters/rhythm_tengxuan.webp","n":"rhythm_tengxuan.webp","k":"rhythmtengxuan","s":75082,"t":"image","z":"A"},{"p":"images/characters/rhythm_wenda.webp","n":"rhythm_wenda.webp","k":"rhythmwenda","s":37796,"t":"image","z":"A"},{"p":"images/characters/rhythm_xiaotian.webp","n":"rhythm_xiaotian.webp","k":"rhythmxiaotian","s":46584,"t":"image","z":"A"},{"p":"images/characters/sprite_coords.json","n":"sprite_coords.json","k":"spritecoords","s":9368,"t":"json","z":"A"},{"p":"images/characters/节奏盒子.webp","n":"节奏盒子.webp","k":"节奏盒子","s":190616,"t":"image","z":"A"},{"p":"images/literacy/识字启蒙200字_p05.png","n":"识字启蒙200字_p05.png","k":"识字启蒙200字p05","s":111446,"t":"image","z":"A"},{"p":"images/shanhai/sh_banana.webp","n":"sh_banana.webp","k":"shbanana","s":37728,"t":"image","z":"A"},{"p":"images/shanhai/sh_bigfoot.webp","n":"sh_bigfoot.webp","k":"shbigfoot","s":9334,"t":"image","z":"A"},{"p":"images/shanhai/sh_bird.webp","n":"sh_bird.webp","k":"shbird","s":9648,"t":"image","z":"A"},{"p":"images/shanhai/sh_bomber.webp","n":"sh_bomber.webp","k":"shbomber","s":10746,"t":"image","z":"A"},{"p":"images/shanhai/sh_camel.webp","n":"sh_camel.webp","k":"shcamel","s":9594,"t":"image","z":"A"},{"p":"images/shanhai/sh_capybara.webp","n":"sh_capybara.webp","k":"shcapybara","s":84444,"t":"image","z":"A"},{"p":"images/shanhai/sh_catfish.webp","n":"sh_catfish.webp","k":"shcatfish","s":9660,"t":"image","z":"A"},{"p":"images/shanhai/sh_cow.webp","n":"sh_cow.webp","k":"shcow","s":9722,"t":"image","z":"A"},{"p":"images/shanhai/sh_croco.webp","n":"sh_croco.webp","k":"shcroco","s":12874,"t":"image","z":"A"},{"p":"images/shanhai/sh_crocoboy.webp","n":"sh_crocoboy.webp","k":"shcrocoboy","s":9544,"t":"image","z":"A"},{"p":"images/shanhai/sh_deer.webp","n":"sh_deer.webp","k":"shdeer","s":9582,"t":"image","z":"A"},{"p":"images/shanhai/sh_elephant.webp","n":"sh_elephant.webp","k":"shelephant","s":11728,"t":"image","z":"A"},{"p":"images/shanhai/sh_fish.webp","n":"sh_fish.webp","k":"shfish","s":8898,"t":"image","z":"A"},{"p":"images/shanhai/sh_gorilla.webp","n":"sh_gorilla.webp","k":"shgorilla","s":12650,"t":"image","z":"A"},{"p":"images/shanhai/sh_gorilla3.webp","n":"sh_gorilla3.webp","k":"shgorilla3","s":12980,"t":"image","z":"A"},{"p":"images/shanhai/sh_hippo.webp","n":"sh_hippo.webp","k":"shhippo","s":9408,"t":"image","z":"A"},{"p":"images/shanhai/sh_honey.webp","n":"sh_honey.webp","k":"shhoney","s":10154,"t":"image","z":"A"},{"p":"images/shanhai/sh_melondeer.webp","n":"sh_melondeer.webp","k":"shmelondeer","s":11662,"t":"image","z":"A"},{"p":"images/shanhai/sh_mouse.webp","n":"sh_mouse.webp","k":"shmouse","s":10470,"t":"image","z":"A"},{"p":"images/shanhai/sh_ninja.webp","n":"sh_ninja.webp","k":"shninja","s":10472,"t":"image","z":"A"},{"p":"images/shanhai/sh_octopus.webp","n":"sh_octopus.webp","k":"shoctopus","s":11524,"t":"image","z":"A"},{"p":"images/shanhai/sh_peach.webp","n":"sh_peach.webp","k":"shpeach","s":9686,"t":"image","z":"A"},{"p":"images/shanhai/sh_pig.webp","n":"sh_pig.webp","k":"shpig","s":12876,"t":"image","z":"A"},{"p":"images/shanhai/sh_salt.webp","n":"sh_salt.webp","k":"shsalt","s":9592,"t":"image","z":"A"},{"p":"images/shanhai/sh_shark.webp","n":"sh_shark.webp","k":"shshark","s":12444,"t":"image","z":"A"},{"p":"images/shanhai/sh_stick.webp","n":"sh_stick.webp","k":"shstick","s":6958,"t":"image","z":"A"},{"p":"images/shanhai/sh_strawberry.webp","n":"sh_strawberry.webp","k":"shstrawberry","s":9756,"t":"image","z":"A"},{"p":"images/shanhai/sh_teacup.webp","n":"sh_teacup.webp","k":"shteacup","s":8906,"t":"image","z":"A"},{"p":"images/shanhai/sh_teapot.webp","n":"sh_teapot.webp","k":"shteapot","s":10428,"t":"image","z":"A"},{"p":"images/shanhai/sh_tire.webp","n":"sh_tire.webp","k":"shtire","s":9166,"t":"image","z":"A"},{"p":"images/shanhai/sh_zebra.webp","n":"sh_zebra.webp","k":"shzebra","s":14144,"t":"image","z":"A"},{"p":"images/stage/rhythm_stage_bg.svg","n":"rhythm_stage_bg.svg","k":"rhythmstagebg","s":3432,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0001.webp","n":"IMAG0001.webp","k":"imag0001","s":530640,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0002.webp","n":"IMAG0002.webp","k":"imag0002","s":143582,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0004.webp","n":"IMAG0004.webp","k":"imag0004","s":2332994,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0005.webp","n":"IMAG0005.webp","k":"imag0005","s":2444282,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0006.webp","n":"IMAG0006.webp","k":"imag0006","s":2777522,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0007.webp","n":"IMAG0007.webp","k":"imag0007","s":2080450,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0008.webp","n":"IMAG0008.webp","k":"imag0008","s":1792410,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0009.webp","n":"IMAG0009.webp","k":"imag0009","s":2333012,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0010.webp","n":"IMAG0010.webp","k":"imag0010","s":2119552,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0011.webp","n":"IMAG0011.webp","k":"imag0011","s":2126102,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0012.webp","n":"IMAG0012.webp","k":"imag0012","s":1759798,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0013.webp","n":"IMAG0013.webp","k":"imag0013","s":2837552,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0014.webp","n":"IMAG0014.webp","k":"imag0014","s":2870038,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0015.webp","n":"IMAG0015.webp","k":"imag0015","s":2026956,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0016.webp","n":"IMAG0016.webp","k":"imag0016","s":2049494,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0017.webp","n":"IMAG0017.webp","k":"imag0017","s":1078218,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0018.webp","n":"IMAG0018.webp","k":"imag0018","s":1180546,"t":"image","z":"A"},{"p":"images/story/保罗大叔分比萨/IMAG0019.webp","n":"IMAG0019.webp","k":"imag0019","s":242022,"t":"image","z":"A"},{"p":"pdf/english/level10.pdf","n":"level10.pdf","k":"level10","s":1229439,"t":"pdf","z":"A"},{"p":"pdf/english/自然拼读学习法_游戏10.pdf","n":"自然拼读学习法_游戏10.pdf","k":"自然拼读学习法游戏10","s":1104898,"t":"pdf","z":"A"},{"p":"pdf/lchinese/理解240句小古文.pdf","n":"理解240句小古文.pdf","k":"理解240句小古文","s":1245354,"t":"pdf","z":"A"},{"p":"pdf/literacy/转盘部首.pdf","n":"转盘部首.pdf","k":"转盘部首","s":447766,"t":"pdf","z":"A"},{"p":"pdf/math/摩比爱数学_萌芽篇1.pdf","n":"摩比爱数学_萌芽篇1.pdf","k":"摩比爱数学萌芽篇1","s":32444279,"t":"pdf","z":"A"},{"p":"pdf/math/第三关_破十法.pdf","n":"第三关_破十法.pdf","k":"第三关破十法","s":1352902,"t":"pdf","z":"A"},{"p":"pdf/pinyin/前鼻韵母.pdf","n":"前鼻韵母.pdf","k":"前鼻韵母","s":1571626,"t":"pdf","z":"A"},{"p":"pdf/pinyin/单韵母.pdf","n":"单韵母.pdf","k":"单韵母","s":1779421,"t":"pdf","z":"A"},{"p":"pdf/pinyin/后鼻韵母.pdf","n":"后鼻韵母.pdf","k":"后鼻韵母","s":1174406,"t":"pdf","z":"A"},{"p":"pdf/pinyin/复韵母.pdf","n":"复韵母.pdf","k":"复韵母","s":2444887,"t":"pdf","z":"A"},{"p":"pdf/pinyin/幼小衔接拼音专项汇总.pdf","n":"幼小衔接拼音专项汇总.pdf","k":"幼小衔接拼音专项汇总","s":1571180,"t":"pdf","z":"A"},{"p":"pdf/pinyin/拼音77首.pdf","n":"拼音77首.pdf","k":"拼音77首","s":27734599,"t":"pdf","z":"A"},{"p":"pdf/pinyin/拼音复韵母+鼻韵母+整体认读拼音.pdf","n":"拼音复韵母+鼻韵母+整体认读拼音.pdf","k":"拼音复韵母鼻韵母整体认读拼音","s":5964031,"t":"pdf","z":"A"},{"p":"pdf/story/保罗大叔分比萨绘本.ppt","n":"保罗大叔分比萨绘本.ppt","k":"保罗大叔分比萨绘本","s":17714688,"t":"ppt","z":"A"},{"p":"pdf/workbook/练习1_回答问题找不同_p4.webp","n":"练习1_回答问题找不同_p4.webp","k":"练习1回答问题找不同p4","s":334736,"t":"image","z":"A"}]}</script>
+<script id="mx-pomoplus">
+/* =============================================================
+   #450 番茄时钟 · 全模块学习计时（2026-09-15）
+   1) 被动计时：停留在学习/游戏模块且页面可见时，按 15s 心跳累计真实时长
+   2) 存储：settings 键 mxfocus:<cid>:<YYYY-MM-DD> → { d, secs{模块id:秒}, po, updatedAt }
+      行顶层带 updatedAt → 云同步走行级「新者胜」，不重蹈 home:* 整行回灌拉锯（红线 17）
+   3) 浮窗番茄钟：各模块右下角 🍅，25/15 分钟专注 + 5 分钟休息，完成 +1⭐ +5 分
+   4) 家长工作台：window.MXPomo.summaryFor(cid, range) 汇总各模块分钟
+   ============================================================= */
+(function () {
+  'use strict';
+  if (window.MXPomo) return;
+  var TICK = 15;              /* 心跳秒数 */
+  var FLUSH_EVERY = 4;        /* 每 4 跳（约 1 分钟）落库一次 */
+  var pageId = '';
+  var tickN = 0;
+  var dirty = false;
+  var row = null;             /* { key, value:{d,secs,po}, updatedAt } */
+  var HIDE_PAGES = ['page-parent', 'page-settings', 'page-account', 'page-errors', 'page-feedback', 'page-resource-center', 'page-tool-ai', 'page-tool-print'];
+  var MOD_LABEL = {
+    pvz: '🌻 植物大战僵尸', pony: '🦄 小马宝莉', frozen: '❄️ 冰雪奇缘', paw: '🐾 汪汪队',
+    shanhai: '🌈 AI山海经', rhythm: '🎵 节奏盒子',
+    'page-games': '🎮 游戏互动大厅', 'page-pinyin': '🔤 拼音拼读', 'page-literacy': '✍️ 识字启蒙',
+    'page-poem': '📜 古诗', 'page-story': '📚 绘本', 'page-abc': '🔠 英文字母',
+    'page-phonics': '🗣️ 自然拼读', 'page-algo': '➕ 数学思维', 'page-maththink': '🧠 认知拓展',
+    'page-listen': '🎧 熏听', 'page-listen-schedule': '🎧 熏听排期', 'page-daily': '🌟 日常表现',
+    'page-shop': '⭐ 积分兑换', 'page-gacha': '🎁 盲盒卡牌', 'page-achievements': '🏆 成就墙',
+    'page-pet': '🐾 宠物养成', 'page-mall': '🏪 萌星好物',
+    'page-tool-pinyin': '✍️ 拼音生成器', 'page-tool-math': '➕ 口算练习', 'page-tool-flash': '🃏 学习闪卡',
+    'page-tool-tomato': '🍅 番茄钟', 'page-tool-resources': '📦 免费资源'
+  };
+
+  function dayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function cidP() {
+    try { if (window.DB && DB.getActiveChildId) return DB.getActiveChildId().then(function (i) { return i || 'default'; }).catch(function () { return 'default'; }); } catch (e) {}
+    return Promise.resolve('default');
+  }
+  function ensureRow(cid) {
+    var key = 'mxfocus:' + cid + ':' + dayKey();
+    if (row && row.key === key) return Promise.resolve(row);
+    return new Promise(function (res) {
+      try {
+        window.DB.get('settings', key).then(function (v) {
+          var val = (v && v.value && v.value.d === dayKey()) ? v.value : { d: dayKey(), secs: {}, po: 0 };
+          if (!val.secs) val.secs = {};
+          if (typeof val.po !== 'number') val.po = 0;
+          row = { key: key, value: val, updatedAt: (v && v.updatedAt) || 0 };
+          res(row);
+        }).catch(function () { row = { key: key, value: { d: dayKey(), secs: {}, po: 0 }, updatedAt: 0 }; res(row); });
+      } catch (e) { row = { key: key, value: { d: dayKey(), secs: {}, po: 0 }, updatedAt: 0 }; res(row); }
+    });
+  }
+  function flush() {
+    if (!dirty || !row) return;
+    dirty = false;
+    row.updatedAt = Date.now();
+    try { window.DB.put('settings', { key: row.key, value: row.value, updatedAt: row.updatedAt }).catch(function () {}); } catch (e) {}
+  }
+  /* 当前所在模块：page-games 特判到具体游戏（读 .mxg-wrap[data-theme]） */
+  function curModule() {
+    var pid = pageId;
+    try {
+      var act = document.querySelector('.content-page.active');
+      if (act && act.id) pid = act.id;
+    } catch (e) {}
+    if (!pid) return '';
+    if (pid === 'page-games') {
+      try {
+        var w = document.querySelector('#page-games .mxg-wrap[data-theme]');
+        if (w && MOD_LABEL[w.getAttribute('data-theme')]) return w.getAttribute('data-theme');
+      } catch (e) {}
+      return MOD_LABEL[pid] ? pid : '';
+    }
+    return MOD_LABEL[pid] ? pid : '';
+  }
+  function heartbeat() {
+    try { if (document.visibilityState !== 'visible') return; } catch (e) {}
+    var m = curModule();
+    if (!m) return;
+    cidP().then(function (cid) { return ensureRow(cid); }).then(function (r) {
+      if (r.value.d !== dayKey()) { row = null; return; }   /* 跨天 rollover（下一跳重建） */
+      r.value.secs[m] = (r.value.secs[m] || 0) + TICK;
+      dirty = true;
+      tickN++;
+      if (tickN % FLUSH_EVERY === 0) flush();
+    }).catch(function () {});
+  }
+
+  /* ---------- 家长工作台汇总：summaryFor(cid, 'today'|'week'|'month'|'quarter'|'year') ---------- */
+  function bounds(range) {
+    var now = new Date();
+    var from = new Date(now); from.setHours(0, 0, 0, 0);
+    if (range === 'week') { var dow = (now.getDay() + 6) % 7; from.setDate(now.getDate() - dow); }
+    else if (range === 'month') { from.setDate(1); }
+    else if (range === 'quarter') { from.setMonth(Math.floor(now.getMonth() / 3) * 3, 1); }
+    else if (range === 'year') { from.setMonth(0, 1); }
+    return { from: from.getTime(), to: Date.now() };
+  }
+  function summaryFor(cid, range) {
+    var b = bounds(range || 'week');
+    var pref = 'mxfocus:' + (cid || 'default') + ':';
+    return new Promise(function (res) {
+      window.DB.getAll('settings').then(function (rows) {
+        var secs = {}, po = 0, total = 0;
+        (rows || []).forEach(function (r) {
+          if (!r || !r.key || r.key.indexOf(pref) !== 0) return;
+          var v = r.value || {};
+          var ts = 0; try { ts = new Date(v.d + 'T12:00:00').getTime(); } catch (e) {}
+          if (!(ts >= b.from && ts <= b.to)) return;
+          Object.keys(v.secs || {}).forEach(function (k) {
+            var s = v.secs[k] || 0;
+            if (s > 0) { secs[k] = (secs[k] || 0) + s; total += s; }
+          });
+          po += v.po || 0;
+        });
+        var byMod = {};
+        Object.keys(secs).forEach(function (k) { byMod[MOD_LABEL[k] || k] = Math.round(secs[k] / 60); });
+        res({ totalMin: Math.round(total / 60), byMod: byMod, po: po });
+      }).catch(function () { res({ totalMin: 0, byMod: {}, po: 0 }); });
+    });
+  }
+
+  /* ---------- 浮窗番茄钟 ---------- */
+  var POMO_KEY = 'mx_pomo_run_v2';
+  var pomo = { mode: 'focus', len: 25 * 60, endTs: 0, running: false, pausedLeft: 0 };
+  try {
+    var _sv = JSON.parse(localStorage.getItem(POMO_KEY) || 'null');
+    if (_sv && _sv.len && _sv.mode) pomo = _sv;
+  } catch (e) {}
+  function pomoSave() { try { localStorage.setItem(POMO_KEY, JSON.stringify(pomo)); } catch (e) {} }
+  function pomoLeft() { return pomo.running ? Math.max(0, Math.round((pomo.endTs - Date.now()) / 1000)) : (pomo.pausedLeft || pomo.len); }
+  function fmt(s) { return ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2); }
+
+  var CSS = ''
+    + '#mx-pp-fab{position:fixed;right:14px;bottom:14px;z-index:9990;width:46px;height:46px;border-radius:50%;'
+    + 'background:#fff;border:2px solid #ff9f43;box-shadow:0 4px 14px rgba(230,126,34,.35);cursor:pointer;'
+    + 'display:none;align-items:center;justify-content:center;font-size:22px;user-select:none}'
+    + '#mx-pp-fab.show{display:flex}'
+    + '#mx-pp-fab .pp-badge{position:absolute;top:-6px;left:-6px;background:#e67e22;color:#fff;font-size:10px;'
+    + 'font-weight:800;border-radius:10px;padding:1px 5px;display:none}'
+    + '#mx-pp-fab.run .pp-badge{display:block}'
+    + '#mx-pp-panel{position:fixed;right:14px;bottom:68px;z-index:9991;width:236px;background:#fff;border-radius:16px;'
+    + 'box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px;display:none;font-size:13px;color:#455}'
+    + '#mx-pp-panel.show{display:block}'
+    + '#mx-pp-panel .pp-mod{font-size:12px;color:#8a9;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '#mx-pp-panel .pp-time{font-size:34px;font-weight:800;text-align:center;color:#e67e22;font-variant-numeric:tabular-nums}'
+    + '#mx-pp-panel .pp-mode{text-align:center;font-size:12px;color:#9ab;margin-bottom:8px}'
+    + '#mx-pp-panel .pp-chips{display:flex;gap:6px;justify-content:center;margin-bottom:8px}'
+    + '#mx-pp-panel .pp-chip{border:1px solid #ffd9b3;background:#fff7ef;color:#c77;border-radius:12px;padding:2px 10px;font-size:12px;cursor:pointer}'
+    + '#mx-pp-panel .pp-chip.on{background:#ff9f43;color:#fff;border-color:#ff9f43}'
+    + '#mx-pp-panel .pp-btns{display:flex;gap:8px;justify-content:center}'
+    + '#mx-pp-panel .pp-btn{border:0;border-radius:10px;padding:6px 14px;font-weight:800;cursor:pointer;font-size:13px}'
+    + '#mx-pp-panel .pp-main{background:#e67e22;color:#fff}'
+    + '#mx-pp-panel .pp-sub{background:#eef2ec;color:#678}'
+    + '#mx-pp-panel .pp-note{text-align:center;font-size:11px;color:#bba;margin-top:8px}';
+  function injectCss() {
+    if (document.getElementById('mx-pp-css')) return;
+    var st = document.createElement('style');
+    st.id = 'mx-pp-css'; st.textContent = CSS;
+    document.head.appendChild(st);
+  }
+  var fab = null, panel = null, uiTimer = null;
+  function buildUi() {
+    injectCss();
+    if (document.getElementById('mx-pp-fab')) return;
+    fab = document.createElement('div');
+    fab.id = 'mx-pp-fab';
+    fab.innerHTML = '🍅<span class="pp-badge"></span>';
+    panel = document.createElement('div');
+    panel.id = 'mx-pp-panel';
+    panel.innerHTML = '<div class="pp-mod" id="pp-mod">—</div>'
+      + '<div class="pp-time" id="pp-time">25:00</div>'
+      + '<div class="pp-mode" id="pp-mode">专注时间</div>'
+      + '<div class="pp-chips">'
+      + '<button class="pp-chip" data-len="15">专注15分</button>'
+      + '<button class="pp-chip on" data-len="25">专注25分</button>'
+      + '<button class="pp-chip" data-len="5">休息5分</button></div>'
+      + '<div class="pp-btns">'
+      + '<button class="pp-btn pp-main" id="pp-run">▶ 开始</button>'
+      + '<button class="pp-btn pp-sub" id="pp-reset">↺ 重置</button></div>'
+      + '<div class="pp-note">完成一个专注番茄 +1⭐ +5分 · 页面停留自动计入学习时长</div>';
+    document.body.appendChild(fab);
+    document.body.appendChild(panel);
+    fab.onclick = function () { panel.classList.toggle('show'); paintUi(); };
+    panel.querySelector('#pp-run').onclick = function () {
+      if (pomo.running) {
+        pomo.pausedLeft = pomoLeft(); pomo.running = false; pomoSave(); paintUi();
+      } else {
+        pomo.running = true;
+        pomo.endTs = Date.now() + (pomo.pausedLeft || pomo.len) * 1000;
+        pomoSave(); paintUi();
+      }
+    };
+    panel.querySelector('#pp-reset').onclick = function () {
+      pomo.running = false; pomo.pausedLeft = 0; pomoSave(); paintUi();
+    };
+    panel.querySelectorAll('.pp-chip').forEach(function (b) {
+      b.onclick = function () {
+        panel.querySelectorAll('.pp-chip').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        var mn = parseInt(b.getAttribute('data-len'), 10);
+        pomo.mode = mn >= 15 ? 'focus' : 'break';
+        pomo.len = mn * 60;
+        pomo.running = false; pomo.pausedLeft = 0;
+        pomoSave(); paintUi();
+      };
+    });
+    if (uiTimer) clearInterval(uiTimer);
+    uiTimer = setInterval(function () { pomoTick(); paintUi(); }, 1000);
+    paintUi();
+  }
+  function pomoTick() {
+    if (!pomo.running) return;
+    if (pomoLeft() > 0) return;
+    pomo.running = false; pomo.pausedLeft = 0;
+    if (pomo.mode === 'focus') {
+      /* 完成一个专注番茄：+1⭐ +5 分 + 计数（防重复：立即落库） */
+      cidP().then(function (cid) {
+        ensureRow(cid).then(function (r) {
+          r.value.po = (r.value.po || 0) + 1;
+          dirty = true; flush();
+        });
+        try {
+          if (window.DB && DB.addPoints) DB.addPoints(cid, 5, '完成一个番茄钟').catch(function () {});
+          if (window.DB && DB.getSetting) {
+            DB.getSetting('tomato:stars:' + cid, 0).then(function (n) {
+              return DB.setSetting('tomato:stars:' + cid, (Number(n) || 0) + 1);
+            }).catch(function () {});
+          }
+        } catch (e) {}
+      });
+      try { if (window.showToast) window.showToast('🍅 番茄完成！+1⭐ +5分，休息 5 分钟～'); } catch (e) {}
+      pomo.mode = 'break'; pomo.len = 5 * 60;
+    } else {
+      try { if (window.showToast) window.showToast('休息结束，继续加油！'); } catch (e) {}
+      pomo.mode = 'focus'; pomo.len = 25 * 60;
+    }
+    pomoSave();
+  }
+  function paintUi() {
+    if (!panel) return;
+    var run = panel.querySelector('#pp-run');
+    var t = panel.querySelector('#pp-time');
+    var md = panel.querySelector('#pp-mode');
+    var mo = panel.querySelector('#pp-mod');
+    if (t) t.textContent = fmt(pomoLeft());
+    if (md) md.textContent = pomo.mode === 'focus' ? '专注时间' : '休息时间';
+    if (mo) { var m = curModule(); mo.textContent = '当前模块：' + (MOD_LABEL[m] || '自由学习'); }
+    if (run) run.textContent = pomo.running ? '⏸ 暂停' : (pomo.pausedLeft ? '▶ 继续' : '▶ 开始');
+    if (fab) {
+      fab.classList.toggle('run', pomo.running);
+      var bd = fab.querySelector('.pp-badge');
+      if (bd && pomo.running) bd.textContent = fmt(pomoLeft());
+    }
+  }
+  function refreshFab() {
+    if (!fab) return;
+    var hide = HIDE_PAGES.indexOf(pageId) >= 0;
+    fab.classList.toggle('show', !hide);
+    if (hide && panel) panel.classList.remove('show');
+  }
+
+  /* ---------- 启动 ---------- */
+  function start() {
+    try {
+      document.addEventListener('navigation', function (e) {
+        try { pageId = (e.detail && e.detail.page) || ''; } catch (e2) { pageId = ''; }
+        refreshFab();
+      });
+    } catch (e) {}
+    buildUi();
+    setInterval(heartbeat, TICK * 1000);
+    /* 回退：navigation 事件晚绑定时，从 active 页兜底 */
+    setInterval(function () {
+      try {
+        var act = document.querySelector('.content-page.active');
+        if (act && act.id && !pageId) pageId = act.id;
+      } catch (e) {}
+      refreshFab();
+    }, 3000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flush();
+    });
+    window.addEventListener('pagehide', flush);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+
+  window.MXPomo = {
+    summaryFor: summaryFor,
+    curModule: curModule,
+    flushNow: flush,
+    _heartbeat: heartbeat
+  };
+})();
+</script>
 </body>
