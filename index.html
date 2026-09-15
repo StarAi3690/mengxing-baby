@@ -21049,10 +21049,47 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('') + '</div>';
 
     h += '<div class="mx-stat-row">' +
-      '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-tasksets\')" title="查看学习计划"><b>' + totalMin + '</b><span>' + RANGE_LABEL[ptRange] + '分钟</span></div>' +
+      /* [#451] 总时长卡合并番茄钟实测：大数字=计划+实测，副行标注番茄钟部分；点击展开明细（不再跳学习任务套组） */
+      '<div class="mx-stat mx-click" onclick="var d=document.getElementById(\'pt-focus-detail\');if(d)d.style.display=(d.style.display===\'none\'?\'\':\'none\')" title="展开/收起学习时间明细"><b>' + (totalMin + (_fsum ? (_fsum.totalMin || 0) : 0)) + '</b><span>' + RANGE_LABEL[ptRange] + '分钟</span>' + (_fsum && _fsum.totalMin ? '<span style="display:block;font-size:11px;color:#e67e22;margin-top:2px">🍅番茄钟记录 ' + _fsum.totalMin + ' 分钟</span>' : '') + '</div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-tasksets\')" title="查看学习计划"><b>' + totalDone + '</b><span>完成任务</span></div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-shop\')" title="进入积分兑换"><b>' + pts + '</b><span>当前积分</span></div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-errors\')" title="查看错题集"><b>' + ps.wrong + '</b><span>' + RANGE_LABEL[ptRange] + '错题</span></div></div>';
+
+    /* [#451] 学习时间明细（点击总时长卡展开）：🍅番茄钟实测 + 📝计划任务时长 两口径 */
+    h += '<div class="mx-card no-print" id="pt-focus-detail" style="display:none"><div class="mx-card-t">📋 学习时间明细 <span style="font-size:12px;color:#9aa;font-weight:400">（' + RANGE_LABEL[ptRange] + ' · 两个口径）</span></div>';
+    h += '<div style="font-size:13px;font-weight:600;margin:4px 0 8px">🍅 番茄钟·真实学习时长 <span style="font-size:12px;color:#9aa;font-weight:400">（进入模块自动计时）</span></div>';
+    if (_fsum && Object.keys(_fsum.byMod).length) {
+      var _fk = Object.keys(_fsum.byMod);
+      _fk.sort(function (a, b) { return _fsum.byMod[b] - _fsum.byMod[a]; });
+      var _fmax = Math.max.apply(null, _fk.map(function (k) { return _fsum.byMod[k]; })) || 1;
+      h += '<div style="font-size:12px;color:#789;margin:2px 0 8px">' + RANGE_LABEL[ptRange] + '合计 <b style="color:#e67e22">' + _fsum.totalMin + '</b> 分钟 · 完成番茄 <b>' + (_fsum.po || 0) + '</b> 个 🍅</div>';
+      _fk.forEach(function (k) {
+        var _w = Math.max(6, Math.round(_fsum.byMod[k] / _fmax * 100));
+        h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">' +
+          '<span style="flex:0 0 108px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + k + '</span>' +
+          '<span style="flex:1;height:10px;border-radius:5px;background:#eef2ec;overflow:hidden"><i style="display:block;height:100%;width:' + _w + '%;background:linear-gradient(90deg,#ff9f43,#e67e22)"></i></span>' +
+          '<span style="flex:0 0 64px;font-size:12px;color:#789;text-align:right">' + _fsum.byMod[k] + ' 分钟</span></div>';
+      });
+    } else {
+      h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有实测学习时长，孩子进入任意学习/游戏模块即自动累计～</div>';
+    }
+    h += '<div style="font-size:13px;font-weight:600;margin:14px 0 8px;border-top:1px dashed #e5e9e2;padding-top:12px">📝 计划任务时长 <span style="font-size:12px;color:#9aa;font-weight:400">（按已完成任务的计划时长）</span></div>';
+    var _mk2 = Object.keys(ps.byMod);
+    if (_mk2.length) {
+      h += '<div class="mx-bars">';
+      var _mMax2 = Math.max.apply(null, _mk2.map(function (k) { return ps.byMod[k].min; }));
+      _mk2.forEach(function (k) {
+        var _mm2 = ps.byMod[k];
+        var _p2 = _mMax2 ? Math.round(_mm2.min / _mMax2 * 100) : 0;
+        h += '<div class="mx-bar-row"><span class="mx-bar-lb">' + esc(k) + '</span>' +
+          '<div class="mx-bar-track"><i class="g" style="width:' + _p2 + '%"></i></div>' +
+          '<span class="mx-bar-v">' + _mm2.min + '分 · ' + _mm2.done + '/' + _mm2.tot + '</span></div>';
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有已完成的学习任务～</div>';
+    }
+    h += '</div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">📈 ' + RANGE_LABEL[ptRange] + '学习时长（分钟）</div><div class="mx-chart">';
     week.forEach(function (w) {
@@ -21063,26 +21100,6 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<span class="mx-chart-x">' + w.l + '</span></div>';
     });
     h += '</div></div>';
-    /* [#450 番茄钟] 真实学习时长卡（按模块实测停留，非计划时长） */
-    if (_fsum) {
-      h += '<div class="mx-card"><div class="mx-card-t">🍅 番茄钟·真实学习时长 <span style="font-size:12px;color:#9aa;font-weight:400">（进入模块自动计时）</span></div>';
-      var _fk = Object.keys(_fsum.byMod);
-      if (!_fk.length) {
-        h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有实测学习时长，孩子进入任意学习/游戏模块即自动累计～</div>';
-      } else {
-        _fk.sort(function (a, b) { return _fsum.byMod[b] - _fsum.byMod[a]; });
-        var _fmax = Math.max.apply(null, _fk.map(function (k) { return _fsum.byMod[k]; })) || 1;
-        h += '<div style="font-size:12px;color:#789;margin:2px 0 8px">' + RANGE_LABEL[ptRange] + '合计 <b style="color:#e67e22">' + _fsum.totalMin + '</b> 分钟 · 完成番茄 <b>' + (_fsum.po || 0) + '</b> 个 🍅</div>';
-        _fk.forEach(function (k) {
-          var _w = Math.max(6, Math.round(_fsum.byMod[k] / _fmax * 100));
-          h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">' +
-            '<span style="flex:0 0 108px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + k + '</span>' +
-            '<span style="flex:1;height:10px;border-radius:5px;background:#eef2ec;overflow:hidden"><i style="display:block;height:100%;width:' + _w + '%;background:linear-gradient(90deg,#ff9f43,#e67e22)"></i></span>' +
-            '<span style="flex:0 0 64px;font-size:12px;color:#789;text-align:right">' + _fsum.byMod[k] + ' 分钟</span></div>';
-        });
-      }
-      h += '</div>';
-    }
 
     // 各模块学习明细（按当前周期）
     var modKeys = Object.keys(ps.byMod);
