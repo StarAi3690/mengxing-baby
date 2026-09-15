@@ -16606,42 +16606,13 @@ window.MX_SEED = data;
   /* ==================================================
    * 入口：渲染小游戏大厅
    * ================================================== */
+  /* [#448 cleanup] 旧积分大厅已废弃：原实现点击卡片走 showGame → 引用 6 个从未定义的
+     游戏引擎（gamePvz/gamePony/gameElsa/gamePaw/gameShanhai/gameRhythm），纯死代码。
+     现役大厅 = MX_GAMES2.open → renderHall（视觉引擎）。此处仅保留兜底转发。 */
   function open() {
-    page = document.getElementById('page-games');
-    if (!page) return;
-    runCleanup();
-    todayDone().then(function (doneMap) {
-      var cards = MG_KEYS.map(function (k) {
-        var g = MG[k];
-        var ok = !!doneMap[k];
-        return '<button type="button" class="gx-mg-card" data-g="' + k + '" style="--mgc:' + g.color + ';--mgsoft:' + g.soft + ';--mgdark:' + g.dark + '">' +
-          '<div class="gx-mg-card-emoji">' + g.emoji + '</div>' +
-          '<div class="gx-mg-card-name">' + esc(g.name) + '</div>' +
-          '<div class="gx-mg-card-icon">' + g.icon + ' ' + g.pts + ' 积分/闯关</div>' +
-          '<div class="gx-mg-card-enemy">敌人：' + g.enemy + ' ' + esc(g.enemyName) + '</div>' +
-          '<div class="gx-mg-card-status">' + (ok ? '✅ 本轮已闯关' : '▶ 开始游戏') + '</div>' +
-        '</button>';
-      }).join('');
-      page.innerHTML =
-        '<div class="content-section-title">🎮 六大主题 · 独立小游戏 <span class="sub">每款玩法不同，闯关赚积分，还会记入今日学习任务</span></div>' +
-        '<div class="dash-stats" id="gx-mg-today"></div>' +
-        '<div class="gx-mg-grid">' + cards + '</div>' +
-        '<div class="empty-tip">完成小游戏可获得对应积分（' +
-        MG_KEYS.map(function (k) { return MG[k].icon + '=' + MG[k].pts + '分'; }).join('、') + '），并自动记入今日学习进度。</div>';
-      var stats = page.querySelector('#gx-mg-today');
-      var count = Object.keys(doneMap).length;
-      stats.innerHTML =
-        '<div class="dash-stat"><div class="stat-num">' + count + '/6</div><div class="stat-label">本轮闯关</div></div>' +
-        '<div class="dash-stat"><div class="stat-num">6 款</div><div class="stat-label">独立玩法</div></div>' +
-        '<div class="dash-stat"><div class="stat-num">🌟 友好</div><div class="stat-label">零压力</div></div>';
-      var grid = page.querySelector('.gx-mg-grid');
-      grid.onclick = function (e) {
-        var c = e.target.closest('[data-g]');
-        if (c) showGame(c.dataset.g);
-      };
-    });
+    try { if (window.MX_GAMES2 && window.MX_GAMES2.open) { window.MX_GAMES2.open(); return; } } catch (eO) {}
+    if (window.showToast) window.showToast('游戏大厅加载中，请稍候…');
   }
-
   /* ==================================================
    * 通用页面框架
    * ================================================== */
@@ -16661,18 +16632,7 @@ window.MX_SEED = data;
     '</div>';
   }
 
-  function showGame(gid) {
-    if (!page) page = document.getElementById('page-games');
-    if (!page) return;
-    runCleanup();
-    var g = MG[gid];
-    var fn = { pvz: gamePvz, pony: gamePony, elsa: gameElsa, paw: gamePaw, shanhai: gameShanhai, rhythm: gameRhythm }[gid];
-    if (!fn) return;
-    page.innerHTML = '';
-    fn(page, g);
-    var back = page.querySelector('.gx-mg-back');
-    if (back) back.onclick = function () { open(); };
-  }
+  /* [#448 cleanup] showGame 已删除：6 个游戏引擎从未定义，属死代码；现役游戏全部走 MX_GAMES2 视觉引擎（renderHall/openGame）。 */
 
   /* 结算 */
   function finish(g, won) {
@@ -17019,6 +16979,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             try {
               if (r.linkage.goods && Array.isArray(r.linkage.goods.shop) && r.linkage.goods.shop.length) window.MX_GOODS_SHOP = r.linkage.goods.shop;
               if (r.linkage.goods && Array.isArray(r.linkage.goods.mall) && r.linkage.goods.mall.length) window.MX_GOODS_MALL = r.linkage.goods.mall;
+              /* [#449] 兑换规则（每日限兑/说明）随配置下发 */
+              window.MX_GOODS_RULES = (r.linkage.goods && r.linkage.goods.rules) ? r.linkage.goods.rules : null;
             } catch (eG) {}
             /* [imgopt B] 管理端在配置表把 imgVer 改大 → 全端图片URL带新?v= → 强制刷新图鉴/卡面缓存 */
             try { var nv = parseInt(r.linkage.imgVer, 10); if (nv > 0) window.MX_IMG_VER = nv; } catch (e) {}
@@ -22826,8 +22788,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   ];
 
   /* [#421-d] 云端商品配置取值器：优先用管理后台下发的 MX_GOODS_SHOP/MALL，回退本地默认 */
-  function MX_SHOP_GOODS(){ return (window.MX_GOODS_SHOP && window.MX_GOODS_SHOP.length) ? window.MX_GOODS_SHOP : SHOP_GOODS; }
-  function MX_MALL_PRODUCTS(){ return (window.MX_GOODS_MALL && window.MX_GOODS_MALL.length) ? window.MX_GOODS_MALL : MALL_PRODUCTS; }
+  /* [#449] 过滤后台下架(on:false)的商品 */
+  function MX_SHOP_GOODS(){
+    var _l = (window.MX_GOODS_SHOP && window.MX_GOODS_SHOP.length) ? window.MX_GOODS_SHOP : SHOP_GOODS;
+    return (_l || []).filter(function(g){ return g && g.on !== false; });
+  }
+  /* [#449] 过滤后台下架(on:false)的好物 */
+  function MX_MALL_PRODUCTS(){
+    var _l = (window.MX_GOODS_MALL && window.MX_GOODS_MALL.length) ? window.MX_GOODS_MALL : MALL_PRODUCTS;
+    return (_l || []).filter(function(p){ return p && p.on !== false; });
+  }
 
   /* ---------- 数据：免费资源库 ---------- */
   var RESOURCE_CATALOG=[
@@ -22951,6 +22921,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
               '<button type="button" class="btn mx-goods-buy'+(can?'':' is-disabled')+'" data-id="'+g.id+'"'+(can?'':' disabled')+'>'+(can?'兑换':'积分不足')+'</button>'+
             '</div>';
           }).join('');
+          if (!cards) cards = '<div class="empty-tip">🛠️ 商品正在整理中，敬请期待</div>';
           var ledgerHtml = history.length ? history.map(function(h){
             var plus=(h.amount>=0);
             return '<div class="mx-ledger-row'+(plus?'':' minus')+'">'+
@@ -22967,6 +22938,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           }).join('') : '<div class="empty-tip">还没有兑换记录，挑一件心仪好物吧</div>';
           page.innerHTML='<div class="content-section-title">🛍️ 积分兑换商城 <span class="sub">用学习积分兑换好物（积分消耗出口）</span></div>'+
             '<div class="mx-balance-bar">💰 我的积分：<b id="mx-shop-pts">'+pts+'</b> ⭐ &nbsp;<span class="sub">完成任务 / 玩游戏可获得积分</span></div>'+
+            (window.MX_GOODS_RULES && window.MX_GOODS_RULES.note ? '<div class="empty-tip">📋 '+esc(window.MX_GOODS_RULES.note)+'</div>' : '')+
             '<div class="mx-goods-grid">'+cards+'</div>'+
             '<div class="mx-block"><div class="dash-block-title">📒 积分明细流水 <span class="sub">全部获得与消耗记录</span></div><div class="mx-ledger">'+ledgerHtml+'</div></div>'+
             '<div class="mx-block"><div class="dash-block-title">🧾 我的兑换记录 <span class="sub">'+orders.length+' 笔</span></div>'+ordHtml+'</div>'+
@@ -22976,6 +22948,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             b.onclick=function(){
               var id=b.dataset.id; var g=MX_SHOP_GOODS().find(function(x){return x.id===id;});
               if(!g) return;
+              /* [#449] 每人每日限兑（规则由后台下发，0=不限） */
+              var _dl=(window.MX_GOODS_RULES&&Number(window.MX_GOODS_RULES.dailyLimit)>0)?Number(window.MX_GOODS_RULES.dailyLimit):0;
+              if(_dl>0){ var _t0=new Date(); _t0.setHours(0,0,0,0); var _n=0;
+                (orders||[]).forEach(function(o){ if(o&&o.kind==='points'&&(o.at||0)>=_t0.getTime()) _n++; });
+                if(_n>=_dl){ T('📋 今日兑换已达上限（每天 '+_dl+' 次），明天再来吧'); return; } }
               childId().then(function(c){
                 spend(c,g.cost,'积分兑换·'+g.name).then(function(tot){
                   if(tot<0){ T('⭐ 积分不足，先去完成任务吧'); return; }
@@ -23023,6 +23000,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             '<button type="button" class="btn mx-mall-buy" data-id="'+p.id+'">'+(showVip?'VIP专享价购买':'去购买')+'</button>'+
           '</div>';
         }).join('');
+        if (!cards) cards = '<div class="empty-tip">🛠️ 好物正在整理中，敬请期待</div>';
         page.innerHTML='<div class="content-section-title">🏪 萌星好物推荐 <span class="sub">精选启蒙好物 · '+(isVip?'VIP专享折扣已自动应用':'开通VIP享部分商品专属折扣')+'</span></div>'+
           '<div class="mx-balance-bar">🛒 我的意向订单：<b>'+orders.length+'</b> 笔 &nbsp;<span class="sub">点击「去购买」将记录意向并跳转官方商城</span></div>'+
           '<div class="mx-mall-grid">'+cards+'</div>'+
