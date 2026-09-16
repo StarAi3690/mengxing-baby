@@ -3309,9 +3309,9 @@ html, body {
 .ov-grid { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding-bottom: 4px; }
 .ov-grid::-webkit-scrollbar { height: 4px; }
 .ov-grid::-webkit-scrollbar-thumb { background: var(--border-color, #dde5da); border-radius: 2px; }
-.ov-card { flex: 0 0 auto; min-width: 84px; max-width: 108px; background: var(--bg-elevated, #f7f9f7); border-radius: 12px; padding: 10px 8px; text-align: center; border-left: 3px solid var(--oa, #7ec850); }
-.ov-card .ov-num { font-size: 21px; font-weight: 800; color: var(--oa, #7ec850); line-height: 1.1; white-space: nowrap; }
-.ov-card .ov-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; white-space: nowrap; }
+.ov-card { flex: 1 1 0; min-width: 84px; background: var(--bg-elevated, #f7f9f7); border-radius: 12px; padding: 12px 8px; text-align: center; border-left: 3px solid var(--oa, #7ec850); }
+.ov-card .ov-num { font-size: 24px; font-weight: 800; color: var(--oa, #7ec850); line-height: 1.1; white-space: nowrap; }
+.ov-card .ov-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; white-space: nowrap; }
 
 
 
@@ -12845,7 +12845,7 @@ window.MX_SEED = data;
 
   const PINYIN_DATA = [
 
-    { main: 'ā', pinyin: 'ā', art: '🍎', ext: '单韵母' },
+    { main: 'ā', pinyin: 'ā', art: '👩', ext: '单韵母 · 阿姨' },
 
     { main: 'b', pinyin: 'b', art: '📚', ext: '声母' },
 
@@ -12866,95 +12866,227 @@ window.MX_SEED = data;
   /* 暴露给「学习任务套组」模块，保证生成的拼音任务是真实存在的卡片 */
   window.MX_PINYIN_DATA = PINYIN_DATA;
 
-  /* =============================================================
-     [#453] 21 天拼音闯关课程（标准体系：声母23 / 韵母24=单6+复9+前鼻5+后鼻4 / 整体认读16）
-     教学顺序参考主流「21天幼小衔接拼音」：单韵母→声调→声母分组→两拼→复/鼻韵母→三拼→整体认读
-     items: [发音主体, 提示/例词]
-     ============================================================= */
+  /* ============ [#455] 拼音 21 天闯关 + 分类筛选 + 四声大卡 (PY455_START) ============
+     标准体系：声母23 / 韵母24=单6+复9+前鼻5+后鼻4 / 整体认读16
+     新增：任意天可点 / 图标修正(a=阿姨) / 大卡+已掌握+错题 / 分类标签筛选 / 四声大卡弹层 */
   const PINYIN_COURSE = [
-    { t: '单韵母 ①', groups: [{ g: '单韵母', items: [['a', '阿姨的 a 🍎'], ['o', '公鸡喔喔 o 🐓'], ['e', '白鹅的 e 🦢']] }] },
-    { t: '单韵母 ②', groups: [{ g: '单韵母', items: [['i', '衣服的 i 👕'], ['u', '乌鸦的 u 🐦'], ['ü', '小鱼的 ü 🐟']] }] },
-    { t: '四声调', groups: [{ g: '以 a 为例 · 一声平二声扬', items: [['ā', '一声平 · 阿姨'], ['á', '二声扬 · 啊？！'], ['ǎ', '三声拐弯 · 啊？'], ['à', '四声降 · 啊！好']] }, { g: '标调口诀', items: [['有 a 不放过', 'a 在就标 a 上'], ['没 a 找 o e', '没 a 找 o / e']] }] },
-    { t: '声母 b p m f', groups: [{ g: '声母', items: [['b', '广播 b 📻'], ['p', '爬山 p ⛰️'], ['m', '摸人 m 🙈'], ['f', '佛祖 f 🙏']] }] },
-    { t: '声母 d t n l', groups: [{ g: '声母', items: [['d', '马蹄 d 🐴'], ['t', '伞柄 t ☂️'], ['n', '门洞 n 🚪'], ['l', '小棍 l 🎵']] }] },
-    { t: '声母 g k h', groups: [{ g: '声母', items: [['g', '鸽子 g 🕊️'], ['k', '蝌蚪 k 🐸'], ['h', '喝水 h 💧']] }] },
-    { t: '声母 j q x', groups: [{ g: '声母', items: [['j', '小鸡 j 🐤'], ['q', '气球 q 🎈'], ['x', '西瓜 x 🍉']] }, { g: 'ü 见 j q x 脱帽', items: [['ju', 'ju = j + ü（两点省略）'], ['qu', 'qu = q + ü'], ['xu', 'xu = x + ü']] }] },
-    { t: '两拼法练习', groups: [{ g: '声母 + 单韵母 → 音节', items: [['bà', 'b-à → bà 爸爸 👨'], ['mā', 'm-ā → mā 妈妈 👩'], ['gē', 'g-ē → gē 哥哥 👦'], ['lù', 'l-ù → lù 小鹿 🦌'], ['hǔ', 'h-ǔ → hǔ 老虎 🐯']] }] },
-    { t: '声母 zh ch sh r', groups: [{ g: '翘舌音', items: [['zh', '蜘蛛 zh 🕷️'], ['ch', '吃果 ch 🍊'], ['sh', '狮子 sh 🦁'], ['r', '日出 r 🌅']] }] },
-    { t: '声母 z c s', groups: [{ g: '平舌音', items: [['z', '写字 z ✏️'], ['c', '刺猬 c 🦔'], ['s', '蚕丝 s 🐛']] }] },
-    { t: '声母 y w', groups: [{ g: '声母', items: [['y', '树枝 y 🌿'], ['w', '屋顶 w 🏠']] }, { g: '整体认读（朋友音）', items: [['yi', '衣 yi 👕'], ['wu', '乌 wu 🐦'], ['yu', '鱼 yu 🐟']] }] },
-    { t: '复韵母 ai ei ui', groups: [{ g: '复韵母', items: [['ai', '爱 ai ❤️ · 白菜'], ['ei', '欸 ei · 喝水'], ['ui', '围巾 ui 🧣 · 水']] }] },
-    { t: '复韵母 ao ou iu', groups: [{ g: '复韵母', items: [['ao', '棉袄 ao 🧥 · 猫'], ['ou', '海鸥 ou 🕊️ · 走'], ['iu', '皮球 iu ⚽ · 六']] }] },
-    { t: '复韵母 ie üe er', groups: [{ g: '复韵母', items: [['ie', '树叶 ie 🍃 · 蝴蝶'], ['üe', '月亮 üe 🌙 · 雪'], ['er', '耳朵 er 👂 · 儿歌（特殊韵母）']] }] },
-    { t: '前鼻韵母 an en in un ün', groups: [{ g: '前鼻韵母（舌尖顶上牙床）', items: [['an', '安 an · 蓝天'], ['en', '恩 en · 门'], ['in', '音 in · 树林'], ['un', '温 un · 蚊子'], ['ün', '云 ün ☁️ · 春天']] }] },
-    { t: '后鼻韵母 ang eng ing ong', groups: [{ g: '后鼻韵母（舌根抬起来）', items: [['ang', '山 ang ⛰️ · 帮忙'], ['eng', '灯 eng 💡 · 风'], ['ing', '鹰 ing 🦅 · 星星'], ['ong', '钟 ong 🔔 · 虫子']] }] },
-    { t: '前后鼻对比拼读', groups: [{ g: '对比练（an ↔ ang）', items: [['bān', 'b-an → 班级'], ['bāng', 'b-ang → 帮助'], ['fēn', 'f-en → 分开'], ['fēng', 'f-eng → 大风'], ['xīn', 'x-in → 心'], ['xīng', 'x-ing → 星星']] }] },
-    { t: '三拼法', groups: [{ g: '声母 + 介母 + 韵母', items: [['guā', 'g-u-a → guā 西瓜 🍉'], ['huā', 'h-u-a → huā 花朵 🌸'], ['shuō', 'sh-u-o → shuō 说话 💬'], ['xiǎo', 'x-i-ao → xiǎo 小的 🐣']] }] },
-    { t: '整体认读 ①', groups: [{ g: '翘舌 + 平舌（整体认读，直接读不出声母韵母）', items: [['zhi', '蜘 zhi 🕷️'], ['chi', '吃 chi 🍊'], ['shi', '狮 shi 🦁'], ['ri', '日 ri 🌅'], ['zi', '字 zi ✏️'], ['ci', '刺 ci 🦔'], ['si', '丝 si 🐛']] }] },
-    { t: '整体认读 ②', groups: [{ g: '剩余 6 个整体认读音节', items: [['ye', '夜 ye 🌃'], ['yue', '月 yue 🌙'], ['yuan', '圆 yuan ⭕'], ['yin', '音 yin 🎵'], ['yun', '云 yun ☁️'], ['ying', '鹰 ying 🦅']] }] },
+    { t: '单韵母 ①', groups: [{ g: '单韵母', items: [['a', '👩 阿姨的 a'], ['o', '🐓 公鸡喔喔 o'], ['e', '🦢 白鹅的 e']] }] },
+    { t: '单韵母 ②', groups: [{ g: '单韵母', items: [['i', '👕 衣服的 i'], ['u', '🐦 乌鸦的 u'], ['ü', '🐟 小鱼的 ü']] }] },
+    { t: '四声调', groups: [{ g: '以 a 为例 · 一声平二声扬', items: [['ā', '➡️ 一声平 · 阿姨'], ['á', '⬆️ 二声扬 · 啊？！'], ['ǎ', '↘️↗️ 三声拐弯 · 啊？'], ['à', '⬇️ 四声降 · 啊！好']] }, { g: '标调口诀', items: [['有 a 不放过', 'a 在就标 a 上'], ['没 a 找 o e', '没 a 找 o / e']] }] },
+    { t: '声母 b p m f', groups: [{ g: '声母', items: [['b', '📻 广播 b'], ['p', '⛰️ 爬山 p'], ['m', '🙈 摸人 m'], ['f', '🙏 佛祖 f']] }] },
+    { t: '声母 d t n l', groups: [{ g: '声母', items: [['d', '🐴 马蹄 d'], ['t', '☂️ 伞柄 t'], ['n', '🚪 门洞 n'], ['l', '🎵 小棍 l']] }] },
+    { t: '声母 g k h', groups: [{ g: '声母', items: [['g', '🕊️ 鸽子 g'], ['k', '🐸 蝌蚪 k'], ['h', '💧 喝水 h']] }] },
+    { t: '声母 j q x', groups: [{ g: '声母', items: [['j', '🐤 小鸡 j'], ['q', '🎈 气球 q'], ['x', '🍉 西瓜 x']] }, { g: 'ü 见 j q x 脱帽', items: [['ju', 'ju = j + ü（两点省略）'], ['qu', 'qu = q + ü'], ['xu', 'xu = x + ü']] }] },
+    { t: '两拼法练习', groups: [{ g: '声母 + 单韵母 → 音节', items: [['bà', '👨 b-à → bà 爸爸'], ['mā', '👩 m-ā → mā 妈妈'], ['gē', '👦 g-ē → gē 哥哥'], ['lù', '🦌 l-ù → lù 小鹿'], ['hǔ', '🐯 h-ǔ → hǔ 老虎']] }] },
+    { t: '声母 zh ch sh r', groups: [{ g: '翘舌音', items: [['zh', '🕷️ 蜘蛛 zh'], ['ch', '🍊 吃果 ch'], ['sh', '🦁 狮子 sh'], ['r', '🌅 日出 r']] }] },
+    { t: '声母 z c s', groups: [{ g: '平舌音', items: [['z', '✏️ 写字 z'], ['c', '🦔 刺猬 c'], ['s', '🐛 蚕丝 s']] }] },
+    { t: '声母 y w', groups: [{ g: '声母', items: [['y', '🌿 树枝 y'], ['w', '🏠 屋顶 w']] }, { g: '整体认读（朋友音）', items: [['yi', '👕 衣 yi'], ['wu', '🐦 乌 wu'], ['yu', '🐟 鱼 yu']] }] },
+    { t: '复韵母 ai ei ui', groups: [{ g: '复韵母', items: [['ai', '❤️ 爱 ai · 白菜'], ['ei', '🥤 欸 ei · 喝水'], ['ui', '🧣 围巾 ui · 水']] }] },
+    { t: '复韵母 ao ou iu', groups: [{ g: '复韵母', items: [['ao', '🧥 棉袄 ao · 猫'], ['ou', '🕊️ 海鸥 ou · 走'], ['iu', '⚽ 皮球 iu · 六']] }] },
+    { t: '复韵母 ie üe er', groups: [{ g: '复韵母', items: [['ie', '🍃 树叶 ie · 蝴蝶'], ['üe', '🌙 月亮 üe · 雪'], ['er', '👂 耳朵 er · 儿歌（特殊韵母）']] }] },
+    { t: '前鼻韵母 an en in un ün', groups: [{ g: '前鼻韵母（舌尖顶上牙床）', items: [['an', '🌤️ 安 an · 蓝天'], ['en', '🚪 恩 en · 门'], ['in', '🌲 音 in · 树林'], ['un', '🦟 温 un · 蚊子'], ['ün', '☁️ 云 ün · 春天']] }] },
+    { t: '后鼻韵母 ang eng ing ong', groups: [{ g: '后鼻韵母（舌根抬起来）', items: [['ang', '⛰️ 山 ang · 帮忙'], ['eng', '💡 灯 eng · 风'], ['ing', '🦅 鹰 ing · 星星'], ['ong', '🔔 钟 ong · 虫子']] }] },
+    { t: '前后鼻对比拼读', groups: [{ g: '对比练（an ↔ ang）', items: [['bān', '🏫 b-an → 班级'], ['bāng', '🤝 b-ang → 帮助'], ['fēn', '✂️ f-en → 分开'], ['fēng', '🌬️ f-eng → 大风'], ['xīn', '❤️ x-in → 心'], ['xīng', '⭐ x-ing → 星星']] }] },
+    { t: '三拼法', groups: [{ g: '声母 + 介母 + 韵母', items: [['guā', '🍉 g-u-a → guā 西瓜'], ['huā', '🌸 h-u-a → huā 花朵'], ['shuō', '💬 sh-u-o → shuō 说话'], ['xiǎo', '🐣 x-i-ao → xiǎo 小的']] }] },
+    { t: '整体认读 ①', groups: [{ g: '翘舌 + 平舌（整体认读，直接读不出声母韵母）', items: [['zhi', '🕷️ 蜘 zhi'], ['chi', '🍊 吃 chi'], ['shi', '🦁 狮 shi'], ['ri', '🌅 日 ri'], ['zi', '✏️ 字 zi'], ['ci', '🦔 刺 ci'], ['si', '🐛 丝 si']] }] },
+    { t: '整体认读 ②', groups: [{ g: '剩余 6 个整体认读音节', items: [['ye', '🌃 夜 ye'], ['yue', '🌙 月 yue'], ['yuan', '⭕ 圆 yuan'], ['yin', '🎵 音 yin'], ['yun', '☁️ 云 yun'], ['ying', '🦅 鹰 ying']] }] },
     { t: '总复习 · 闯关', groups: [{ g: '声母 23 个（按顺序读一遍）', items: [['b p m f', 'd t n l'], ['g k h', 'j q x'], ['zh ch sh r', 'z c s'], ['y w', '共 23 个']] }, { g: '韵母 24 个', items: [['a o e i u ü', '单韵母 6'], ['ai ei ui ao ou iu ie üe er', '复韵母 9'], ['an en in un ün', '前鼻 5'], ['ang eng ing ong', '后鼻 4']] }, { g: '整体认读 16 个', items: [['zhi chi shi ri zi ci si', 'yi wu yu'], ['ye yue yuan', 'yin yun ying']] }] }
   ];
 
+  /* 分类派生：天级归类的兜底表（0-based），组级关键词再修正 */
+  const PY_DAY_CAT = ['单韵母', '单韵母', '声调', '声母', '声母', '声母', '声母', '音节拼读', '声母', '声母', '声母', '复韵母', '复韵母', '复韵母', '前鼻韵母', '后鼻韵母', '音节拼读', '音节拼读', '整体认读', '整体认读', '总复习'];
+  const PY_CATS = ['全部', '单韵母', '声母', '复韵母', '前鼻韵母', '后鼻韵母', '整体认读', '音节拼读', '声调'];
+  function pyCatOf(di, gLabel) {
+    const g = String(gLabel || '');
+    if (g.indexOf('整体认读') >= 0) return '整体认读';
+    if (g.indexOf('对比') >= 0 || g.indexOf('两拼') >= 0 || g.indexOf('三拼') >= 0 || g.indexOf('音节') >= 0 || g.indexOf('脱帽') >= 0) return '音节拼读';
+    return PY_DAY_CAT[di] || '音节拼读';
+  }
+  function pyEmoji(txt) {
+    const m = String(txt || '').match(/\p{Extended_Pictographic}/u);
+    return m ? m[0] : '🔤';
+  }
+  /* 标调：程序化生成四声（标调口诀：有 a 不放过，没 a 找 o e，i u 并列标后头） */
+  const PY_TONE = { a: ['ā', 'á', 'ǎ', 'à'], o: ['ō', 'ó', 'ǒ', 'ò'], e: ['ē', 'é', 'ě', 'è'], i: ['ī', 'í', 'ǐ', 'ì'], u: ['ū', 'ú', 'ǔ', 'ù'], 'ü': ['ǖ', 'ǘ', 'ǚ', 'ǜ'] };
+  const PY_DETONE = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e', 'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'ü', 'ǘ': 'ü', 'ǚ': 'ü', 'ǜ': 'ü' };
+  function pyTone4(py) {
+    const s = String(py || '').split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+    if (!s || s.length > 5 || s.indexOf(' ') >= 0) return null;
+    const vows = ['a', 'o', 'e', 'ü'];
+    for (let k = 0; k < vows.length; k++) {
+      const i = s.indexOf(vows[k]);
+      if (i >= 0) return [0, 1, 2, 3].map(function (t) { return s.slice(0, i) + PY_TONE[vows[k]][t] + s.slice(i + 1); });
+    }
+    const iu = Math.max(s.lastIndexOf('i'), s.lastIndexOf('u'));
+    if (iu >= 0) return [0, 1, 2, 3].map(function (t) { return s.slice(0, iu) + PY_TONE[s[iu]][t] + s.slice(iu + 1); });
+    return null;
+  }
+  /* 已掌握标记：settings 键 pinyin_master:<cid>（顶层 updatedAt 行级新者胜） */
+  let _pyMaster = {}, _pyMasterKey = '';
+  function pyMasterLoad(cid) {
+    _pyMasterKey = 'pinyin_master:' + cid;
+    _pyMaster = {};
+    try {
+      if (!window.DB) return Promise.resolve();
+      return DB.get('settings', _pyMasterKey).then(function (v) { _pyMaster = (v && v.value && v.value.items) ? v.value.items : {}; }).catch(function () { _pyMaster = {}; });
+    } catch (e) { return Promise.resolve(); }
+  }
+  function pyMasterSave() {
+    try { window.DB && DB.put('settings', { key: _pyMasterKey, value: { items: _pyMaster, updatedAt: Date.now() }, updatedAt: Date.now() }).catch(function () {}); } catch (e) {}
+  }
+  function pyInjectStyle() {
+    if (document.getElementById('py455-style')) return;
+    const st = document.createElement('style');
+    st.id = 'py455-style';
+    st.textContent = '.py-master{flex:1;min-width:0;min-height:34px;border:none;border-radius:10px;background:#eef7ea;color:#5cb832;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}' +
+      '.py-master.on{background:#5cb832;color:#fff}' +
+      '.py-chip{border:1.5px solid #e3e9e3;background:#fff;color:#67788f;border-radius:14px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;flex:0 0 auto}' +
+      '.py-chip.on{background:#e8f5e2;border-color:#7ec850;color:#4a8b2c}' +
+      '.py-tone-card{background:#fff8f0;border:1.5px solid #ffd9b3;border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s}' +
+      '.py-tone-card:hover{transform:translateY(-2px)}' +
+      '.py-tone-card .t{font-size:34px;font-weight:800;color:#e5484d;line-height:1.15}' +
+      '.py-tone-card .n{font-size:12px;color:#9aa;margin-top:4px}';
+    document.head.appendChild(st);
+  }
+  let PY_FLAT = [];
+  function pyBuildFlat() {
+    PY_FLAT = [];
+    PINYIN_COURSE.forEach(function (d, di) {
+      d.groups.forEach(function (G) {
+        const cat = pyCatOf(di, G.g);
+        G.items.forEach(function (it) {
+          PY_FLAT.push({ p: it[0], tip: it[1], cat: cat, day: di + 1, emoji: pyEmoji(it[1]) });
+        });
+      });
+    });
+  }
+  function pyCardHtml(it) {
+    const m = _pyMaster[it.p] ? ' on' : '';
+    return '<div class="study-card" data-py="' + it.p + '" data-pytip="' + it.tip + '" data-pycat="' + it.cat + '" data-pyday="' + it.day + '" data-pyemoji="' + it.emoji + '" data-speak-zh="' + it.p + '" title="点开看四声大卡">' +
+      '<div class="card-art" style="font-size:42px;width:78px;height:78px">' + it.emoji + '</div>' +
+      '<div class="card-main" style="font-size:32px;color:#e5484d">' + it.p + '</div>' +
+      '<div class="card-ext" style="font-size:13px">' + it.tip + '</div>' +
+      '<div style="display:flex;gap:5px;width:100%">' +
+      '<button class="speak-btn" data-say="' + it.p + '" data-dir="pinyin" style="flex:1;min-width:0">🔊</button>' +
+      '<button class="py-master' + m + '" data-pym="' + it.p + '">✓掌握</button>' +
+      '<button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + it.p + '" style="flex:1;margin-top:0">📕错题</button></div></div>';
+  }
+  function pyOpenModal(it) {
+    pyCloseModal();
+    const t4 = pyTone4(it.p);
+    const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
+    let tones = '';
+    if (t4) {
+      tones = '<div style="font-size:13px;font-weight:800;color:#789;margin:14px 0 8px">🔤 四声读一读（点小卡发音）</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
+        t4.map(function (s, i) { return '<div class="py-tone-card" data-tone-say="' + s + '"><div class="t">' + s + '</div><div class="n">' + tNames[i] + '</div></div>'; }).join('') + '</div>';
+    } else if (String(it.p).indexOf(' ') >= 0) {
+      tones = '<div style="margin-top:14px;padding:10px 12px;background:#eef7ea;border-radius:12px;font-size:13px;color:#4a8b2c">📖 整行跟读：按顺序把每个读一遍，读熟就算过关！</div>';
+    } else {
+      tones = '<div style="margin-top:14px;padding:10px 12px;background:#eef7ea;border-radius:12px;font-size:13px;color:#4a8b2c">ℹ️ 声母不标调——读得又轻又短，跟韵母拼在一起读！</div>';
+    }
+    const m = _pyMaster[it.p] ? ' on' : '';
+    const ov = document.createElement('div');
+    ov.id = 'py-modal';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(30,40,30,.5);display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = '<div style="background:var(--card-bg,#fff);border-radius:22px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative">' +
+      '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
+      '<div style="display:flex;align-items:center;gap:16px">' +
+      '<div style="flex:0 0 92px;width:92px;height:92px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:52px">' + it.emoji + '</div>' +
+      '<div style="min-width:0"><div style="font-size:54px;font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' +
+      '<div style="font-size:14px;color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b> · 第 ' + it.day + ' 天</div></div></div>' +
+      tones +
+      '<div style="display:flex;gap:8px;margin-top:16px">' +
+      '<button id="py-modal-say" style="flex:2;border:0;background:linear-gradient(90deg,#ff9f43,#e67e22);color:#fff;border-radius:12px;padding:11px 0;font-weight:800;font-size:14px;cursor:pointer">🔊 跟我读</button>' +
+      '<button id="py-modal-master" class="py-master' + m + '" style="flex:1;min-height:46px;border-radius:12px;font-size:14px">✓ 已掌握</button>' +
+      '<button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + it.p + '" style="flex:1;margin-top:0;min-height:46px;border-radius:12px;font-size:14px">📕 错题</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) pyCloseModal(); });
+    ov.querySelector('#py-modal-x').onclick = pyCloseModal;
+    ov.querySelector('#py-modal-say').onclick = function () { speak(it.p, 'zh-CN', 'pinyin'); };
+    ov.querySelectorAll('[data-tone-say]').forEach(function (c) {
+      c.onclick = function () { speak(c.getAttribute('data-tone-say'), 'zh-CN', 'pinyin'); };
+    });
+    ov.querySelector('#py-modal-master').onclick = function () {
+      if (_pyMaster[it.p]) delete _pyMaster[it.p]; else _pyMaster[it.p] = 1;
+      pyMasterSave();
+      ov.querySelector('#py-modal-master').classList.toggle('on', !!_pyMaster[it.p]);
+      document.querySelectorAll('[data-pym]').forEach(function (b) { if (b.getAttribute('data-pym') === it.p) b.classList.toggle('on', !!_pyMaster[it.p]); });
+    };
+  }
+  function pyCloseModal() { const o = document.getElementById('py-modal'); if (o) o.remove(); }
+
   function renderPinyin() {
-
-    const cards = PINYIN_DATA.map(c => `
-
-      <div class="study-card" data-speak-zh="${c.main}">
-
-        <div class="card-art">${c.art}</div>
-
-        <div class="card-main">${c.main}</div>
-
-        <div class="card-pinyin">${c.pinyin}</div>
-
-        <div class="card-ext">${c.ext}</div>
-
-        <button class="speak-btn" data-say="${c.main}" data-dir="pinyin">🔊</button>
-
-        <button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="${c.main}">📕错题</button>
-
-      </div>`).join('');
-
-    /* [#453] 21 天闯关：进度存 settings 键 pinyin21:<cid>（顶层 updatedAt → 行级新者胜，红线 17 正面示范） */
     let _pyCid = Promise.resolve('default');
     try { if (window.DB && DB.getActiveChildId) _pyCid = DB.getActiveChildId().then(function (i) { return i || 'default'; }); } catch (e) {}
+    pyInjectStyle();
+    pyBuildFlat();
     const courseHtml = `
-
       <div class="mx-card" id="pinyin21-card" style="margin-bottom:16px">
-
-        <div class="mx-card-t" style="display:flex;align-items:center;gap:8px">🗓️ 21 天拼音闯关 <span style="font-size:12px;color:#9aa;font-weight:400" id="py21-prog"></span></div>
-
+        <div class="mx-card-t" style="display:flex;align-items:center;gap:8px">🗓️ 21 天拼音闯关 <span style="font-size:12px;color:#9aa;font-weight:400" id="py21-prog"></span><span style="font-size:12px;color:#c5a572;font-weight:400">（任意天可点）</span></div>
         <div id="py21-days" style="display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px"></div>
-
         <div id="py21-body"></div>
-
+      </div>
+      <div class="mx-card" style="margin-bottom:16px">
+        <div class="mx-card-t">🏷️ 分类练习 <span style="font-size:12px;color:#9aa;font-weight:400">（选分类出卡片 · 点卡片看四声大卡）</span></div>
+        <div id="py-cat-chips" style="display:flex;gap:8px;overflow-x:auto;padding:6px 0 12px"></div>
+        <div class="study-cards" id="py-cat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
       </div>`;
-
     setSectionContent('page-pinyin', `
-
-      <div class="content-section-title">🔤 拼音认读 <span class="sub">先闯关 · 再自由练</span></div>
-
+      <div class="content-section-title">🔤 拼音认读 <span class="sub">先闯关 · 再分类练</span></div>
       ${courseHtml}
-
-      <div class="content-section-title" style="margin-top:6px">🔤 自由练习卡 <span class="sub">点击卡片或喇叭播放发音</span></div>
-
-      <div class="study-cards" id="pinyin-grid">${cards}</div>
-
       <div class="empty-tip">🔊 已配置 HTML5 Audio → assets/audio/pinyin/${'<音频>.mp3'}（如 a.mp3/b.mp3）。当前无本地音频时回退中文 TTS，后续放入拼音音频包即可发声。</div>`);
-
-    bindSpeak('#pinyin-grid');
-
-    /* —— 21 天闯关渲染与交互 —— */
+    /* —— 21 天闯关 + 分类筛选渲染与交互 —— */
     _pyCid.then(function (cid) {
+      pyMasterLoad(cid).then(function () { pyInit(cid); });
+    });
+    function pyInit(cid) {
       const KEY = 'pinyin21:' + cid;
       let prog = { done: {} };
       let curDay = 1;
+      let curCat = '全部';
       const root = document.getElementById('pinyin21-card');
       if (!root) return;
+      const sec = document.getElementById('page-pinyin');
+      if (sec && !sec.dataset.pyDeleg) {
+        sec.dataset.pyDeleg = '1';
+        sec.addEventListener('click', function (e) {
+          const mb = e.target.closest('[data-pym]');
+          if (mb) {
+            const p = mb.getAttribute('data-pym');
+            if (_pyMaster[p]) delete _pyMaster[p]; else _pyMaster[p] = 1;
+            pyMasterSave();
+            sec.querySelectorAll('[data-pym]').forEach(function (b) { if (b.getAttribute('data-pym') === p) b.classList.toggle('on', !!_pyMaster[p]); });
+            try { if (window.showToast) showToast(_pyMaster[p] ? '✓ 已标记掌握：' + p : '已取消掌握：' + p); } catch (e2) {}
+            return;
+          }
+          if (e.target.closest('button')) return;
+          const card = e.target.closest('[data-py]');
+          if (card) {
+            pyOpenModal({ p: card.getAttribute('data-py'), tip: card.getAttribute('data-pytip') || '', cat: card.getAttribute('data-pycat') || '拼音', day: card.getAttribute('data-pyday') || '', emoji: card.getAttribute('data-pyemoji') || '🔤' });
+          }
+        });
+      }
       function readProg() {
         try {
           return window.DB ? DB.get('settings', KEY).then(function (v) { return (v && v.value && v.value.done) ? v.value : { done: {} }; }).catch(function () { return { done: {} }; }) : Promise.resolve({ done: {} });
         } catch (e) { return Promise.resolve({ done: {} }); }
+      }
+      function paintChips() {
+        const chips = document.getElementById('py-cat-chips');
+        if (!chips) return;
+        chips.innerHTML = PY_CATS.map(function (c) {
+          return '<button class="py-chip' + (c === curCat ? ' on' : '') + '" data-cat="' + c + '">' + c + '</button>';
+        }).join('');
+        chips.querySelectorAll('[data-cat]').forEach(function (b) {
+          b.onclick = function () { curCat = b.getAttribute('data-cat'); paintChips(); paintCards(); };
+        });
+      }
+      function paintCards() {
+        const grid = document.getElementById('py-cat-grid');
+        if (!grid) return;
+        const list = curCat === '全部' ? PY_FLAT : PY_FLAT.filter(function (x) { return x.cat === curCat; });
+        grid.innerHTML = list.length ? list.map(pyCardHtml).join('') : '<div class="empty-tip" style="grid-column:1/-1">这个分类暂时没有卡片～</div>';
       }
       function paint() {
         const doneN = Object.keys(prog.done).length;
@@ -12965,24 +13097,21 @@ window.MX_SEED = data;
           const dn = i + 1;
           const done = prog.done[dn];
           const on = dn === curDay;
-          return '<button data-pyday="' + dn + '" style="flex:0 0 auto;border-radius:10px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;' +
+          return '<button data-pyday="' + dn + '" style="flex:0 0 auto;border-radius:10px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer;' +
             (done ? 'background:#7ec850;color:#fff;border:0;' : on ? 'background:#e8f5e2;color:#4a8b2c;border:1.5px solid #7ec850;' : 'background:#f4f6f4;color:#8a99ad;border:0;') +
             '">D' + dn + (done ? ' ✓' : '') + '</button>';
         }).join('');
         const body = root.querySelector('#py21-body');
         if (!body) return;
         const day = PINYIN_COURSE[curDay - 1];
-        body.innerHTML = '<div style="font-size:14px;font-weight:800;color:#3a5;margin:2px 0 8px">第 ' + curDay + ' 天 · ' + day.t + '</div>' +
+        body.innerHTML = '<div style="font-size:15px;font-weight:800;color:#3a5;margin:2px 0 8px">第 ' + curDay + ' 天 · ' + day.t + '</div>' +
           day.groups.map(function (G) {
+            const cat = pyCatOf(curDay - 1, G.g);
             const cardsHtml = G.items.map(function (it) {
-              return '<div class="study-card" data-speak-zh="' + it[0] + '" style="min-width:112px">' +
-                '<div class="card-main">' + it[0] + '</div>' +
-                '<div class="card-ext">' + it[1] + '</div>' +
-                '<button class="speak-btn" data-say="' + it[0] + '" data-dir="pinyin">🔊</button>' +
-                '<button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + it[0] + '">📕</button></div>';
+              return pyCardHtml({ p: it[0], tip: it[1], cat: cat, day: curDay, emoji: pyEmoji(it[1]) });
             }).join('');
             return '<div style="font-size:12px;font-weight:700;color:#789;margin:8px 0 6px">' + G.g + '</div>' +
-              '<div class="study-cards" style="margin-bottom:4px">' + cardsHtml + '</div>';
+              '<div class="study-cards" style="margin-bottom:4px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' + cardsHtml + '</div>';
           }).join('') +
           '<div style="margin-top:10px">' + (prog.done[curDay]
             ? '<span style="font-size:13px;color:#7ec850;font-weight:800">✅ 第 ' + curDay + ' 天已完成，继续加油！</span>'
@@ -13010,10 +13139,15 @@ window.MX_SEED = data;
         for (let i = 0; i < PINYIN_COURSE.length; i++) if (!prog.done[i + 1]) { nxt = i; break; }
         curDay = nxt >= 0 ? nxt + 1 : PINYIN_COURSE.length;
         paint();
+        paintChips();
+        paintCards();
+        const grid = document.getElementById('py-cat-grid');
+        if (grid) bindSpeak('#py-cat-grid');
       });
-    });
-
+    }
   }
+  /* (PY455_END) */
+
   /* =============================================
 
      4. 识字卡片（page-literacy）— 读取 js/data/words_core_200.json
