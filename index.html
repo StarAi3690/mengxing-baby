@@ -13033,7 +13033,7 @@ window.MX_SEED = data;
       '<div style="display:flex;align-items:center;gap:16px">' +
       '<div style="flex:0 0 92px;width:92px;height:92px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:52px">' + it.emoji + '</div>' +
       '<div style="min-width:0"><div style="font-size:54px;font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' +
-      '<div style="font-size:14px;color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b> · 第 ' + it.day + ' 天</div></div></div>' +
+      '<div style="font-size:14px;color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
       '<button id="py-modal-say" style="flex:2;border:0;background:linear-gradient(90deg,#ff9f43,#e67e22);color:#fff;border-radius:12px;padding:11px 0;font-weight:800;font-size:14px;cursor:pointer">🔊 跟我读</button>' +
@@ -13055,6 +13055,96 @@ window.MX_SEED = data;
     };
   }
   function pyCloseModal() { const o = document.getElementById('py-modal'); if (o) o.remove(); }
+  /* ============ [#450] 音节组合模块 (PYCOMB_START) ============
+     数据源=assets/audio/pinyin 实际录音(有音频才算有效音节)。
+     low=单韵母 mid=复韵母 high=鼻韵母; token=base+默认声调; 四声大卡复用 pyOpenModal; 掌握键复用 _pyMaster */
+  const PYC_TOK = {
+    low: 'ai1 ao1 ba4 bi3 bo2 bu4 ca1 ce4 cha2 che1 chi1 chu1 chua1 chuo1 ci4 cu4 cuo4 da4 de1 di1 dia1 du2 duo1 ei1 fa4 fe1 fo2 fu4 ga1 ge1 gu3 gua1 guo2 ha1 he1 hu3 hua1 huo3 ji1 jia1 ju2 jü4 ka3 ke1 ku1 kua1 kuo4 la1 le1 li1 lia1 lo1 lu4 luo4 lü1 ma1 me1 mi3 mo1 mu4 na2 ne1 ni3 nu1 nuo1 nü1 ou1 pa2 pi1 po1 pu4 qi1 qia1 qu4 re4 ri4 ru1 rua1 ruo4 sa3 se4 sha1 she1 shi1 shu1 shua1 shuo1 si1 su4 suo3 ta1 te4 ti1 tu2 tuo1 wa1 wo3 wu3 xi1 xia1 xu2 ya1 ye4 yi1 yu2 yue4 za2 ze2 zha1 zhe4 zhi1 zhu1 zhua1 zhuo1 zi4 zu2 zuo4',
+    mid: 'bai2 bao1 bei1 biao1 bie1 cai1 cao3 cei1 chai1 chao1 chou3 chui1 cou4 cui4 dai4 dao1 dei1 diao4 die2 diu1 dou1 dui4 fei1 fiao1 fou1 gai3 gao1 gei3 gou3 gui1 hai3 hao3 hei1 hou2 hui4 jiao4 jie3 jiu3 jue2 kai1 kao3 kei1 kou3 kui1 lai2 lao3 lei4 liao2 lie1 liu1 lou2 lüe1 mai3 mao1 mei2 miao1 mie4 miu1 mou1 nai3 nao3 nei4 niao3 nie1 niu2 nou1 nüe1 pai1 pao3 pei2 piao1 pie1 pou1 qiao3 qie1 qiu2 que1 rao4 rou4 rui1 sai4 sao3 shai4 shao1 shei2 shou3 shui3 sou1 sui4 tai4 tao2 tei1 tiao4 tie3 tou2 tui3 wai4 wei4 xiao3 xie3 xiu1 xue2 yai1 yao4 you3 zai4 zao3 zei1 zhai1 zhao3 zhei1 zhou1 zhui1 zou3 zui3',
+    high: 'ban1 bang4 ben3 beng4 bian1 bin1 bing1 can1 cang2 cen1 ceng2 chan2 chang2 chen2 cheng2 chong2 chuai1 chuan2 chuang1 chun1 cong2 cuan1 cun1 dan4 dang3 den1 deng1 dian3 ding1 dong1 duan3 dun1 fan4 fang2 fen1 feng1 gan1 gang1 gen1 geng4 gong1 guai1 guan1 guang1 gun1 han4 hang2 hen3 heng2 hong2 huai4 huan1 huang2 hun1 jian3 jiang3 jin1 jing1 jiong1 juan4 jun1 kan4 kang4 ken1 keng1 kong1 kuai1 kuan1 kuang1 kun4 lan2 lang2 leng3 lian3 liang4 lin2 ling2 long2 luan4 lun2 man4 mang2 men2 meng4 mian4 min2 ming2 nan2 nang1 nen1 neng2 nian2 niang1 nin2 ning2 nong2 nuan3 nun1 pan2 pang2 pen1 peng4 pian1 pin1 ping2 qian1 qiang2 qin2 qing1 qiong1 quan1 qun2 ran1 rang4 ren2 reng1 rong1 ruan3 run4 san1 sang3 sen1 seng1 shan1 shang4 shen1 sheng1 shuai1 shuan1 shuang1 shun4 song4 suan1 sun1 tan1 tang1 teng1 tian1 ting1 tong2 tuan1 tun1 wan1 wang2 wen4 weng1 xian1 xiang1 xin1 xing1 xiong2 xuan3 xun2 yan3 yang2 yin1 ying1 yong4 yuan2 yun2 zan2 zang1 zen3 zeng1 zhan4 zhang1 zhen1 zheng1 zhong1 zhuai1 zhuan4 zhuang1 zhun3 zong3 zuan1 zun1'
+  };
+  const PYC_EX = { ba: '👨 爸爸', bai: '⬜ 白色', bang: '🦴 棒棒', bao: '🎒 书包', bei: '🥤 杯子', ben: '📖 本子', beng: '🦘 蹦跳', bi: '🖊️ 笔', bian: '📍 旁边', bing: '🧊 冰', bo: '🧔 伯伯', bu: '🚫 不', ca: '🧽 擦桌子', cai: '🤔 猜一猜', can: '🚶 参加', cang: '🎁 藏起来', cao: '🌿 小草', ce: '📏 测量', ceng: '🏛️ 楼层', cha: '🍵 喝茶', chai: '📦 拆开', chan: '🦗 蝉鸣', chang: '📏 很长', chao: '🏪 超市', che: '🚗 汽车', chen: '🌅 清晨', cheng: '🏙️ 城市', chi: '🍚 吃饭', chong: '🐛 虫子', chou: '😨 丑', chu: '🚪 出门', chuan: '⛵ 小船', chui: '🫧 吹泡泡', chun: '🌸 春天', ci: '🦔 刺猬', cong: '🧅 从来', cou: '🧩 凑齐', cu: '🧴 醋', cui: '💎 翠绿', cun: '🏘️ 村庄', cuo: '❌ 错误', da: '🐘 大的', dai: '🧢 戴帽子', dan: '🥚 鸡蛋', dang: '🛡️ 挡住', dao: '🔪 刀', deng: '💡 灯', di: '🧎 低', dian: '⚡ 点', diao: '🎣 掉了', die: '🦋 蝴蝶', ding: '👀 盯着', diu: '🪀 丢了', dong: '❄️ 冬天', dou: '🫘 都在', du: '📖 读书', duan: '📏 很短', dui: '✅ 对', dun: '🛋️ 蹲下', duo: '🪷 多多', fa: '💇 头发', fan: '🍚 米饭', fang: '🏠 房子', fei: '✈️ 飞机', fen: '✂️ 分开', feng: '🌬️ 大风', fo: '🛕 佛', fu: '👨 父亲', gai: '✏️ 改正', gan: '🧹 干净', gang: '⚔️ 钢铁', gao: '📏 高', ge: '🕊️ 鸽子', gei: '🎁 送给', geng: '⏩ 更快', gong: '🐓 公鸡', gou: '🐶 小狗', gu: '🦴 骨头', gua: '🍉 西瓜', guai: '😇 乖乖', guan: '💡 关灯', guang: '💡 光', gui: '🐢 乌龟', guo: '🇨🇳 中国', ha: '😂 哈哈', hai: '🌊 大海', han: '😅 汗水', hang: '✈️ 航班', hao: '👍 好的', he: '💧 喝水', hei: '🖤 黑色', hen: '🔢 很多', heng: '➡️ 横着', hong: '🔴 红色', hou: '🐒 猴子', hu: '🐯 老虎', hua: '🌸 花朵', huai: '💔 坏了', huan: '😊 欢乐', huang: '🟡 黄色', hui: '🙅 会', hun: '💍 结婚', huo: '🔥 火苗', ji: '🐔 小鸡', jia: '🏠 家', jian: '✂️ 剪刀', jiang: '🗣️ 讲话', jiao: '🏫 教室', jie: '👧 姐姐', jin: '🥇 金色', jing: '👁️ 眼睛', jiu: '9️⃣ 九个', ju: '🍊 橘子', juan: '📜 卷子', jue: '🧠 决定', jun: '🎖️ 军人', ka: '🧩 卡片', kai: '🚗 开车', kan: '👀 看', kang: '💪 反抗', kao: '📝 考试', ke: '🔬 科学', keng: '🕳️ 坑', kong: '🛩️ 天空', kou: '👄 口', ku: '😭 哭', kua: '🏆 夸奖', kuan: '📏 宽度', kuang: '🧺 筐子', kun: '😪 困了', kuo: '🔍 扩大', la: '🪵 拉手', lai: '🚶 来', lan: '🔵 蓝色', lang: '🐺 狼', lao: '🧓 老师', lei: '😵 累了', leng: '🥶 冷', li: '🍐 鸭梨', lian: '😀 脸', liang: '🌙 月亮', liao: '💬 聊天', lin: '🌳 森林', ling: '🔔 铃声', long: '🐉 恐龙', lou: '🏢 楼房', lu: '🦌 小鹿', luan: '🌀 乱了', lun: '☸️ 车轮', luo: '🍂 落叶', ma: '👩 妈妈', mai: '🛒 买东西', man: '🐢 慢慢', mang: '🤝 忙', mao: '🐱 小猫', mei: '🚪 没有', men: '🚪 大门', meng: '🌈 梦想', mi: '🍚 米饭', mian: '🍜 面条', miao: '🐱 喵喵', mie: '🔥 灭火', min: '🧑 人民', ming: '⭐ 明天', mo: '👋 摸一摸', mu: '🌳 木头', na: '🫴 拿', nai: '🥛 牛奶', nan: '🧑 男孩', nao: '🧠 大脑', nei: '📦 里面', neng: '💪 能', ni: '🫵 你', nian: '🎯 年', niao: '🐦 小鸟', nie: '🤏 捏住', nin: '🙏 您', ning: '🍋 柠檬', niu: '🐄 黄牛', nong: '🧑‍🌾 农村', nuan: '🔥 暖和', pa: '⛰️ 爬山', pai: '👏 拍手', pan: '🍽️ 盘子', pang: '🦀 旁边', pao: '🏃 跑步', pei: '🥂 陪伴', peng: '🧱 碰撞', pin: '🧩 拼图', ping: '🍎 苹果', po: '⛰️ 山坡', pu: '🏞️ 瀑布', qi: '🎈 气球', qian: '💰 一千', qiang: '🧱 墙壁', qiao: '🧠 巧妙', qie: '🔪 切开', qin: '🎹 弹琴', qing: '🟢 青色', qiu: '⚽ 皮球', qu: '🚶 去上学', quan: '⭕ 圆圈', que: '🧩 缺一块', qun: '👗 裙子', rang: '🤲 让开', rao: '🧵 绕线', re: '🔥 热的', ren: '🧑 人们', reng: '🗑️ 扔垃圾', ri: '🌅 日出', rou: '🍖 肉', ruan: '🧸 软软', run: '💧 湿润', ruo: '🥀 弱小', sa: '💦 洒水', sai: '🏁 赛跑', san: '3️⃣ 三个', sang: '🎤 嗓音', sao: '🧹 扫地', se: '🌈 颜色', sen: '🌲 森林', sha: '🏖️ 沙子', shai: '☀️ 晒太阳', shan: '⛰️ 高山', shang: '🧥 上衣', shao: '🔥 烧火', she: '🐍 蛇', shei: '🤷 谁', sheng: '🔊 声音', shi: '🦁 狮子', shou: '🤲 小手', shu: '📚 书本', shua: '🪥 刷牙', shuang: '🧤 一双', shui: '💧 水', shun: '➡️ 顺利', shuo: '💬 说话', si: '🐛 蚕丝', song: '🎁 送到', sou: '🔎 搜索', su: '🏃 速度', suan: '🍋 酸', sui: '🎂 岁数', sun: '🧑 孙子', suo: '🔐 一把锁', ta: '🌉 他', tai: '☀️ 太阳', tang: '🥣 喝汤', tao: '🍑 桃子', te: '🈶 特别', ti: '⚽ 踢球', tian: '🌾 天空', tiao: '🦘 跳跃', tie: '🚈 铁轨', ting: '🎧 听', tong: '🧒 儿童', tou: '👀 头', tu: '🖍️ 涂色', tui: '🦵 腿', tuo: '🧦 脱鞋', wa: '🐸 娃娃', wai: '🚪 外面', wan: '🌙 弯弯', wang: '👑 国王', wei: '🍽️ 喂饭', wen: '❓ 提问', wo: '✋ 我', wu: '🖐️ 五个', xi: '🍈 西', xia: '🦐 大虾', xiang: '🍌 香蕉', xiao: '🐣 小', xie: '✏️ 写字', xin: '❤️ 心', xing: '⭐ 星星', xiong: '🐻 熊', xiu: '🛠️ 修理', xu: '📚 学习', xuan: '✅ 选择', xue: '📚 学习', xun: '🔍 寻找', ya: '🦆 鸭子', yan: '👁️ 眼睛', yang: '🐑 山羊', yao: '💊 吃药', ye: '🌙 夜晚', yi: '👕 衣服', yin: '🎵 音符', ying: '🦅 老鹰', yong: '🏊 用力', you: '🙋 有', yu: '🐟 小鱼', yuan: '⭕ 圆形', yue: '🌕 月亮', yun: '☁️ 白云', za: '🔨 砸开', zai: '🔁 再来', zan: '🧑‍🤝‍🧑 咱们', zang: '🧦 脏袜子', zao: '🌅 早上', ze: '⚖️ 选择', zen: '🤔 怎么', zeng: '➕ 增加', zha: '📌 扎住', zhai: '🌸 摘花', zhan: '🚉 车站', zhang: '📄 一张纸', zhao: '🔎 找到', zhe: '👉 这个', zhen: '💎 珍珠', zheng: '🕛 正在', zhi: '🕷️ 蜘蛛', zhong: '🔔 钟', zhou: '🥣 粥', zhu: '🐷 小猪', zhua: '🐾 抓住', zhuan: '🎡 转动', zhui: '🏃 追赶', zhun: '✅ 准备', zhuo: '🪑 桌子', zi: '🖋️ 写字', zong: '🧮 总共', zou: '🏃 走路', zu: '🦶 足球', zuan: '🛠️ 钻孔', zui: '👄 嘴巴', zun: '🙏 尊敬', zuo: '🪑 坐下' };
+  const PYC_FINS = ['uang','iang','iong','üe','uan','uai','ang','eng','ing','ong','ai','ei','ui','ao','ou','iu','ie','an','en','in','un','ün','a','o','e','i','u','ü'];
+  function pycFinalOf(base) {
+    const s = String(base);
+    if (/^[jqxnl]ue$/.test(s)) return 'üe';
+    for (let k = 0; k < PYC_FINS.length; k++) {
+      const f = PYC_FINS[k];
+      if (s.length > f.length && s.slice(-f.length) === f) {
+        const ini = s.slice(0, s.length - f.length);
+        const isJQX = ini && 'jqx'.indexOf(ini.charAt(ini.length - 1)) >= 0;
+        if (f === 'u' && isJQX) return 'ü';
+        if ((f === 'un' || f === 'uan') && isJQX) return 'ü' + f.slice(1);
+        return f;
+      }
+    }
+    return '';
+  }
+  function pycTone(s, t) {
+    s = String(s || '');
+    if (!t || t === '5') return s;
+    const vows = ['a', 'o', 'e', 'ü'];
+    for (let k = 0; k < vows.length; k++) {
+      const i = s.indexOf(vows[k]);
+      if (i >= 0) return s.slice(0, i) + PY_TONE[vows[k]][t - 1] + s.slice(i + 1);
+    }
+    const iu = Math.max(s.lastIndexOf('i'), s.lastIndexOf('u'));
+    if (iu >= 0) return s.slice(0, iu) + PY_TONE[s[iu]][t - 1] + s.slice(iu + 1);
+    return s;
+  }
+  function pyCombInit(cid) {
+    const lvChips = document.getElementById('pyc-lv-chips');
+    if (!lvChips || lvChips.dataset.done) return;
+    lvChips.dataset.done = '1';
+    const LVS = [['low', '🌱 低级 · 单韵母'], ['mid', '🌿 中级 · 复韵母'], ['high', '🌳 高级 · 鼻韵母']];
+    let curLv = 'low', curFin = '全部';
+    function toks() { return (PYC_TOK[curLv] || '').split(' ').filter(Boolean); }
+    function toned(tk) { return pycTone(tk.slice(0, -1), tk.slice(-1)); }
+    function fins() { const m = {}; toks().forEach(function (tk) { const f = pycFinalOf(tk.slice(0, -1)); if (f) m[f] = 1; }); return Object.keys(m); }
+    function paintChips() {
+      lvChips.innerHTML = LVS.map(function (L) {
+        return '<button class="py-chip' + (L[0] === curLv ? ' on' : '') + '" data-lv="' + L[0] + '">' + L[1] + '</button>';
+      }).join('');
+      lvChips.querySelectorAll('[data-lv]').forEach(function (b) {
+        b.onclick = function () { curLv = b.getAttribute('data-lv'); curFin = '全部'; paintChips(); paint(); };
+      });
+      const fc = document.getElementById('pyc-fin-chips');
+      if (fc) {
+        const fl = ['全部'].concat(fins());
+        fc.innerHTML = fl.map(function (f) {
+          return '<button class="py-chip' + (f === curFin ? ' on' : '') + '" data-fin="' + f + '">' + f + '</button>';
+        }).join('');
+        fc.querySelectorAll('[data-fin]').forEach(function (b) {
+          b.onclick = function () { curFin = b.getAttribute('data-fin'); paintChips(); paint(); };
+        });
+      }
+    }
+    function paint() {
+      const grid = document.getElementById('pyc-grid');
+      if (!grid) return;
+      const list = toks().filter(function (tk) {
+        return curFin === '全部' || pycFinalOf(tk.slice(0, -1)) === curFin;
+      }).map(function (tk) {
+        const base = tk.slice(0, -1);
+        const fin = pycFinalOf(base);
+        const ini = fin ? base.slice(0, Math.max(base.length - fin.length, 0)) : base;
+        const ex = PYC_EX[base] || '';
+        const tip = (ini && fin ? ini + ' + ' + fin : base) + (ex ? ' ｜ ' + ex : '');
+        return pyCardHtml({ p: toned(tk), tip: tip, cat: '音节组合', day: '', emoji: ex ? pyEmoji(ex) : '🧩' });
+      });
+      grid.innerHTML = list.join('') || '<div class="empty-tip" style="grid-column:1/-1">这个韵母暂时没有组合～</div>';
+      try { bindSpeak(grid); } catch (e) {}
+      let total = 0, done = 0;
+      toks().forEach(function (tk) {
+        if (curFin === '全部' || pycFinalOf(tk.slice(0, -1)) === curFin) { total++; if (_pyMaster[toned(tk)]) done++; }
+      });
+      const pr = document.getElementById('pyc-prog');
+      if (pr) pr.textContent = '共 ' + total + ' 个 · 已掌握 ' + done + ' 个（点卡片看四声 · 🔊 发音 · ✓掌握 · 📕错题）';
+    }
+    paintChips();
+    paint();
+  }
+  /* (PYCOMB_END) */
 
   function renderPinyin() {
     let _pyCid = Promise.resolve('default');
@@ -13071,7 +13161,15 @@ window.MX_SEED = data;
         <div class="mx-card-t">🏷️ 分类练习 <span style="font-size:12px;color:#9aa;font-weight:400">（选分类出卡片 · 点卡片看四声大卡）</span></div>
         <div id="py-cat-chips" style="display:flex;gap:8px;overflow-x:auto;padding:6px 0 12px"></div>
         <div class="study-cards" id="py-cat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
-      </div>`;
+      </div>
+      <div class="mx-card" style="margin-bottom:16px">
+        <div class="mx-card-t">🧩 音节组合 <span style="font-size:12px;color:#9aa;font-weight:400">（声母 × 韵母 · 点卡片看四声大卡）</span></div>
+        <div id="pyc-lv-chips" style="display:flex;gap:8px;overflow-x:auto;padding:6px 0 4px"></div>
+        <div id="pyc-fin-chips" style="display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px"></div>
+        <div id="pyc-prog" style="font-size:12px;color:#9aa;margin:0 0 8px"></div>
+        <div class="study-cards" id="pyc-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
+      </div>
+      `;
     setSectionContent('page-pinyin', `
       <div class="content-section-title">🔤 拼音认读 <span class="sub">先闯关 · 再分类练</span></div>
       ${courseHtml}
@@ -13183,6 +13281,7 @@ window.MX_SEED = data;
         paintCards();
         const grid = document.getElementById('py-cat-grid');
         if (grid) bindSpeak('#py-cat-grid');
+        pyCombInit(cid);
       });
     }
   }
@@ -25257,7 +25356,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var n = list.filter(function (w) { return (w.level || '初级') === lv; }).length;
       return '<button type="button" class="mx22-wtab' + (_curWordsLevel === lv ? ' on' : '') + '" data-lv="' + lv + '">' + lv + ' <i>' + n + '</i></button>';
     }).join('');
-    var lvl = list.filter(function (w) { return (w.level || '初级') === _curWordsLevel; });
+    /* [#454] 生成器专区标签栏 (GEN454) */
+    var genN = list.filter(function (w) { return w.fromGen; }).length;
+    tabs += '<button type="button" class="mx22-wtab' + (_curWordsLevel === '生成器' ? ' on' : '') + '" data-lv="生成器">✍️ 生成器 <i>' + genN + '</i></button>';
+    var lvl = _curWordsLevel === '生成器' ? list.filter(function (w) { return w.fromGen; }) : list.filter(function (w) { return (w.level || '初级') === _curWordsLevel; });
     var cards = lvl.map(function (w, i) {
       return '<div class="mx22-wcard" data-idx="' + i + '" data-word="' + w.word + '">' +
         '<div class="mx22-w-hanzi">' + w.word + '</div>' +
@@ -25285,7 +25387,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   function _renderWordsGrid(wrap, kw) {
-    var lvl = (window.MX_SEED && window.MX_SEED.words || []).filter(function (w) { return (w.level || '初级') === _curWordsLevel; });
+    var lvl = _curWordsLevel === '生成器'
+      ? wordsList().filter(function (w) { return w.fromGen; })
+      : (window.MX_SEED && window.MX_SEED.words || []).filter(function (w) { return (w.level || '初级') === _curWordsLevel; });
     if (kw) {
       var all = wordsList();
       lvl = all.filter(function (w) { return w.word.indexOf(kw) >= 0 || (w.pinyin || '').indexOf(kw) >= 0 || (w.group || '').indexOf(kw) >= 0; });
@@ -25306,7 +25410,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   function renderWordDetail() {
     var w = (window.MX_SEED && window.MX_SEED.words || []).filter(function (x) { return x.word === _curWordDetail; })[0];
-    if (!w) return;
+    if (!w) {
+      var gw = null;
+      try { wordsList().forEach(function (x) { if (x.word === _curWordDetail && x.fromGen) gw = x; }); } catch (e) {}
+      if (gw) return renderGenWordDetail(gw);
+      return;
+    }
     if (window.__mx22_modal) window.__mx22_modal.remove();
     var modal = document.createElement('div');
     modal.className = 'mx22-modal';
@@ -25342,6 +25451,71 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (window.showToast) window.showToast(w.is_mastered ? '🎉 已标记掌握' : '已取消掌握');
     };
   }
+
+  /* [#454] 生成器专区字卡详情：已掌握 / 加错题 / 删除 (GEN454_START) */
+  function renderGenWordDetail(w) {
+    if (window.__mx22_modal) window.__mx22_modal.remove();
+    var modal = document.createElement('div');
+    modal.className = 'mx22-modal';
+    modal.id = 'mx22-word-modal';
+    modal.innerHTML =
+      '<div class="mx22-modal-box">' +
+        '<button type="button" class="mx22-modal-close" id="mx22-wclose">✕</button>' +
+        '<div class="mx22-wm-hanzi">' + w.word + '</div>' +
+        '<div class="mx22-wm-pinyin">' + (w.pinyin || '') + '</div>' +
+        '<div class="mx22-wm-meta">' +
+          '<span class="pill">✍️ 生成器</span>' +
+          '<span class="pill">识字 ' + (w.level || '初级') + '</span>' +
+          '<span class="pill">组词：' + (w.group || '—') + '</span>' +
+        '</div>' +
+        '<div class="mx22-wm-actions">' +
+          '<button type="button" class="btn mx22wm-btn" id="mx22-wspeak" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;">🔊 读一读</button>' +
+          '<button type="button" class="btn mx22wm-btn" id="mx22-wmaster" style="background:#ffb300;color:#fff;border:none;">' + (w.is_mastered ? '✅ 已掌握' : '☆ 标为已掌握') + '</button>' +
+          '<button type="button" class="btn mx22wm-btn" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + w.word + '(' + (w.pinyin || '') + ')" style="background:#e57373;color:#fff;border:none;">📕 加错题</button>' +
+          '<button type="button" class="btn mx22wm-btn" id="mx22-wdel" style="background:#90a4ae;color:#fff;border:none;">🗑️ 删除</button>' +
+        '</div>' +
+        '<div class="mx22-wm-tip">多读几遍，大声说出来，很快就能记住它啦！</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    window.__mx22_modal = modal;
+    var close = document.getElementById('mx22-wclose');
+    if (close) close.onclick = function () { modal.remove(); };
+    var sp = document.getElementById('mx22-wspeak');
+    if (sp) sp.onclick = function () {
+      var syls = String(w.pinyin || '').split(/\s+/).filter(Boolean);
+      if (window.mxPlayAudio && syls.length) {
+        syls.forEach(function (s, k) { setTimeout(function () { try { window.mxPlayAudio(s, 'zh-CN', 'pinyin'); } catch (e) {} }, k * 450); });
+      } else if (window.speakTTS) {
+        window.speakTTS(w.word + '，' + (w.group || ''), 'zh-CN');
+      }
+    };
+    var m = document.getElementById('mx22-wmaster');
+    if (m) m.onclick = function () {
+      w.is_mastered = !w.is_mastered;
+      try { window.DB.put('words', w).then(function () { refreshDbWords(); }).catch(function () {}); } catch (e) {}
+      m.innerHTML = w.is_mastered ? '✅ 已掌握' : '☆ 标为已掌握';
+      if (window.showToast) window.showToast(w.is_mastered ? '🎉 已标记掌握' : '已取消掌握');
+    };
+    var del = document.getElementById('mx22-wdel');
+    if (del) del.onclick = function () {
+      if (del.dataset.busy) return;
+      del.dataset.busy = '1';
+      var done = function () {
+        modal.remove();
+        refreshDbWords().then(function () { try { renderWords(); } catch (e) {} });
+        if (window.showToast) window.showToast('🗑️ 已删除：' + w.word);
+      };
+      try {
+        window.DB.del('words', w.word).then(done).catch(function (e) {
+          console.error('[GEN454] 删除失败', e);
+          if (window.showToast) window.showToast('删除失败：' + ((e && e.message) || e));
+        });
+      } catch (e) {
+        if (window.showToast) window.showToast('删除失败：' + ((e && e.message) || e));
+      }
+    };
+  }
+  /* (GEN454_END) */
 
   /* =============================================
      C. 拼音拼读生成器 page-tool-pinyin
@@ -25430,7 +25604,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       res.querySelectorAll('.mx22-pychar.speakable, .mx22-pychar').forEach(function (c) {
         if (c.classList.contains('miss')) return;
         c.addEventListener('click', function () {
-          if (window.speakTTS) window.speakTTS(c.getAttribute('data-txt'), 'zh-CN');
+          var syls = String(c.getAttribute('data-py') || '').split(/\s+/).filter(Boolean);
+          if (window.mxPlayAudio && syls.length) {
+            syls.forEach(function (s, k) { setTimeout(function () { try { window.mxPlayAudio(s, 'zh-CN', 'pinyin'); } catch (e) {} }, k * 450); });
+          } else if (window.speakTTS) {
+            window.speakTTS(c.getAttribute('data-txt'), 'zh-CN');
+          }
         });
       });
     };
@@ -25465,19 +25644,25 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var items = lastParts.filter(function (p) { return p.py; });
       if (!items.length) { if (window.showToast) window.showToast('这些字暂未收录，无可保存内容'); return; }
       if (!(window.DB && window.DB.get && window.DB.put)) { if (window.showToast) window.showToast('存储层未就绪，稍后再试'); return; }
-      var added = 0, skipped = 0;
+      var added = 0, skipped = [];
+      var seedMap = {};
+      try { (window.MX_SEED && window.MX_SEED.words || []).forEach(function (s) { if (s && s.word) seedMap[s.word] = s; }); } catch (e) {}
       var chain = Promise.resolve();
       items.forEach(function (p) {
         chain = chain.then(function () {
+          if (seedMap[p.txt]) { skipped.push(p.txt + ' 已在识字' + (seedMap[p.txt].level || '初级')); return null; }
           return window.DB.get('words', p.txt).then(function (ex) {
-            if (ex) { skipped++; return null; }
+            if (ex) { skipped.push(p.txt + ' 已在识字' + (ex.level || '初级') + (ex.fromGen ? '（生成器）' : '')); return null; }
             added++;
-            return window.DB.put('words', { word: p.txt, pinyin: p.py, group: '拼音拼读生成', level: '初级', is_mastered: false, def: '', createdAt: Date.now() });
+            return window.DB.put('words', { word: p.txt, pinyin: p.py, group: '拼音拼读生成', level: '初级', fromGen: true, is_mastered: false, def: '', createdAt: Date.now() });
           });
         });
       });
       chain.then(function () {
-        if (window.showToast) window.showToast('📥 已存入 ' + added + ' 个字' + (skipped ? '（跳过 ' + skipped + ' 个已有）' : '') + '，到「识字」页复习吧');
+        var msg = '📥 已存入 ' + added + ' 个字';
+        if (skipped.length) msg += '（' + skipped.slice(0, 6).join('、') + (skipped.length > 6 ? ' 等' : '') + '）';
+        msg += '，到「识字 · ✍️ 生成器」标签复习吧';
+        if (window.showToast) window.showToast(msg);
         refreshDbWords().then(function () { try { renderWords(); } catch (e) {} });
       }).catch(function () { if (window.showToast) window.showToast('保存失败，请重试'); });
     };
