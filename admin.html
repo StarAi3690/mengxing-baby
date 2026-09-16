@@ -331,6 +331,8 @@
         <button class="btn ghost sm" onclick="pubAddRow('sw.js')">＋ sw.js</button>
         <button class="btn ghost sm" onclick="pubAddRow('version.json')">＋ version.json</button>
         <button class="btn ghost sm" onclick="pubAddRow('assets/pool/示例.webp')">＋ 自定义路径</button>
+        <input type="file" id="pubFolder" webkitdirectory directory multiple style="display:none" onchange="pubAddFolder(this)">
+        <button class="btn ghost sm" onclick="document.getElementById('pubFolder').click()">📁 选定文件夹上传</button>
         <button class="btn ghost sm" onclick="PUB_ROWS=[];pubRender()">↺ 清空</button>
       </div>
       <div class="row" style="margin-top:12px">
@@ -370,16 +372,36 @@
         <input id="roModule" placeholder="归属模块（可选，如 poem）" style="width:190px">
         <button class="btn" onclick="officialUpload()">⬆ 直传为官方资源</button>
       </div>
+      <div class="row" id="roBatchBar" style="margin-top:8px;display:none;align-items:center">
+        <select id="roBatchSel" style="max-width:200px"></select>
+        <button class="btn ghost sm" onclick="roBatchModule()">🏷 批量设为该模块</button>
+        <button class="btn ghost sm" style="color:#e53935;border-color:#e53935" onclick="roBatchDel()">🗑 批量删除选中</button>
+        <span class="hint" id="roBatchInfo" style="margin:0"></span>
+      </div>
       <div class="scroll" style="margin-top:10px"><table class="gt">
-        <thead><tr><th>文件</th><th>大小</th><th>模块</th><th>上传时间</th><th style="width:70px">操作</th></tr></thead>
+        <thead><tr><th style="width:30px">✓</th><th>文件</th><th>大小</th><th style="min-width:170px">模块（下拉即改）</th><th>上传时间</th><th style="width:70px">操作</th></tr></thead>
         <tbody id="roOffBody"></tbody></table></div>
-      <div class="hint" style="margin-top:6px">共 <b id="roOffCount">0</b> 个官方资源；删除会同时清理 COS 对象与元数据。</div>
+      <div class="hint" style="margin-top:6px">共 <b id="roOffCount">0</b> 个官方资源；勾选后可批量改归属/批量删除；删除会同时清理 COS 对象与元数据。</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px">▶️ 资源播放调用统计（Top 200 · 最近 1000 条播放事件）</h3>
+      <div class="row" style="margin:0 0 8px">
+        <button class="btn ghost sm" onclick="loadResPlayStats()">↻ 读取播放统计</button>
+        <button class="btn ghost sm" onclick="exportPlayCsv()">⬇ 导出播放统计 CSV</button>
+        <span id="roPlayMsg" class="msg"></span>
+      </div>
+      <div class="scroll" style="max-height:360px"><table class="gt">
+        <thead><tr><th style="width:34px">#</th><th>资源（标题/文件名）</th><th>模块</th><th style="width:80px">播放次数</th><th>最近播放</th><th>存储位置</th></tr></thead>
+        <tbody id="roPlayBody"><tr><td colspan="6" style="padding:10px;color:#9aa">点「读取播放统计」加载（新版客户端每次播放音频都会上报，旧版本播放不产生记录）</td></tr></tbody>
+      </table></div>
     </div>
 
     <div class="card">
       <h3 style="margin:0 0 6px">📊 用户云端占用 · Top 50 大文件</h3>
       <div class="sub" style="margin:0 0 8px">用于判断「谁占了多少」「哪些文件最大」——大文件优先考虑压缩或转用 GitHub Pages 静态池。</div>
       <div id="roUsers"></div>
+      <div id="roMods" style="margin-top:10px"></div>
       <div class="scroll" style="margin-top:10px"><table class="gt">
         <thead><tr><th style="width:34px">#</th><th>指纹</th><th>用户</th><th>大小</th><th>模块</th><th>时间</th></tr></thead>
         <tbody id="roTopBody"></tbody></table></div>
@@ -1222,6 +1244,28 @@ function pubPick(i, inp){
   PUB_ROWS[i].status = f.size > PUB_MAX ? '❌ 超过 60MB，请走 git' : '✅ 已选择';
   pubRender();
 }
+/* [#PUBDIR] 选定文件夹上传：webkitdirectory 递归列出文件，按相对路径入库行，逐文件直推 */
+function pubAddFolder(inp){
+  const files = Array.from((inp && inp.files) || []);
+  if (!files.length) return;
+  let strip = false;
+  const rel0 = String((files[0] && files[0].webkitRelativePath) || files[0].name || '');
+  if (rel0.indexOf('/') >= 0)
+    strip = confirm('是否去掉顶层文件夹名、只保留其下的相对路径？\n\n【确定】选的是与仓库根对应的文件夹（推荐）\n【取消】选的是 assets 等子目录，保留完整相对路径');
+  let added = 0, skipped = 0;
+  files.forEach(function(f){
+    let rel = String(f.webkitRelativePath || f.name || '');
+    if (strip && rel.indexOf('/') >= 0) rel = rel.split('/').slice(1).join('/');
+    if (!rel) { skipped++; return; }
+    if (PUB_ROWS.some(function(r){ return r.path === rel; })) { skipped++; return; }
+    PUB_ROWS.push({ path: rel, file: f, size: f.size, status: f.size > PUB_MAX ? '❌ 超过 60MB，请走 git' : '✅ 已选择（文件夹）' });
+    added++;
+  });
+  pubRender();
+  setMsg('pubMsg', '📁 已加入 ' + added + ' 个文件' + (skipped ? '（跳过 ' + skipped + ' 个：重复/空路径）' : '')
+    + '；请核对「仓库路径」列后点「🚀 一键发布全部已选文件」', added ? 'ok' : 'warn');
+  inp.value = '';
+}
 function pubB64(file){
   return new Promise(function(res, rej){
     const fr = new FileReader();
@@ -1286,7 +1330,8 @@ async function pubVerifyAll(){
 
 
 /* ===== [#421-b / #432 / #421-c] 资源运维：体检 · 官方资源直传 · 云端流量月限额 ===== */
-const RESOPS = { report: null, official: [] };
+const RESOPS = { report: null, official: [], checked: {} };
+const RESOPS_PLAY = { items: [], byId: {} };
 
 function roBytes(n){
   n = Number(n)||0;
@@ -1349,12 +1394,19 @@ function renderResOps(){
   const cnt = $('roOffCount'); if (cnt) cnt.textContent = off.length;
   const ob = $('roOffBody');
   if (ob) ob.innerHTML = off.length ? off.map(function(o){
-    return '<tr><td>'+esc(o.title||o.fp)+'<div class="hint" style="margin:0">'+esc(o.fp)+'.'+esc(o.ext)+'</div></td>'
-      + '<td>'+roBytes(o.size)+'</td><td>'+esc(o.module||'—')+'</td><td>'+roTime(o.at)+'</td>'
+    const key = String(o.fp) + '.' + String(o.ext || '');
+    const ck = RESOPS.checked[key] ? ' checked' : '';
+    return '<tr><td><input type="checkbox" data-key="' + esc(key) + '"' + ck + ' onchange="roCk(this)"></td>'
+      + '<td>' + esc(o.title || o.fp) + '<div class="hint" style="margin:0">' + esc(o.fp) + '.' + esc(o.ext) + '</div></td>'
+      + '<td>' + roBytes(o.size) + '</td>'
+      + '<td><select style="max-width:160px" data-fp="' + esc(o.fp) + '" data-ext="' + esc(o.ext) + '" onchange="officialMetaSel(this)">' + roModuleOptions(o.module) + '</select></td>'
+      + '<td>' + roTime(o.at) + '</td>'
       + '<td><button class="ico del" title="删除" onclick="officialDel('
       + JSON.stringify(String(o.fp)).replace(/"/g,'&quot;') + ','
       + JSON.stringify(String(o.ext)).replace(/"/g,'&quot;') + ')">✕</button></td></tr>';
-  }).join('') : '<tr><td colspan="5" style="padding:10px;color:#9aa">还没有官方资源，用上方直传添加</td></tr>';
+  }).join('') : '<tr><td colspan="6" style="padding:10px;color:#9aa">还没有官方资源，用上方直传添加</td></tr>';
+  const bs = $('roBatchSel');
+  if (bs && bs.options.length === 0) bs.innerHTML = roModuleOptions('');
 
   /* —— 占用概览 + Top50 —— */
   const us = r.users || [];
@@ -1370,9 +1422,41 @@ function renderResOps(){
   const top = r.top || [];
   const tb = $('roTopBody');
   if (tb) tb.innerHTML = top.length ? top.map(function(t,i){
-    return '<tr><td style="color:#9aa">'+(i+1)+'</td><td class="c-id">'+esc(t.fp)+(t.ext?'.'+esc(t.ext):'')+'</td>'
-      + '<td class="c-id">'+esc(t.uid)+'</td><td>'+roBytes(t.size)+'</td><td>'+esc(t.module||'—')+'</td><td>'+roTime(t.at)+'</td></tr>';
+    const om = (RESOPS.official || []).find(function(o){ return o.fp === t.fp; }) || {};
+    const ps = RESOPS_PLAY.byId[t.fp] || RESOPS_PLAY.byId[String(t.fp) + '.' + String(t.ext || '')];
+    return '<tr><td style="color:#9aa">'+(i+1)+'</td><td class="c-id">'+esc(t.fp)+(t.ext?'.'+esc(t.ext):'')
+      + (om.title ? '<div class="hint" style="margin:0">'+esc(om.title)+'</div>' : '') + '</td>'
+      + '<td class="c-id">'+esc(t.uid)+'</td><td>'+roBytes(t.size)+'</td><td>'+esc(om.module||t.module||'—')
+      + (ps ? ' <span class="hint" style="margin:0">▶ '+ps.count+' 次</span>' : '') + '</td><td>'+roTime(t.at)+'</td></tr>';
   }).join('') : '<tr><td colspan="6" style="padding:10px;color:#9aa">暂无数据</td></tr>';
+
+  /* [#RESOPS5] 模块占用分布（官方资源 + Top大文件，前端聚合） */
+  const mo = $('roMods');
+  if (mo) {
+    const agg = function(list, fKey, fSize){
+      const m = {};
+      (list || []).forEach(function(x){
+        const k = fKey(x) || '未归属';
+        if (!m[k]) m[k] = { n: 0, b: 0 };
+        m[k].n++; m[k].b += fSize(x) || 0;
+      });
+      return Object.keys(m).map(function(k){ return { mod: k, n: m[k].n, b: m[k].b }; })
+        .sort(function(a,b){ return b.b - a.b; });
+    };
+    const tbl = function(title, rows, tot){
+      return '<div style="font-size:13px;font-weight:800;margin:6px 0 4px">'+title+'</div>'
+        + '<table class="gt"><thead><tr><th>模块</th><th>文件数</th><th>体积</th><th>占比</th></tr></thead><tbody>'
+        + (rows.length ? rows.map(function(x){
+            const p = tot ? (x.b/tot*100) : 0;
+            return '<tr><td>'+esc(x.mod)+'</td><td class="c-num">'+x.n+'</td><td>'+roBytes(x.b)+'</td><td class="c-num">'+p.toFixed(1)+'%</td></tr>';
+          }).join('') : '<tr><td colspan="4" style="padding:8px;color:#9aa">暂无数据</td></tr>') + '</tbody></table>';
+    };
+    const offAgg = agg(off, function(o){ return o.module || '未归属'; }, function(o){ return o.size; });
+    const topAgg = agg(top, function(t){ return t.module || '—'; }, function(t){ return t.size; });
+    const offTot = offAgg.reduce(function(s,x){ return s + x.b; }, 0);
+    const topTot = topAgg.reduce(function(s,x){ return s + x.b; }, 0);
+    mo.innerHTML = tbl('🗂 官方资源 · 按归属模块分布', offAgg, offTot) + tbl('📁 云端 Top50 大文件 · 按模块分布', topAgg, topTot);
+  }
 
   if (r.msg) setMsg('roMsg','⚠ '+r.msg,'warn');
 }
@@ -1451,7 +1535,7 @@ async function officialUpload(){
   try{
     setMsg('roMsg','计算指纹…','sub');
     const fp = await roFp(f);
-    const _title = ($('roTitle')||{}).value || '', _mod = ($('roModule')||{}).value || '';
+    const _title = ($('roTitle')||{}).value || f.name, _mod = ($('roModule')||{}).value || ''; /* [#RESOPS5] 未填资源名时保留原文件名 */
     let cm;
     if (f.size > MX_MPU_AT){
       /* [#444 / 待办[3]] >5MB 走真分片直传：逐片重试，弱网/大文件不再整体重传 */
@@ -1471,6 +1555,119 @@ async function officialUpload(){
     inp.value = '';
     await loadResOps();
   }catch(e){ setMsg('roMsg','❌ '+String(e.message||e),'bad'); }
+}
+
+/* ===== [#RESOPS5] 归属模块下拉 / 批量操作 / 播放统计 ===== */
+function roModuleOptions(cur){
+  const mods = Object.keys(HEAT_PAGE_NAMES).sort();
+  const c = String(cur || '');
+  let h = '<option value="">—</option>';
+  if (c && mods.indexOf(c) < 0) h += '<option value="' + esc(c) + '" selected>' + esc(c) + '</option>';
+  mods.forEach(function(m){ h += '<option value="' + m + '"' + (m === c ? ' selected' : '') + '>' + esc(HEAT_PAGE_NAMES[m] + ' (' + m + ')') + '</option>'; });
+  return h;
+}
+function roCk(cb){
+  RESOPS.checked[cb.getAttribute('data-key')] = cb.checked;
+  const n = Object.keys(RESOPS.checked).filter(function(k){ return RESOPS.checked[k]; }).length;
+  const bar = $('roBatchBar'); if (bar) bar.style.display = n ? 'flex' : 'none';
+  const info = $('roBatchInfo'); if (info) info.textContent = '已选 ' + n + ' 个';
+}
+async function officialMetaSel(sel){
+  const fp = sel.getAttribute('data-fp'), ext = sel.getAttribute('data-ext'), mod = sel.value || '';
+  setMsg('roMsg', '更新归属模块…', 'sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'officialRes', op:'meta', fp:fp, ext:ext, module:mod, adminKey:ADMIN_KEY });
+    if (r && r.ok) {
+      const o = (RESOPS.official || []).find(function(x){ return x.fp === fp; });
+      if (o) o.module = mod;
+      setMsg('roMsg', '✅ 已更新 ' + fp + ' → ' + (mod || '（未归属）'), 'ok');
+    } else setMsg('roMsg', '❌ ' + ((r && r.msg) || '更新失败'), 'bad');
+  } catch(e){ setMsg('roMsg', '❌ ' + String(e.message || e), 'bad'); }
+}
+function roPickKeys(){
+  return Object.keys(RESOPS.checked).filter(function(k){ return RESOPS.checked[k]; })
+    .map(function(k){ const i = k.lastIndexOf('.'); return { fp: k.slice(0, i), ext: k.slice(i + 1), key: k }; });
+}
+async function roBatchModule(){
+  const keys = roPickKeys();
+  if (!keys.length) return setMsg('roMsg', '请先勾选资源', 'bad');
+  const mod = ($('roBatchSel') || {}).value || '';
+  if (!confirm('将 ' + keys.length + ' 个资源的归属模块设为「' + (mod || '（未归属）') + '」？')) return;
+  let ok = 0;
+  for (const k of keys){
+    try {
+      const r = await proxy('mxAdmin', { action:'officialRes', op:'meta', fp:k.fp, ext:k.ext, module:mod, adminKey:ADMIN_KEY });
+      if (r && r.ok){ ok++; const o = (RESOPS.official || []).find(function(x){ return x.fp === k.fp; }); if (o) o.module = mod; }
+    } catch(e){}
+  }
+  RESOPS.checked = {};
+  renderResOps();
+  setMsg('roMsg', '✅ 批量归属完成 ' + ok + '/' + keys.length, ok === keys.length ? 'ok' : 'warn');
+}
+async function roBatchDel(){
+  const keys = roPickKeys();
+  if (!keys.length) return setMsg('roMsg', '请先勾选资源', 'bad');
+  if (!confirm('⚠️ 确认批量删除 ' + keys.length + ' 个官方资源？\n将同时删除 COS 对象与元数据，不可恢复！')) return;
+  let ok = 0;
+  for (const k of keys){
+    try {
+      const r = await proxy('mxAdmin', { action:'officialRes', op:'del', fp:k.fp, ext:k.ext, adminKey:ADMIN_KEY });
+      if (r && r.ok) ok++;
+    } catch(e){}
+  }
+  RESOPS.checked = {};
+  await loadResOps();
+  setMsg('roMsg', '批量删除完成 ' + ok + '/' + keys.length, ok === keys.length ? 'ok' : 'warn');
+}
+async function loadResPlayStats(){
+  setMsg('roPlayMsg', '读取中…', 'sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'resStats', adminKey: ADMIN_KEY });
+    if (r && r.ok){
+      RESOPS_PLAY.items = r.items || [];
+      RESOPS_PLAY.byId = {};
+      RESOPS_PLAY.items.forEach(function(it){ RESOPS_PLAY.byId[it.resId] = it; });
+      renderPlayStats();
+      setMsg('roPlayMsg', '✅ 共 ' + RESOPS_PLAY.items.length + ' 项（样本 ' + (r.sampled || 0) + ' 条事件）', 'ok');
+    } else setMsg('roPlayMsg', '❌ ' + ((r && r.msg) || '读取失败'), 'bad');
+  } catch(e){ setMsg('roPlayMsg', '❌ ' + String(e.message || e), 'bad'); }
+}
+function roWhereOf(it){
+  const off = (RESOPS.official || []).find(function(o){
+    return (o.title && (o.title === it.title || o.title === it.fname)) || (it.resId && it.resId.indexOf('|' + o.fp) >= 0);
+  });
+  if (off) return { w: 'COS official/（官方直传）', size: off.size };
+  if (String(it.resId || '').indexOf('pool|') === 0) return { w: 'GitHub 官方池（站内）', size: 0 };
+  return { w: '本地/其他', size: 0 };
+}
+function renderPlayStats(){
+  const b = $('roPlayBody'); if (!b) return;
+  b.innerHTML = RESOPS_PLAY.items.length ? RESOPS_PLAY.items.slice(0, 200).map(function(it, i){
+    const where = roWhereOf(it);
+    return '<tr><td style="color:#9aa">' + (i + 1) + '</td>'
+      + '<td>' + esc(it.title || it.fname || it.resId)
+      + ((it.fname && it.fname !== it.title) ? '<div class="hint" style="margin:0">' + esc(it.fname) + '</div>' : '')
+      + '<div class="hint" style="margin:0">' + esc(it.resId) + '</div></td>'
+      + '<td>' + esc(it.module || '—') + '</td>'
+      + '<td class="c-num"><b>' + it.count + '</b></td>'
+      + '<td>' + (it.lastTs ? roTime(new Date(it.lastTs).toISOString()) : '—') + '</td>'
+      + '<td>' + esc(where.w) + (where.size ? '<div class="hint" style="margin:0">' + roBytes(where.size) + '</div>' : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="6" style="padding:10px;color:#9aa">暂无播放记录（新版客户端播放音频后会上报；历史播放无数据）</td></tr>';
+}
+function exportPlayCsv(){
+  if (!RESOPS_PLAY.items.length) { setMsg('roPlayMsg', '暂无播放统计数据，先点「读取播放统计」', 'bad'); return; }
+  const L = ['排名,标题,原文件名,资源ID,模块,播放次数,最近播放,存储位置,大小字节'];
+  RESOPS_PLAY.items.forEach(function(it, i){
+    const w = roWhereOf(it);
+    L.push((i + 1) + ',"' + String(it.title || '').replace(/"/g, '""') + '","' + String(it.fname || '').replace(/"/g, '""') + '",'
+      + it.resId + ',' + (it.module || '') + ',' + it.count + ','
+      + (it.lastTs ? new Date(it.lastTs).toISOString() : '') + ',"' + w.w + '",' + (w.size || 0));
+  });
+  const blob = new Blob(['\ufeff' + L.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mx_res_play_stats_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 async function officialDel(fp, ext){

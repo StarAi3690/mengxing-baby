@@ -13649,7 +13649,8 @@ window.MX_SEED = data;
 
   function bindSpeak(containerSel) {
 
-    const container = document.querySelector(containerSel);
+    /* [#PY459] 兼容传 DOM 元素（此前传元素会被当选择器抛 SyntaxError，中断拼音页渲染链） */
+    const container = (typeof containerSel === 'string') ? document.querySelector(containerSel) : containerSel;
 
     if (!container) return;
 
@@ -24608,6 +24609,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var it = items[idx];
       /* [#453] 上报熏听资源模块 → MXPomo 按音频真实播放归口「熏听时长」 */
       try { if (window.MXPomo && MXPomo.setListen) MXPomo.setListen(it.module || 'listen'); } catch (e) {}
+      /* [#RESP] 播放统计上报（fire-and-forget，失败静默不影响播放） */
+      try {
+        if (window.mxApiProxy) window.mxApiProxy('mxAdmin', { action: 'track', data: { cat: 'res', resId: it.id || '', fname: it.original_filename || '', title: it.title || '', module: it.module || '', uid: window.__mx_uid__ || '', deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : '' } }).catch(function () {});
+      } catch (e) {}
       var t = ov.querySelector('#mq-title'), ix = ov.querySelector('#mq-idx');
       if (t) t.textContent = it.title || '';
       if (ix) ix.textContent = '第 ' + (idx + 1) + ' / ' + items.length + ' 个（播完自动下一个）';
@@ -25360,11 +25365,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var genN = list.filter(function (w) { return w.fromGen; }).length;
     tabs += '<button type="button" class="mx22-wtab' + (_curWordsLevel === '生成器' ? ' on' : '') + '" data-lv="生成器">✍️ 生成器 <i>' + genN + '</i></button>';
     var lvl = _curWordsLevel === '生成器' ? list.filter(function (w) { return w.fromGen; }) : list.filter(function (w) { return (w.level || '初级') === _curWordsLevel; });
+    var genSeedMap = {};
+    try { ((window.MX_SEED && window.MX_SEED.words) || []).forEach(function (s) { if (s && s.word) genSeedMap[s.word] = s; }); } catch (e) {}
     var cards = lvl.map(function (w, i) {
-      return '<div class="mx22-wcard" data-idx="' + i + '" data-word="' + w.word + '">' +
+      var isGen = _curWordsLevel === '生成器';
+      var dup = w.dupOf || (genSeedMap[w.word] ? '已在识字' + (genSeedMap[w.word].level || '初级') : '');
+      return '<div class="mx22-wcard" data-idx="' + i + '" data-word="' + w.word + '"' + (isGen ? ' data-gen="1"' : '') + '>' +
         '<div class="mx22-w-hanzi">' + w.word + '</div>' +
         '<div class="mx22-w-pinyin">' + (w.pinyin || '') + '</div>' +
-        '<div class="mx22-w-group">' + (w.group || '') + '</div>' +
+        '<div class="mx22-w-group">' + (isGen && dup ? '<b style="color:#e67e22">🔁 ' + dup + '</b> · ' : '') + (w.group || '') + '</div>' +
       '</div>';
     }).join('') || '<div class="mx22-empty">这个等级还没有生字哦～</div>';
 
@@ -25382,7 +25391,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       b.addEventListener('click', function () { _curWordsLevel = b.getAttribute('data-lv'); renderWords(); });
     });
     wrap.querySelectorAll('.mx22-wcard').forEach(function (c) {
-      c.addEventListener('click', function () { _curWordDetail = c.getAttribute('data-word'); renderWordDetail(); });
+      c.addEventListener('click', function () {
+        /* [#GEN454B] 同上：生成器卡直开 gen 详情 */
+        if (c.getAttribute('data-gen')) {
+          var gwid = c.getAttribute('data-word');
+          var gw = null;
+          try { (_mxDbWords || []).forEach(function (x) { if (x.word === gwid && x.fromGen) gw = x; }); } catch (e) {}
+          if (gw) { _curWordDetail = gwid; renderGenWordDetail(gw); return; }
+        }
+        _curWordDetail = c.getAttribute('data-word'); renderWordDetail();
+      });
     });
   }
 
@@ -25394,17 +25412,30 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var all = wordsList();
       lvl = all.filter(function (w) { return w.word.indexOf(kw) >= 0 || (w.pinyin || '').indexOf(kw) >= 0 || (w.group || '').indexOf(kw) >= 0; });
     }
+    var gridSeedMap = {};
+    try { ((window.MX_SEED && window.MX_SEED.words) || []).forEach(function (s) { if (s && s.word) gridSeedMap[s.word] = s; }); } catch (e) {}
     var cards = lvl.map(function (w) {
-      return '<div class="mx22-wcard" data-word="' + w.word + '">' +
+      var isGen = !kw && _curWordsLevel === '生成器';
+      var dup = w.dupOf || (gridSeedMap[w.word] ? '已在识字' + (gridSeedMap[w.word].level || '初级') : '');
+      return '<div class="mx22-wcard" data-word="' + w.word + '"' + (isGen && w.fromGen ? ' data-gen="1"' : '') + '>' +
         '<div class="mx22-w-hanzi">' + w.word + '</div>' +
         '<div class="mx22-w-pinyin">' + (w.pinyin || '') + '</div>' +
-        '<div class="mx22-w-group">' + (w.group || '') + '</div>' +
+        '<div class="mx22-w-group">' + (isGen && dup ? '<b style="color:#e67e22">🔁 ' + dup + '</b> · ' : '') + (w.group || '') + '</div>' +
       '</div>';
     }).join('') || '<div class="mx22-empty">没有找到相关生字～</div>';
     var grid = el('mx22-wgrid');
     if (grid) grid.innerHTML = cards;
     if (grid) grid.querySelectorAll('.mx22-wcard').forEach(function (c) {
-      c.addEventListener('click', function () { _curWordDetail = c.getAttribute('data-word'); renderWordDetail(); });
+      c.addEventListener('click', function () {
+        /* [#GEN454B] 生成器标签的卡（含与种子重复的字）直开生成器详情，家长可删除 */
+        if (c.getAttribute('data-gen')) {
+          var gwid = c.getAttribute('data-word');
+          var gw = null;
+          try { (_mxDbWords || []).forEach(function (x) { if (x.word === gwid && x.fromGen) gw = x; }); } catch (e) {}
+          if (gw) { _curWordDetail = gwid; renderGenWordDetail(gw); return; }
+        }
+        _curWordDetail = c.getAttribute('data-word'); renderWordDetail();
+      });
     });
   }
 
@@ -25601,6 +25632,29 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('');
       var res = document.getElementById('mx22-py-result');
       res.innerHTML = '<div class="mx22-pyll">' + html + '</div>' + pinyinGuide(parts);
+      /* [#GEN454B] 异步标注重复来源：识字种子库 / 生成器已有 */
+      (function annotateDups() {
+        var seedMap = {};
+        try { ((window.MX_SEED && window.MX_SEED.words) || []).forEach(function (s) { if (s && s.word) seedMap[s.word] = s; }); } catch (e) {}
+        res.querySelectorAll('.mx22-pychar:not(.miss)').forEach(function (c) {
+          var t = c.getAttribute('data-txt');
+          if (!t || c.querySelector('.mx22-py-dup')) return;
+          function put(badge) {
+            if (!badge || c.querySelector('.mx22-py-dup')) return;
+            var d = document.createElement('div');
+            d.className = 'mx22-py-dup';
+            d.style.cssText = 'font-size:10px;line-height:1.2;color:#e67e22;background:#fff7ef;border:1px solid #ffd9b3;border-radius:8px;padding:1px 6px;margin-top:2px;display:inline-block';
+            d.textContent = badge;
+            c.appendChild(d);
+          }
+          if (seedMap[t]) { put('已在识字' + (seedMap[t].level || '初级')); return; }
+          if (window.DB && DB.get) {
+            DB.get('words', t).then(function (ex) {
+              if (ex) put(ex.fromGen ? '已在生成器' : '已在识字' + (ex.level || '初级'));
+            }).catch(function () {});
+          }
+        });
+      })();
       res.querySelectorAll('.mx22-pychar.speakable, .mx22-pychar').forEach(function (c) {
         if (c.classList.contains('miss')) return;
         c.addEventListener('click', function () {
@@ -25644,27 +25698,34 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var items = lastParts.filter(function (p) { return p.py; });
       if (!items.length) { if (window.showToast) window.showToast('这些字暂未收录，无可保存内容'); return; }
       if (!(window.DB && window.DB.get && window.DB.put)) { if (window.showToast) window.showToast('存储层未就绪，稍后再试'); return; }
-      var added = 0, skipped = [];
+      /* [#GEN454B] 重复字也入「生成器」标签（家长自行删除），并标注重复来源：
+         种子库已有→记录 dupOf=识字X级；DB 已有 fromGen→提示已在生成器；DB 旧版非 fromGen→原位补 fromGen 标记 */
+      var added = 0, dups = [];
       var seedMap = {};
       try { (window.MX_SEED && window.MX_SEED.words || []).forEach(function (s) { if (s && s.word) seedMap[s.word] = s; }); } catch (e) {}
       var chain = Promise.resolve();
       items.forEach(function (p) {
         chain = chain.then(function () {
-          if (seedMap[p.txt]) { skipped.push(p.txt + ' 已在识字' + (seedMap[p.txt].level || '初级')); return null; }
           return window.DB.get('words', p.txt).then(function (ex) {
-            if (ex) { skipped.push(p.txt + ' 已在识字' + (ex.level || '初级') + (ex.fromGen ? '（生成器）' : '')); return null; }
+            if (ex && ex.fromGen) { dups.push(p.txt + '·生成器'); return null; }
+            if (ex) {
+              added++;
+              ex.fromGen = true;
+              return window.DB.put('words', ex);
+            }
             added++;
-            return window.DB.put('words', { word: p.txt, pinyin: p.py, group: '拼音拼读生成', level: '初级', fromGen: true, is_mastered: false, def: '', createdAt: Date.now() });
+            var sd = seedMap[p.txt] || null;
+            return window.DB.put('words', { word: p.txt, pinyin: p.py, group: '拼音拼读生成', level: (sd && sd.level) || '初级', fromGen: true, is_mastered: false, def: '', dupOf: sd ? '已在识字' + (sd.level || '初级') : '', createdAt: Date.now() });
           });
         });
       });
       chain.then(function () {
         var msg = '📥 已存入 ' + added + ' 个字';
-        if (skipped.length) msg += '（' + skipped.slice(0, 6).join('、') + (skipped.length > 6 ? ' 等' : '') + '）';
-        msg += '，到「识字 · ✍️ 生成器」标签复习吧';
+        if (dups.length) msg += '（' + dups.slice(0, 6).join('、') + (dups.length > 6 ? ' 等' : '') + ' 已在生成器）';
+        msg += '，重复字也已保留在「识字 · ✍️ 生成器」标签并标注来源';
         if (window.showToast) window.showToast(msg);
         refreshDbWords().then(function () { try { renderWords(); } catch (e) {} });
-      }).catch(function () { if (window.showToast) window.showToast('保存失败，请重试'); });
+      }).catch(function (e) { console.error('[GEN454B] 保存失败', e); if (window.showToast) window.showToast('保存失败，请重试'); });
     };
   }
 
