@@ -13814,6 +13814,13 @@ window.MX_SEED = data;
         const ws = (await DB.getAll('wrongQuestions').catch(function(){ return []; })) || [];
         ws.forEach(function(w){ const t = w.lastErrAt || w.createdAt || 0; if (t >= from && t <= now) wrong++; });
       }
+      /* [#452] 熏听时长归口真实计时（MXPomo 熏听类模块停留分钟；listen_log 无写入侧、历史恒 0） */
+      try {
+        if (window.MXPomo && MXPomo.summaryFor) {
+          const _fsOv = await MXPomo.summaryFor(childId, range === 'today' ? 'today' : range === 'week' ? 'week' : 'month');
+          listenMin += _fsOv.listenMin || 0;
+        }
+      } catch (eOv) {}
       return { tasksDone: tasksDone, listenMin: listenMin, wrong: wrong };
     }
     let wordsDone = 0, enWords = 0;
@@ -21033,6 +21040,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     /* [#450 番茄钟] 真实计时（各模块停留时长）汇总，与「计划时长」分开统计 */
     var _fsum = null;
     try { if (window.MXPomo && window.MXPomo.summaryFor) _fsum = await window.MXPomo.summaryFor(c, ptRange); } catch (eF) {}
+    /* [#452] 按日真实分钟（时长柱图数据源，替代计划口径） */
+    var _fdays = null;
+    try { if (window.MXPomo && window.MXPomo.summaryByDay) _fdays = await window.MXPomo.summaryByDay(c, ptRange); } catch (eD) {}
 
     var h = '';
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">👨‍👩‍👧 家长工作台</div>' +
@@ -21049,14 +21059,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       }).join('') + '</div>';
 
     h += '<div class="mx-stat-row">' +
-      /* [#451] 总时长卡合并番茄钟实测：大数字=计划+实测，副行标注番茄钟部分；点击展开明细（不再跳学习任务套组） */
-      '<div class="mx-stat mx-click" onclick="var d=document.getElementById(\'pt-focus-detail\');if(d)d.style.display=(d.style.display===\'none\'?\'\':\'none\')" title="展开/收起学习时间明细"><b>' + (totalMin + (_fsum ? (_fsum.totalMin || 0) : 0)) + '</b><span>' + RANGE_LABEL[ptRange] + '分钟</span>' + (_fsum && _fsum.totalMin ? '<span style="display:block;font-size:11px;color:#e67e22;margin-top:2px">🍅番茄钟记录 ' + _fsum.totalMin + ' 分钟</span>' : '') + '</div>' +
+      /* [#452] 总时长卡改为纯真实计时（页面停留自动累计，闲置 3 分钟不计时）；点击展开/收起明细 */
+      '<div class="mx-stat mx-click" onclick="var d=document.getElementById(\'pt-focus-detail\');if(d)d.style.display=(d.style.display===\'none\'?\'\':\'none\')" title="展开/收起学习时间明细"><b>' + (_fsum ? _fsum.totalMin : 0) + '</b><span>' + RANGE_LABEL[ptRange] + '分钟</span>' + (_fsum && _fsum.totalMin ? '<span style="display:block;font-size:11px;color:#e67e22;margin-top:2px">⏱ 真实页面计时 · 🍅完成 ' + (_fsum.po || 0) + ' 个</span>' : '<span style="display:block;font-size:11px;color:#9aa;margin-top:2px">⏱ 进入模块自动计时</span>') + '</div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-tasksets\')" title="查看学习计划"><b>' + totalDone + '</b><span>完成任务</span></div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-shop\')" title="进入积分兑换"><b>' + pts + '</b><span>当前积分</span></div>' +
       '<div class="mx-stat mx-click" onclick="if(window.navigateTo)window.navigateTo(\'page-errors\')" title="查看错题集"><b>' + ps.wrong + '</b><span>' + RANGE_LABEL[ptRange] + '错题</span></div></div>';
 
-    /* [#451] 学习时间明细（点击总时长卡展开）：🍅番茄钟实测 + 📝计划任务时长 两口径 */
-    h += '<div class="mx-card no-print" id="pt-focus-detail" style="display:none"><div class="mx-card-t">📋 学习时间明细 <span style="font-size:12px;color:#9aa;font-weight:400">（' + RANGE_LABEL[ptRange] + ' · 两个口径）</span></div>';
+    /* [#452] 学习时间明细（点击总时长卡展开）：统一真实计时口径（闲置 3 分钟不计时） */
+    h += '<div class="mx-card no-print" id="pt-focus-detail" style="display:none"><div class="mx-card-t">📋 学习时间明细 <span style="font-size:12px;color:#9aa;font-weight:400">（' + RANGE_LABEL[ptRange] + ' · 真实页面计时）</span></div>';
     h += '<div style="font-size:13px;font-weight:600;margin:4px 0 8px">🍅 番茄钟·真实学习时长 <span style="font-size:12px;color:#9aa;font-weight:400">（进入模块自动计时）</span></div>';
     if (_fsum && Object.keys(_fsum.byMod).length) {
       var _fk = Object.keys(_fsum.byMod);
@@ -21073,32 +21083,23 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     } else {
       h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有实测学习时长，孩子进入任意学习/游戏模块即自动累计～</div>';
     }
-    h += '<div style="font-size:13px;font-weight:600;margin:14px 0 8px;border-top:1px dashed #e5e9e2;padding-top:12px">📝 计划任务时长 <span style="font-size:12px;color:#9aa;font-weight:400">（按已完成任务的计划时长）</span></div>';
-    var _mk2 = Object.keys(ps.byMod);
-    if (_mk2.length) {
-      h += '<div class="mx-bars">';
-      var _mMax2 = Math.max.apply(null, _mk2.map(function (k) { return ps.byMod[k].min; }));
-      _mk2.forEach(function (k) {
-        var _mm2 = ps.byMod[k];
-        var _p2 = _mMax2 ? Math.round(_mm2.min / _mMax2 * 100) : 0;
-        h += '<div class="mx-bar-row"><span class="mx-bar-lb">' + esc(k) + '</span>' +
-          '<div class="mx-bar-track"><i class="g" style="width:' + _p2 + '%"></i></div>' +
-          '<span class="mx-bar-v">' + _mm2.min + '分 · ' + _mm2.done + '/' + _mm2.tot + '</span></div>';
-      });
-      h += '</div>';
-    } else {
-      h += '<div class="mx-empty">' + RANGE_LABEL[ptRange] + '还没有已完成的学习任务～</div>';
-    }
     h += '</div>';
 
-    h += '<div class="mx-card"><div class="mx-card-t">📈 ' + RANGE_LABEL[ptRange] + '学习时长（分钟）</div><div class="mx-chart">';
-    week.forEach(function (w) {
-      var hgt = Math.max(4, Math.round(w.m / maxM * 110));
-      h += '<div class="mx-chart-col">' +
-        '<span class="mx-chart-v">' + (w.m || '') + '</span>' +
-        '<i style="height:' + hgt + 'px"></i>' +
-        '<span class="mx-chart-x">' + w.l + '</span></div>';
-    });
+    /* [#452] 学习时长柱图：改为按日「真实页面计时」（原为计划口径的 ps.chart） */
+    var _dayRows = (_fdays && _fdays.days) || [];
+    h += '<div class="mx-card"><div class="mx-card-t">📈 ' + RANGE_LABEL[ptRange] + '学习时长（分钟 · 真实计时）</div><div class="mx-chart">';
+    if (_dayRows.length) {
+      var _dMax = Math.max.apply(null, _dayRows.map(function (x) { return x.min; })) || 1;
+      _dayRows.forEach(function (w) {
+        var hgt = Math.max(4, Math.round(w.min / _dMax * 110));
+        h += '<div class="mx-chart-col">' +
+          '<span class="mx-chart-v">' + (w.min || '') + '</span>' +
+          '<i style="height:' + hgt + 'px"></i>' +
+          '<span class="mx-chart-x">' + w.lab + '</span></div>';
+      });
+    } else {
+      h += '<div class="mx-empty">该周期还没有真实计时数据（闲置超 3 分钟不累计）</div>';
+    }
     h += '</div></div>';
 
     // 各模块学习明细（按当前周期）
@@ -31568,17 +31569,24 @@ window.MX_SPRITE_COORDS = {
 <script id="mx-pomoplus">
 /* =============================================================
    #450 番茄时钟 · 全模块学习计时（2026-09-15）
+   #452 升级（2026-09-16）：
+   - 闲置判定：3 分钟无任何点击/键盘/滚动/触摸 → 视为挂后台，心跳不计
+   - summaryFor 增加 listenMin（熏听类页面真实停留分钟）
+   - 新增 summaryByDay(cid, range)：按日分钟数组（家长工作台周柱图用）
+   - 浮窗番茄钟：自定义时长（1~180 分）+ 开始/暂停 · 完成 · 重置
    1) 被动计时：停留在学习/游戏模块且页面可见时，按 15s 心跳累计真实时长
    2) 存储：settings 键 mxfocus:<cid>:<YYYY-MM-DD> → { d, secs{模块id:秒}, po, updatedAt }
       行顶层带 updatedAt → 云同步走行级「新者胜」，不重蹈 home:* 整行回灌拉锯（红线 17）
-   3) 浮窗番茄钟：各模块右下角 🍅，25/15 分钟专注 + 5 分钟休息，完成 +1⭐ +5 分
-   4) 家长工作台：window.MXPomo.summaryFor(cid, range) 汇总各模块分钟
+   3) 浮窗番茄钟：完成一个专注 +1⭐ +5 分
+   4) 家长工作台：window.MXPomo.summaryFor(cid, range) / summaryByDay(cid, range)
    ============================================================= */
 (function () {
   'use strict';
   if (window.MXPomo) return;
   var TICK = 15;              /* 心跳秒数 */
   var FLUSH_EVERY = 4;        /* 每 4 跳（约 1 分钟）落库一次 */
+  var IDLE_MS = 3 * 60 * 1000;/* [#452] 3 分钟无交互视为挂后台，不计时 */
+  var lastAct = Date.now();
   var pageId = '';
   var tickN = 0;
   var dirty = false;
@@ -31596,6 +31604,8 @@ window.MX_SPRITE_COORDS = {
     'page-tool-pinyin': '✍️ 拼音生成器', 'page-tool-math': '➕ 口算练习', 'page-tool-flash': '🃏 学习闪卡',
     'page-tool-tomato': '🍅 番茄钟', 'page-tool-resources': '📦 免费资源'
   };
+  /* [#452] 熏听类模块（真实停留分钟单独归口「熏听时长」） */
+  var LISTEN_KEYS = { 'page-listen': 1, 'page-listen-schedule': 1, 'listen-en': 1, 'listen-music': 1, lchinese: 1, lstory: 1, lsci: 1, lnews: 1, lmath: 1 };
 
   function dayKey() {
     var d = new Date();
@@ -31645,6 +31655,8 @@ window.MX_SPRITE_COORDS = {
   }
   function heartbeat() {
     try { if (document.visibilityState !== 'visible') return; } catch (e) {}
+    /* [#452] 闲置判定：长时间无点击/键盘/滚动/触摸 → 视为挂后台，不计时 */
+    if (Date.now() - lastAct > IDLE_MS) return;
     var m = curModule();
     if (!m) return;
     cidP().then(function (cid) { return ensureRow(cid); }).then(function (r) {
@@ -31657,37 +31669,62 @@ window.MX_SPRITE_COORDS = {
   }
 
   /* ---------- 家长工作台汇总：summaryFor(cid, 'today'|'week'|'month'|'quarter'|'year') ---------- */
+  /* [#452] 周期上界改为「周期末尾」（原 Date.now() + 行归一正午 → 上午运行时段误滤当天行） */
   function bounds(range) {
     var now = new Date();
     var from = new Date(now); from.setHours(0, 0, 0, 0);
-    if (range === 'week') { var dow = (now.getDay() + 6) % 7; from.setDate(now.getDate() - dow); }
-    else if (range === 'month') { from.setDate(1); }
-    else if (range === 'quarter') { from.setMonth(Math.floor(now.getMonth() / 3) * 3, 1); }
-    else if (range === 'year') { from.setMonth(0, 1); }
-    return { from: from.getTime(), to: Date.now() };
+    var to = new Date(now); to.setHours(23, 59, 59, 999);
+    if (range === 'week') { var dow = (now.getDay() + 6) % 7; from.setDate(now.getDate() - dow); to = new Date(from); to.setDate(from.getDate() + 7); to.setHours(0, 0, 0, 0); }
+    else if (range === 'month') { from.setDate(1); to = new Date(from); to.setMonth(from.getMonth() + 1); to.setHours(0, 0, 0, 0); }
+    else if (range === 'quarter') { from.setMonth(Math.floor(now.getMonth() / 3) * 3, 1); to = new Date(from); to.setMonth(from.getMonth() + 3); to.setHours(0, 0, 0, 0); }
+    else if (range === 'year') { from.setMonth(0, 1); to = new Date(from); to.setFullYear(from.getFullYear() + 1); to.setHours(0, 0, 0, 0); }
+    return { from: from.getTime(), to: to.getTime() };
   }
-  function summaryFor(cid, range) {
+  function collect(cid, range) {
     var b = bounds(range || 'week');
     var pref = 'mxfocus:' + (cid || 'default') + ':';
     return new Promise(function (res) {
       window.DB.getAll('settings').then(function (rows) {
-        var secs = {}, po = 0, total = 0;
+        var secs = {}, po = 0, total = 0, byDay = {};
         (rows || []).forEach(function (r) {
           if (!r || !r.key || r.key.indexOf(pref) !== 0) return;
           var v = r.value || {};
           var ts = 0; try { ts = new Date(v.d + 'T12:00:00').getTime(); } catch (e) {}
           if (!(ts >= b.from && ts <= b.to)) return;
+          var dayTot = 0;
           Object.keys(v.secs || {}).forEach(function (k) {
             var s = v.secs[k] || 0;
-            if (s > 0) { secs[k] = (secs[k] || 0) + s; total += s; }
+            if (s > 0) { secs[k] = (secs[k] || 0) + s; total += s; dayTot += s; }
           });
+          if (dayTot > 0) byDay[v.d] = (byDay[v.d] || 0) + dayTot;
           po += v.po || 0;
         });
-        var byMod = {};
-        Object.keys(secs).forEach(function (k) { byMod[MOD_LABEL[k] || k] = Math.round(secs[k] / 60); });
-        res({ totalMin: Math.round(total / 60), byMod: byMod, po: po });
-      }).catch(function () { res({ totalMin: 0, byMod: {}, po: 0 }); });
+        res({ secs: secs, po: po, total: total, byDay: byDay });
+      }).catch(function () { res({ secs: {}, po: 0, total: 0, byDay: {} }); });
     });
+  }
+  function summaryFor(cid, range) {
+    return collect(cid, range).then(function (c) {
+      var byMod = {}, listenS = 0;
+      Object.keys(c.secs).forEach(function (k) {
+        if (LISTEN_KEYS[k]) { listenS += c.secs[k]; return; }
+        byMod[MOD_LABEL[k] || k] = Math.round(c.secs[k] / 60);
+      });
+      /* 熏听分钟并入（有则展示），listenMin 供首页统览直接取用 */
+      var listenMin = Math.round(listenS / 60);
+      if (listenMin > 0) byMod['🎧 熏听'] = (byMod['🎧 熏听'] || 0) + listenMin;
+      return { totalMin: Math.round(c.total / 60), byMod: byMod, po: c.po, listenMin: listenMin };
+    }).catch(function () { return { totalMin: 0, byMod: {}, po: 0, listenMin: 0 }; });
+  }
+  /* [#452] 按日分钟数组（家长工作台时长柱图）：[{d:'YYYY-MM-DD', lab:'MM-DD', min}] */
+  function summaryByDay(cid, range) {
+    return collect(cid, range).then(function (c) {
+      var days = [];
+      Object.keys(c.byDay).sort().forEach(function (d) {
+        days.push({ d: d, lab: d.slice(5).replace('-', '/'), min: Math.round(c.byDay[d] / 60) });
+      });
+      return { days: days };
+    }).catch(function () { return { days: [] }; });
   }
 
   /* ---------- 浮窗番茄钟 ---------- */
@@ -31715,11 +31752,11 @@ window.MX_SPRITE_COORDS = {
     + '#mx-pp-panel .pp-mod{font-size:12px;color:#8a9;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '#mx-pp-panel .pp-time{font-size:34px;font-weight:800;text-align:center;color:#e67e22;font-variant-numeric:tabular-nums}'
     + '#mx-pp-panel .pp-mode{text-align:center;font-size:12px;color:#9ab;margin-bottom:8px}'
-    + '#mx-pp-panel .pp-chips{display:flex;gap:6px;justify-content:center;margin-bottom:8px}'
+    + '#mx-pp-panel .pp-chips{display:flex;gap:6px;justify-content:center;margin-bottom:6px}'
     + '#mx-pp-panel .pp-chip{border:1px solid #ffd9b3;background:#fff7ef;color:#c77;border-radius:12px;padding:2px 10px;font-size:12px;cursor:pointer}'
     + '#mx-pp-panel .pp-chip.on{background:#ff9f43;color:#fff;border-color:#ff9f43}'
     + '#mx-pp-panel .pp-btns{display:flex;gap:8px;justify-content:center}'
-    + '#mx-pp-panel .pp-btn{border:0;border-radius:10px;padding:6px 14px;font-weight:800;cursor:pointer;font-size:13px}'
+    + '#mx-pp-panel .pp-btn{border:0;border-radius:10px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}'
     + '#mx-pp-panel .pp-main{background:#e67e22;color:#fff}'
     + '#mx-pp-panel .pp-sub{background:#eef2ec;color:#678}'
     + '#mx-pp-panel .pp-note{text-align:center;font-size:11px;color:#bba;margin-top:8px}';
@@ -31742,11 +31779,17 @@ window.MX_SPRITE_COORDS = {
       + '<div class="pp-time" id="pp-time">25:00</div>'
       + '<div class="pp-mode" id="pp-mode">专注时间</div>'
       + '<div class="pp-chips">'
-      + '<button class="pp-chip" data-len="15">专注15分</button>'
-      + '<button class="pp-chip on" data-len="25">专注25分</button>'
+      + '<button class="pp-chip" data-len="15">15分</button>'
+      + '<button class="pp-chip" data-len="25">25分</button>'
+      + '<button class="pp-chip" data-len="45">45分</button>'
       + '<button class="pp-chip" data-len="5">休息5分</button></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:8px">'
+      + '<input id="pp-len" type="number" min="1" max="180" placeholder="自定义分钟(1-180)"'
+      + ' style="width:118px;border:1px solid #ffd9b3;border-radius:8px;padding:3px 8px;font-size:12px"/>'
+      + '<button class="pp-chip" id="pp-len-ok">设为专注</button></div>'
       + '<div class="pp-btns">'
       + '<button class="pp-btn pp-main" id="pp-run">▶ 开始</button>'
+      + '<button class="pp-btn pp-sub" id="pp-done">✓ 完成</button>'
       + '<button class="pp-btn pp-sub" id="pp-reset">↺ 重置</button></div>'
       + '<div class="pp-note">完成一个专注番茄 +1⭐ +5分 · 页面停留自动计入学习时长</div>';
     document.body.appendChild(fab);
@@ -31761,12 +31804,22 @@ window.MX_SPRITE_COORDS = {
         pomoSave(); paintUi();
       }
     };
+    /* [#452] 完成按钮：立即按当前模式结算（专注→发奖切休息；休息→切专注） */
+    panel.querySelector('#pp-done').onclick = function () {
+      if (pomo.mode === 'focus') {
+        if (!pomo.running && !pomo.pausedLeft) { try { if (window.showToast) window.showToast('当前没有进行中的番茄哦'); } catch (e) {} return; }
+        pomo.running = false; pomo.pausedLeft = 0;
+        settleFocus();
+      } else {
+        settleBreak();
+      }
+    };
     panel.querySelector('#pp-reset').onclick = function () {
       pomo.running = false; pomo.pausedLeft = 0; pomoSave(); paintUi();
     };
-    panel.querySelectorAll('.pp-chip').forEach(function (b) {
+    panel.querySelectorAll('.pp-chip[data-len]').forEach(function (b) {
       b.onclick = function () {
-        panel.querySelectorAll('.pp-chip').forEach(function (x) { x.classList.remove('on'); });
+        panel.querySelectorAll('.pp-chip[data-len]').forEach(function (x) { x.classList.remove('on'); });
         b.classList.add('on');
         var mn = parseInt(b.getAttribute('data-len'), 10);
         pomo.mode = mn >= 15 ? 'focus' : 'break';
@@ -31775,37 +31828,53 @@ window.MX_SPRITE_COORDS = {
         pomoSave(); paintUi();
       };
     });
+    /* [#452] 自定义专注时长（1~180 分钟） */
+    var lenOk = panel.querySelector('#pp-len-ok');
+    if (lenOk) lenOk.onclick = function () {
+      var inp = panel.querySelector('#pp-len');
+      var mn = parseInt(inp && inp.value, 10);
+      if (!(mn >= 1 && mn <= 180)) { try { if (window.showToast) window.showToast('请输入 1~180 的分钟数'); } catch (e) {} return; }
+      panel.querySelectorAll('.pp-chip[data-len]').forEach(function (x) { x.classList.remove('on'); });
+      pomo.mode = 'focus'; pomo.len = mn * 60;
+      pomo.running = false; pomo.pausedLeft = 0;
+      pomoSave(); paintUi();
+    };
     if (uiTimer) clearInterval(uiTimer);
     uiTimer = setInterval(function () { pomoTick(); paintUi(); }, 1000);
     paintUi();
+  }
+  /* 结算（专注/休息）：#452 从 pomoTick 抽出，供「✓ 完成」按钮复用 */
+  function settleFocus() {
+    cidP().then(function (cid) {
+      ensureRow(cid).then(function (r) {
+        r.value.po = (r.value.po || 0) + 1;
+        dirty = true; flush();
+      });
+      try {
+        if (window.DB && DB.addPoints) DB.addPoints(cid, 5, '完成一个番茄钟').catch(function () {});
+        if (window.DB && DB.getSetting) {
+          DB.getSetting('tomato:stars:' + cid, 0).then(function (n) {
+            return DB.setSetting('tomato:stars:' + cid, (Number(n) || 0) + 1);
+          }).catch(function () {});
+        }
+      } catch (e) {}
+    });
+    try { if (window.showToast) window.showToast('🍅 番茄完成！+1⭐ +5分，休息 5 分钟～'); } catch (e) {}
+    pomo.mode = 'break'; pomo.len = 5 * 60;
+    pomoSave();
+  }
+  function settleBreak() {
+    try { if (window.showToast) window.showToast('休息结束，继续加油！'); } catch (e) {}
+    pomo.mode = 'focus'; pomo.len = 25 * 60;
+    pomo.running = false; pomo.pausedLeft = 0;
+    pomoSave();
   }
   function pomoTick() {
     if (!pomo.running) return;
     if (pomoLeft() > 0) return;
     pomo.running = false; pomo.pausedLeft = 0;
-    if (pomo.mode === 'focus') {
-      /* 完成一个专注番茄：+1⭐ +5 分 + 计数（防重复：立即落库） */
-      cidP().then(function (cid) {
-        ensureRow(cid).then(function (r) {
-          r.value.po = (r.value.po || 0) + 1;
-          dirty = true; flush();
-        });
-        try {
-          if (window.DB && DB.addPoints) DB.addPoints(cid, 5, '完成一个番茄钟').catch(function () {});
-          if (window.DB && DB.getSetting) {
-            DB.getSetting('tomato:stars:' + cid, 0).then(function (n) {
-              return DB.setSetting('tomato:stars:' + cid, (Number(n) || 0) + 1);
-            }).catch(function () {});
-          }
-        } catch (e) {}
-      });
-      try { if (window.showToast) window.showToast('🍅 番茄完成！+1⭐ +5分，休息 5 分钟～'); } catch (e) {}
-      pomo.mode = 'break'; pomo.len = 5 * 60;
-    } else {
-      try { if (window.showToast) window.showToast('休息结束，继续加油！'); } catch (e) {}
-      pomo.mode = 'focus'; pomo.len = 25 * 60;
-    }
-    pomoSave();
+    if (pomo.mode === 'focus') settleFocus();
+    else settleBreak();
   }
   function paintUi() {
     if (!panel) return;
@@ -31838,6 +31907,12 @@ window.MX_SPRITE_COORDS = {
         refreshFab();
       });
     } catch (e) {}
+    /* [#452] 交互活跃度监听（闲置判定数据源） */
+    try {
+      ['click', 'pointerdown', 'keydown', 'scroll', 'touchstart', 'wheel'].forEach(function (ev) {
+        document.addEventListener(ev, function () { lastAct = Date.now(); }, { passive: true, capture: true });
+      });
+    } catch (e) { try { document.addEventListener('click', function () { lastAct = Date.now(); }); } catch (e2) {} }
     buildUi();
     setInterval(heartbeat, TICK * 1000);
     /* 回退：navigation 事件晚绑定时，从 active 页兜底 */
@@ -31858,6 +31933,7 @@ window.MX_SPRITE_COORDS = {
 
   window.MXPomo = {
     summaryFor: summaryFor,
+    summaryByDay: summaryByDay,
     curModule: curModule,
     flushNow: flush,
     _heartbeat: heartbeat
