@@ -7677,6 +7677,14 @@ html, body {
         <!-- [#391] 旧「资源导入已升级」跳转卡与内容标签页已整体清理：导入统一走 家长工作台 → 资源中心；
              数据备份/清除本机数据/重新输入兑换码 统一归口「账号中心」（原内容pane data-page-node-id=F0T5YpdJxwXP5woEw7Zrol） -->
 
+        <!-- [PY456] 开源与授权：所有可商用第三方素材的统一署名区（后续新增都放这里） -->
+        <div id="mx-oss-credits" style="max-width:680px;margin:8px auto 24px;padding:14px 16px;background:#fff;border:1px dashed #c9d7ea;border-radius:14px;">
+          <div style="font-weight:700;color:#5b6b80;margin-bottom:6px;">📜 开源与授权</div>
+          <div style="font-size:12px;color:#8a99b0;line-height:1.8;">
+            · 拼音音节发音音频：来自开源项目 <a href="https://github.com/daomo/audio-cmn" target="_blank" rel="noopener" style="color:#4a7bd4;">daomo/audio-cmn</a>（发音：Chen Wang），遵循 <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener" style="color:#4a7bd4;">CC BY-SA 4.0</a> 授权用于本产品。<br>
+            · 后续所有可商用需署名的第三方素材，统一在此登记。
+          </div>
+        </div>
       </section>
 
 
@@ -12617,6 +12625,30 @@ window.MX_SEED = data;
 
 
 
+  /* [PY456_START] 拼音音节 → 声调编号本地音频映射
+     音频源：daomo/audio-cmn（CC-BY-SA 4.0，发音：Chen Wang）→ assets/audio/pinyin/
+     规则：声调符号转声调数字（bā→ba1）ü→v；无调号默认读一声；轻声 5（部分音节有）
+     单韵母 i/u/ü 无独立录音 → 回退 yi/wu/yu 同调文件 */
+  const MX_PY_TONE_MAP = { 'ā': ['a', '1'], 'á': ['a', '2'], 'ǎ': ['a', '3'], 'à': ['a', '4'], 'ē': ['e', '1'], 'é': ['e', '2'], 'ě': ['e', '3'], 'è': ['e', '4'], 'ī': ['i', '1'], 'í': ['i', '2'], 'ǐ': ['i', '3'], 'ì': ['i', '4'], 'ō': ['o', '1'], 'ó': ['o', '2'], 'ǒ': ['o', '3'], 'ò': ['o', '4'], 'ū': ['u', '1'], 'ú': ['u', '2'], 'ǔ': ['u', '3'], 'ù': ['u', '4'], 'ǖ': ['v', '1'], 'ǘ': ['v', '2'], 'ǚ': ['v', '3'], 'ǜ': ['v', '4'], 'ü': ['v', ''] };
+
+  function pinyinAudioCandidates(text) {
+    let s = String(text == null ? '' : text).trim().toLowerCase();
+    if (!s || !/^[a-züāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]+$/.test(s)) return null;
+    let plain = '', tone = '';
+    for (const ch of s) {
+      const m = MX_PY_TONE_MAP[ch];
+      if (m) { plain += m[0]; if (m[1]) tone = m[1]; } else { plain += ch; }
+    }
+    const base = AUDIO_BASE + 'pinyin/';
+    const out = [base + plain + (tone || '1') + '.mp3'];
+    if (plain.length === 1) {
+      const alt = { 'i': 'yi', 'u': 'wu', 'v': 'yu' }[plain];
+      if (alt) out.push(base + alt + (tone || '1') + '.mp3');
+    }
+    return out;
+  }
+  /* [PY456_END] */
+
   /** 由文本+语言+指定目录 推导候选音频路径（不支持文件名中的反斜杠/非法字符） */
 
   function resolveAudioPaths(text, lang, dir) {
@@ -12629,9 +12661,16 @@ window.MX_SEED = data;
 
     let folder = dir || (lang && String(lang).indexOf('en') === 0 ? 'english' : 'pinyin');
 
-    const head = `${AUDIO_BASE}${folder}/${name}.mp3`;
+    const paths = [];
 
-    const paths = [head];
+    // [PY456] 拼音音节 → 声调编号本地音频（bā → pinyin/ba1.mp3；无调默认一声）
+    if (folder === 'pinyin') {
+      const py = pinyinAudioCandidates(name);
+      if (py) py.forEach(p => paths.push(p));
+    }
+
+    const head = `${AUDIO_BASE}${folder}/${name}.mp3`;
+    paths.push(head);
 
     // 拼音音节/中文名也尝试 uri 编码版本（含声调字符）
 
@@ -12758,6 +12797,7 @@ window.MX_SEED = data;
   function speak(text, lang, dir) { playAudio(text, lang, dir); }
 
   window.MXSpeak = playAudio;
+  window.mxPlayAudio = playAudio; /* [PY456] 外部模块（拼音生成器等）统一播放入口 */
 
 
 

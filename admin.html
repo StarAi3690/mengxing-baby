@@ -262,6 +262,7 @@
     <div class="card">
       <h3 style="margin:0 0 4px">🛍️ 商品配置（萌星好物 / 积分兑换）</h3>
       <div class="sub">上架 / 下架、调价、改库存均在此配置，点「发布」后全端生效。数据存于云端 <code>CFG::linkage_config.goods</code>。某分类留空数组 <code>[]</code> = 该分类不展示。孩子端每 3 分钟自动刷新。</div>
+      <div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="loadGoods()">↻ 从云端重新读取</button><span class="hint" style="margin:0">读不到/显示不对时，先刷新页面重新登录再点这里（[AD457] 读取失败不会再拿默认模板冒充云端数据）</span></div>
 
       <div class="row" style="justify-content:space-between;margin-top:6px">
         <h3 style="margin:0">⭐ 积分兑换商品（SHOP_GOODS）</h3>
@@ -1132,12 +1133,28 @@ function goodsBuild(which){
   return { list: out, errs: errs };
 }
 async function loadGoods(){
-  setMsg('goodsMsg','加载中…','sub');
+  setMsg('goodsMsg','正在从云端读取…','sub');
   try {
     const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY });
+    if (!r || r.ok === false) {
+      /* [AD457] 读取失败：绝不能用默认模板冒充云端数据 */
+      setMsg('goodsMsg','❌ 读取失败：'+((r&&r.msg)||'网络异常或登录会话已过期')+' —— 表格仍是上一次内容，不代表云端数据！请刷新页面重新登录后台，再点「↻ 从云端重新读取」。','bad');
+      return;
+    }
     const g = (r && r.goods) || {};
-    GOODS.shop = (Array.isArray(g.shop) && g.shop.length) ? g.shop.map(function(x){ return Object.assign({},x); }) : DEFAULT_SHOP_GOODS.map(function(x){ return Object.assign({},x); });
-    GOODS.mall = (Array.isArray(g.mall) && g.mall.length) ? g.mall.map(function(x){ return Object.assign({},x); }) : DEFAULT_MALL_PRODUCTS.map(function(x){ return Object.assign({},x); });
+    const hasShop = Array.isArray(g.shop) && g.shop.length;
+    const hasMall = Array.isArray(g.mall) && g.mall.length;
+    if (!hasShop && !hasMall) {
+      /* [AD457] 云端确实无配置才回填默认，并明确告知这是模板 */
+      GOODS.shop = DEFAULT_SHOP_GOODS.map(function(x){ return Object.assign({},x); });
+      GOODS.mall = DEFAULT_MALL_PRODUCTS.map(function(x){ return Object.assign({},x); });
+      goodsRender('shop'); goodsRender('mall');
+      goodsSyncJson('shop', true); goodsSyncJson('mall', true);
+      setMsg('goodsMsg','⚠️ 云端暂无商品配置：下方显示的是代码默认模板（点「🚀 发布」后孩子端才生效）','warn');
+      return;
+    }
+    GOODS.shop = hasShop ? g.shop.map(function(x){ return Object.assign({},x); }) : DEFAULT_SHOP_GOODS.map(function(x){ return Object.assign({},x); });
+    GOODS.mall = hasMall ? g.mall.map(function(x){ return Object.assign({},x); }) : DEFAULT_MALL_PRODUCTS.map(function(x){ return Object.assign({},x); });
     /* [#449] 回填兑换规则 */
     const _ru = g.rules || {};
     const _rl = $('goodsRuleLimit'), _rn = $('goodsRuleNote');
@@ -1145,8 +1162,10 @@ async function loadGoods(){
     if (_rn) _rn.value = String(_ru.note || '');
     goodsRender('shop'); goodsRender('mall');
     goodsSyncJson('shop', true); goodsSyncJson('mall', true);
-    setMsg('goodsMsg', (r && r.ok) ? '已读取当前商品配置' : '读取失败', 'sub');
-  } catch(e){ setMsg('goodsMsg','读取失败：'+String(e.message||e),'bad'); }
+    let _u = '';
+    try { if (r.updatedAt) _u = ' · 云端发布时间 ' + new Date(r.updatedAt).toLocaleString('zh-CN'); } catch(e2){}
+    setMsg('goodsMsg','✅ 已读取云端配置：积分兑换 '+GOODS.shop.length+' 项 · 萌星好物 '+GOODS.mall.length+' 项'+_u,'ok');
+  } catch(e){ setMsg('goodsMsg','❌ 读取失败：'+String(e.message||e)+' —— 表格仍是上一次内容，不代表云端数据！请检查网络后重试。','bad'); }
 }
 function resetGoods(which){
   if (!confirm('确认将「'+(which==='shop'?'积分兑换商品':'萌星好物')+'」重置为代码默认？表格里未发布的改动会丢失。')) return;
