@@ -3305,10 +3305,13 @@ html, body {
 .ov-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .ov-tab { flex: 0 0 auto; min-width: 64px; height: 34px; border: 1px solid var(--border-color); background: var(--bg-elevated, #f4f6f4); border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--text-secondary); cursor: pointer; padding: 0 16px; transition: all .15s ease; }
 .ov-tab.active { background: var(--accent-primary, #7ec850); color: #fff; border-color: var(--accent-primary, #7ec850); }
-.ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
-.ov-card { background: var(--bg-elevated, #f7f9f7); border-radius: 14px; padding: 14px 10px; text-align: center; border-left: 4px solid var(--oa, #7ec850); }
-.ov-card .ov-num { font-size: 26px; font-weight: 800; color: var(--oa, #7ec850); line-height: 1.1; }
-.ov-card .ov-label { font-size: 12px; color: var(--text-secondary); margin-top: 6px; font-weight: 600; }
+/* [#453] 8 张统计卡单行横排：宽屏一行放下，窄屏横向滑动不换行 */
+.ov-grid { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding-bottom: 4px; }
+.ov-grid::-webkit-scrollbar { height: 4px; }
+.ov-grid::-webkit-scrollbar-thumb { background: var(--border-color, #dde5da); border-radius: 2px; }
+.ov-card { flex: 0 0 auto; min-width: 84px; max-width: 108px; background: var(--bg-elevated, #f7f9f7); border-radius: 12px; padding: 10px 8px; text-align: center; border-left: 3px solid var(--oa, #7ec850); }
+.ov-card .ov-num { font-size: 21px; font-weight: 800; color: var(--oa, #7ec850); line-height: 1.1; white-space: nowrap; }
+.ov-card .ov-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; white-space: nowrap; }
 
 
 
@@ -12863,7 +12866,34 @@ window.MX_SEED = data;
   /* 暴露给「学习任务套组」模块，保证生成的拼音任务是真实存在的卡片 */
   window.MX_PINYIN_DATA = PINYIN_DATA;
 
-
+  /* =============================================================
+     [#453] 21 天拼音闯关课程（标准体系：声母23 / 韵母24=单6+复9+前鼻5+后鼻4 / 整体认读16）
+     教学顺序参考主流「21天幼小衔接拼音」：单韵母→声调→声母分组→两拼→复/鼻韵母→三拼→整体认读
+     items: [发音主体, 提示/例词]
+     ============================================================= */
+  const PINYIN_COURSE = [
+    { t: '单韵母 ①', groups: [{ g: '单韵母', items: [['a', '阿姨的 a 🍎'], ['o', '公鸡喔喔 o 🐓'], ['e', '白鹅的 e 🦢']] }] },
+    { t: '单韵母 ②', groups: [{ g: '单韵母', items: [['i', '衣服的 i 👕'], ['u', '乌鸦的 u 🐦'], ['ü', '小鱼的 ü 🐟']] }] },
+    { t: '四声调', groups: [{ g: '以 a 为例 · 一声平二声扬', items: [['ā', '一声平 · 阿姨'], ['á', '二声扬 · 啊？！'], ['ǎ', '三声拐弯 · 啊？'], ['à', '四声降 · 啊！好']] }, { g: '标调口诀', items: [['有 a 不放过', 'a 在就标 a 上'], ['没 a 找 o e', '没 a 找 o / e']] }] },
+    { t: '声母 b p m f', groups: [{ g: '声母', items: [['b', '广播 b 📻'], ['p', '爬山 p ⛰️'], ['m', '摸人 m 🙈'], ['f', '佛祖 f 🙏']] }] },
+    { t: '声母 d t n l', groups: [{ g: '声母', items: [['d', '马蹄 d 🐴'], ['t', '伞柄 t ☂️'], ['n', '门洞 n 🚪'], ['l', '小棍 l 🎵']] }] },
+    { t: '声母 g k h', groups: [{ g: '声母', items: [['g', '鸽子 g 🕊️'], ['k', '蝌蚪 k 🐸'], ['h', '喝水 h 💧']] }] },
+    { t: '声母 j q x', groups: [{ g: '声母', items: [['j', '小鸡 j 🐤'], ['q', '气球 q 🎈'], ['x', '西瓜 x 🍉']] }, { g: 'ü 见 j q x 脱帽', items: [['ju', 'ju = j + ü（两点省略）'], ['qu', 'qu = q + ü'], ['xu', 'xu = x + ü']] }] },
+    { t: '两拼法练习', groups: [{ g: '声母 + 单韵母 → 音节', items: [['bà', 'b-à → bà 爸爸 👨'], ['mā', 'm-ā → mā 妈妈 👩'], ['gē', 'g-ē → gē 哥哥 👦'], ['lù', 'l-ù → lù 小鹿 🦌'], ['hǔ', 'h-ǔ → hǔ 老虎 🐯']] }] },
+    { t: '声母 zh ch sh r', groups: [{ g: '翘舌音', items: [['zh', '蜘蛛 zh 🕷️'], ['ch', '吃果 ch 🍊'], ['sh', '狮子 sh 🦁'], ['r', '日出 r 🌅']] }] },
+    { t: '声母 z c s', groups: [{ g: '平舌音', items: [['z', '写字 z ✏️'], ['c', '刺猬 c 🦔'], ['s', '蚕丝 s 🐛']] }] },
+    { t: '声母 y w', groups: [{ g: '声母', items: [['y', '树枝 y 🌿'], ['w', '屋顶 w 🏠']] }, { g: '整体认读（朋友音）', items: [['yi', '衣 yi 👕'], ['wu', '乌 wu 🐦'], ['yu', '鱼 yu 🐟']] }] },
+    { t: '复韵母 ai ei ui', groups: [{ g: '复韵母', items: [['ai', '爱 ai ❤️ · 白菜'], ['ei', '欸 ei · 喝水'], ['ui', '围巾 ui 🧣 · 水']] }] },
+    { t: '复韵母 ao ou iu', groups: [{ g: '复韵母', items: [['ao', '棉袄 ao 🧥 · 猫'], ['ou', '海鸥 ou 🕊️ · 走'], ['iu', '皮球 iu ⚽ · 六']] }] },
+    { t: '复韵母 ie üe er', groups: [{ g: '复韵母', items: [['ie', '树叶 ie 🍃 · 蝴蝶'], ['üe', '月亮 üe 🌙 · 雪'], ['er', '耳朵 er 👂 · 儿歌（特殊韵母）']] }] },
+    { t: '前鼻韵母 an en in un ün', groups: [{ g: '前鼻韵母（舌尖顶上牙床）', items: [['an', '安 an · 蓝天'], ['en', '恩 en · 门'], ['in', '音 in · 树林'], ['un', '温 un · 蚊子'], ['ün', '云 ün ☁️ · 春天']] }] },
+    { t: '后鼻韵母 ang eng ing ong', groups: [{ g: '后鼻韵母（舌根抬起来）', items: [['ang', '山 ang ⛰️ · 帮忙'], ['eng', '灯 eng 💡 · 风'], ['ing', '鹰 ing 🦅 · 星星'], ['ong', '钟 ong 🔔 · 虫子']] }] },
+    { t: '前后鼻对比拼读', groups: [{ g: '对比练（an ↔ ang）', items: [['bān', 'b-an → 班级'], ['bāng', 'b-ang → 帮助'], ['fēn', 'f-en → 分开'], ['fēng', 'f-eng → 大风'], ['xīn', 'x-in → 心'], ['xīng', 'x-ing → 星星']] }] },
+    { t: '三拼法', groups: [{ g: '声母 + 介母 + 韵母', items: [['guā', 'g-u-a → guā 西瓜 🍉'], ['huā', 'h-u-a → huā 花朵 🌸'], ['shuō', 'sh-u-o → shuō 说话 💬'], ['xiǎo', 'x-i-ao → xiǎo 小的 🐣']] }] },
+    { t: '整体认读 ①', groups: [{ g: '翘舌 + 平舌（整体认读，直接读不出声母韵母）', items: [['zhi', '蜘 zhi 🕷️'], ['chi', '吃 chi 🍊'], ['shi', '狮 shi 🦁'], ['ri', '日 ri 🌅'], ['zi', '字 zi ✏️'], ['ci', '刺 ci 🦔'], ['si', '丝 si 🐛']] }] },
+    { t: '整体认读 ②', groups: [{ g: '剩余 6 个整体认读音节', items: [['ye', '夜 ye 🌃'], ['yue', '月 yue 🌙'], ['yuan', '圆 yuan ⭕'], ['yin', '音 yin 🎵'], ['yun', '云 yun ☁️'], ['ying', '鹰 ying 🦅']] }] },
+    { t: '总复习 · 闯关', groups: [{ g: '声母 23 个（按顺序读一遍）', items: [['b p m f', 'd t n l'], ['g k h', 'j q x'], ['zh ch sh r', 'z c s'], ['y w', '共 23 个']] }, { g: '韵母 24 个', items: [['a o e i u ü', '单韵母 6'], ['ai ei ui ao ou iu ie üe er', '复韵母 9'], ['an en in un ün', '前鼻 5'], ['ang eng ing ong', '后鼻 4']] }, { g: '整体认读 16 个', items: [['zhi chi shi ri zi ci si', 'yi wu yu'], ['ye yue yuan', 'yin yun ying']] }] }
+  ];
 
   function renderPinyin() {
 
@@ -12880,13 +12910,33 @@ window.MX_SEED = data;
         <div class="card-ext">${c.ext}</div>
 
         <button class="speak-btn" data-say="${c.main}" data-dir="pinyin">🔊</button>
+
         <button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="${c.main}">📕错题</button>
 
       </div>`).join('');
 
+    /* [#453] 21 天闯关：进度存 settings 键 pinyin21:<cid>（顶层 updatedAt → 行级新者胜，红线 17 正面示范） */
+    let _pyCid = Promise.resolve('default');
+    try { if (window.DB && DB.getActiveChildId) _pyCid = DB.getActiveChildId().then(function (i) { return i || 'default'; }); } catch (e) {}
+    const courseHtml = `
+
+      <div class="mx-card" id="pinyin21-card" style="margin-bottom:16px">
+
+        <div class="mx-card-t" style="display:flex;align-items:center;gap:8px">🗓️ 21 天拼音闯关 <span style="font-size:12px;color:#9aa;font-weight:400" id="py21-prog"></span></div>
+
+        <div id="py21-days" style="display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px"></div>
+
+        <div id="py21-body"></div>
+
+      </div>`;
+
     setSectionContent('page-pinyin', `
 
-      <div class="content-section-title">🔤 拼音认读 <span class="sub">点击卡片或喇叭播放发音</span></div>
+      <div class="content-section-title">🔤 拼音认读 <span class="sub">先闯关 · 再自由练</span></div>
+
+      ${courseHtml}
+
+      <div class="content-section-title" style="margin-top:6px">🔤 自由练习卡 <span class="sub">点击卡片或喇叭播放发音</span></div>
 
       <div class="study-cards" id="pinyin-grid">${cards}</div>
 
@@ -12894,10 +12944,76 @@ window.MX_SEED = data;
 
     bindSpeak('#pinyin-grid');
 
+    /* —— 21 天闯关渲染与交互 —— */
+    _pyCid.then(function (cid) {
+      const KEY = 'pinyin21:' + cid;
+      let prog = { done: {} };
+      let curDay = 1;
+      const root = document.getElementById('pinyin21-card');
+      if (!root) return;
+      function readProg() {
+        try {
+          return window.DB ? DB.get('settings', KEY).then(function (v) { return (v && v.value && v.value.done) ? v.value : { done: {} }; }).catch(function () { return { done: {} }; }) : Promise.resolve({ done: {} });
+        } catch (e) { return Promise.resolve({ done: {} }); }
+      }
+      function paint() {
+        const doneN = Object.keys(prog.done).length;
+        const pr = root.querySelector('#py21-prog');
+        if (pr) pr.textContent = '已完成 ' + doneN + ' / 21 天';
+        const daysEl = root.querySelector('#py21-days');
+        if (daysEl) daysEl.innerHTML = PINYIN_COURSE.map(function (d, i) {
+          const dn = i + 1;
+          const done = prog.done[dn];
+          const on = dn === curDay;
+          return '<button data-pyday="' + dn + '" style="flex:0 0 auto;border-radius:10px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;' +
+            (done ? 'background:#7ec850;color:#fff;border:0;' : on ? 'background:#e8f5e2;color:#4a8b2c;border:1.5px solid #7ec850;' : 'background:#f4f6f4;color:#8a99ad;border:0;') +
+            '">D' + dn + (done ? ' ✓' : '') + '</button>';
+        }).join('');
+        const body = root.querySelector('#py21-body');
+        if (!body) return;
+        const day = PINYIN_COURSE[curDay - 1];
+        body.innerHTML = '<div style="font-size:14px;font-weight:800;color:#3a5;margin:2px 0 8px">第 ' + curDay + ' 天 · ' + day.t + '</div>' +
+          day.groups.map(function (G) {
+            const cardsHtml = G.items.map(function (it) {
+              return '<div class="study-card" data-speak-zh="' + it[0] + '" style="min-width:112px">' +
+                '<div class="card-main">' + it[0] + '</div>' +
+                '<div class="card-ext">' + it[1] + '</div>' +
+                '<button class="speak-btn" data-say="' + it[0] + '" data-dir="pinyin">🔊</button>' +
+                '<button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + it[0] + '">📕</button></div>';
+            }).join('');
+            return '<div style="font-size:12px;font-weight:700;color:#789;margin:8px 0 6px">' + G.g + '</div>' +
+              '<div class="study-cards" style="margin-bottom:4px">' + cardsHtml + '</div>';
+          }).join('') +
+          '<div style="margin-top:10px">' + (prog.done[curDay]
+            ? '<span style="font-size:13px;color:#7ec850;font-weight:800">✅ 第 ' + curDay + ' 天已完成，继续加油！</span>'
+            : '<button id="py21-done" style="border:0;background:linear-gradient(90deg,#7ec850,#5cb832);color:#fff;border-radius:12px;padding:8px 22px;font-weight:800;font-size:14px;cursor:pointer">✅ 完成今天闯关（+5 积分 ⭐）</button>') + '</div>';
+        bindSpeak(body);
+        daysEl.querySelectorAll('[data-pyday]').forEach(function (b) {
+          b.onclick = function () { curDay = parseInt(b.getAttribute('data-pyday'), 10); paint(); };
+        });
+        const doneBtn = body.querySelector('#py21-done');
+        if (doneBtn) doneBtn.onclick = function () {
+          prog.done[curDay] = true;
+          const val = { d: 'p21', done: prog.done, updatedAt: Date.now() };
+          try { window.DB && DB.put('settings', { key: KEY, value: val, updatedAt: val.updatedAt }).catch(function () {}); } catch (e) {}
+          try { window.DB && DB.addPoints(cid, 5, '拼音闯关第' + curDay + '天完成').catch(function () {}); } catch (e) {}
+          try { if (window.showToast) showToast('🎉 第 ' + curDay + ' 天闯关成功！+5 积分 ⭐'); } catch (e) {}
+          let nxt = -1;
+          for (let i = 0; i < PINYIN_COURSE.length; i++) if (!prog.done[i + 1]) { nxt = i; break; }
+          curDay = nxt >= 0 ? nxt + 1 : curDay;
+          paint();
+        };
+      }
+      readProg().then(function (p) {
+        prog = p && p.done ? p : { done: {} };
+        let nxt = -1;
+        for (let i = 0; i < PINYIN_COURSE.length; i++) if (!prog.done[i + 1]) { nxt = i; break; }
+        curDay = nxt >= 0 ? nxt + 1 : PINYIN_COURSE.length;
+        paint();
+      });
+    });
+
   }
-
-
-
   /* =============================================
 
      4. 识字卡片（page-literacy）— 读取 js/data/words_core_200.json
@@ -13821,7 +13937,40 @@ window.MX_SEED = data;
           listenMin += _fsOv.listenMin || 0;
         }
       } catch (eOv) {}
-      return { tasksDone: tasksDone, listenMin: listenMin, wrong: wrong };
+      /* [#453] 新增三维：数学答题 / 体能运动 / 日常表现 */
+      let mathAns = 0, sportDone = 0, dailyDone = 0;
+      if (window.DB && DB.getAll) {
+        // 数学答题：积分流中数学类得分事件数（数感训练/数独/口算/算法口诀等）
+        try {
+          const pr = await DB.get('points', childId);
+          ((pr && pr.history) || []).forEach(function (h) {
+            if (!h || !(h.amount > 0)) return;
+            const t = h.time || 0;
+            if (t >= from && t <= now && /数学|数感|数独|口算|算法/.test(String(h.reason || ''))) mathAns++;
+          });
+        } catch (eM) {}
+        // 体能运动：sport:done:<日期> 完成动作数
+        try {
+          const ss = (await DB.getAll('settings').catch(function(){ return []; })) || [];
+          ss.forEach(function (r) {
+            if (!r || !r.key || String(r.key).indexOf('sport:done:') !== 0) return;
+            const dstr = String(r.key).slice('sport:done:'.length);
+            const t = new Date(dstr + 'T12:00:00').getTime();
+            if (t >= from && t <= now) sportDone += Object.keys(r.value || {}).length;
+          });
+        } catch (eS) {}
+        // 日常表现：daily:<cid>:<日期> 打卡完成数
+        try {
+          const ds = (await DB.getAll('daily').catch(function(){ return []; })) || [];
+          ds.forEach(function (r) {
+            if (!r || !r.id || String(r.id).indexOf('daily:' + childId + ':') !== 0) return;
+            const dstr = String(r.id).split(':').pop();
+            const t = new Date(dstr + 'T12:00:00').getTime();
+            if (t >= from && t <= now) dailyDone += Object.keys(r.done || {}).length;
+          });
+        } catch (eD) {}
+      }
+      return { tasksDone: tasksDone, listenMin: listenMin, wrong: wrong, mathAns: mathAns, sportDone: sportDone, dailyDone: dailyDone };
     }
     let wordsDone = 0, enWords = 0;
     if (window.DB && DB.getAll) {
@@ -13965,6 +14114,9 @@ window.MX_SEED = data;
         ovCard((o.listenMin || 0) + '′', '熏听时长(分)', '#26a69a') +
         ovCard(o.wordsDone || 0, '认字数', '#7ec850') +
         ovCard(o.enWords || 0, '英文单词', '#ab47bc') +
+        ovCard(o.mathAns || 0, '数学答题', '#ff9800') +
+        ovCard(o.sportDone || 0, '体能运动', '#ec407a') +
+        ovCard(o.dailyDone || 0, '日常表现', '#8d6e63') +
         ovCard(o.wrong || 0, '错题数', '#ef5350');
     }
     paintOv('today');
@@ -24181,6 +24333,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     function load(i){
       idx = (i + items.length) % items.length;
       var it = items[idx];
+      /* [#453] 上报熏听资源模块 → MXPomo 按音频真实播放归口「熏听时长」 */
+      try { if (window.MXPomo && MXPomo.setListen) MXPomo.setListen(it.module || 'listen'); } catch (e) {}
       var t = ov.querySelector('#mq-title'), ix = ov.querySelector('#mq-idx');
       if (t) t.textContent = it.title || '';
       if (ix) ix.textContent = '第 ' + (idx + 1) + ' / ' + items.length + ' 个（播完自动下一个）';
@@ -24200,6 +24354,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     ov.addEventListener('click', function(ev){
       if (ev.target === ov || (ev.target && ev.target.id === 'mq-close')) {
         try { audio.pause(); } catch (e) {}
+        try { if (window.MXPomo && MXPomo.setListen) MXPomo.setListen(null); } catch (e) {}   /* [#453] 关闭播放器停止熏听归口 */
         if (ov.parentNode) ov.parentNode.removeChild(ov);
         if (_qOv === ov) _qOv = null;
         if (_qUrl) { try { URL.revokeObjectURL(_qUrl); } catch (e) {} _qUrl = null; }
@@ -31602,10 +31757,11 @@ window.MX_SPRITE_COORDS = {
     'page-shop': '⭐ 积分兑换', 'page-gacha': '🎁 盲盒卡牌', 'page-achievements': '🏆 成就墙',
     'page-pet': '🐾 宠物养成', 'page-mall': '🏪 萌星好物',
     'page-tool-pinyin': '✍️ 拼音生成器', 'page-tool-math': '➕ 口算练习', 'page-tool-flash': '🃏 学习闪卡',
-    'page-tool-tomato': '🍅 番茄钟', 'page-tool-resources': '📦 免费资源'
+    'page-tool-tomato': '🍅 番茄钟', 'page-tool-resources': '📦 免费资源',
+    listen: '🎧 熏听'
   };
   /* [#452] 熏听类模块（真实停留分钟单独归口「熏听时长」） */
-  var LISTEN_KEYS = { 'page-listen': 1, 'page-listen-schedule': 1, 'listen-en': 1, 'listen-music': 1, lchinese: 1, lstory: 1, lsci: 1, lnews: 1, lmath: 1 };
+  var LISTEN_KEYS = { 'page-listen': 1, 'page-listen-schedule': 1, 'listen-en': 1, 'listen-music': 1, lchinese: 1, lstory: 1, lsci: 1, lnews: 1, lmath: 1, listen: 1 };
 
   function dayKey() {
     var d = new Date();
@@ -31653,12 +31809,26 @@ window.MX_SPRITE_COORDS = {
     }
     return MOD_LABEL[pid] ? pid : '';
   }
+  /* [#453] 音频真实播放检测：任何 <audio> 正在播放 → 视为熏听进行中（挂着听不算闲置） */
+  var listenMod = null;   /* 连播播放器上报的资源模块（listen-en/lchinese/...），null=通用 listen */
+  function setListen(k) { listenMod = k || null; }
+  function audioPlaying() {
+    try {
+      var as = document.querySelectorAll('audio');
+      for (var i = 0; i < as.length; i++) {
+        var a = as[i];
+        if (a.src && !a.paused && !a.ended && a.currentTime > 0) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
   function heartbeat() {
     try { if (document.visibilityState !== 'visible') return; } catch (e) {}
-    /* [#452] 闲置判定：长时间无点击/键盘/滚动/触摸 → 视为挂后台，不计时 */
-    if (Date.now() - lastAct > IDLE_MS) return;
-    var m = curModule();
+    /* [#453] 音频播放中 → 直接归口熏听计时，不受页面白名单与闲置判定限制（挂着听也是学习） */
+    var playing = audioPlaying();
+    var m = playing ? (listenMod || 'listen') : curModule();
     if (!m) return;
+    if (!playing && Date.now() - lastAct > IDLE_MS) return;   /* [#452] 闲置判定仅约束页面停留计时 */
     cidP().then(function (cid) { return ensureRow(cid); }).then(function (r) {
       if (r.value.d !== dayKey()) { row = null; return; }   /* 跨天 rollover（下一跳重建） */
       r.value.secs[m] = (r.value.secs[m] || 0) + TICK;
@@ -31729,10 +31899,10 @@ window.MX_SPRITE_COORDS = {
 
   /* ---------- 浮窗番茄钟 ---------- */
   var POMO_KEY = 'mx_pomo_run_v2';
-  var pomo = { mode: 'focus', len: 25 * 60, endTs: 0, running: false, pausedLeft: 0 };
+  var pomo = { mode: 'focus', len: 25 * 60, endTs: 0, running: false, pausedLeft: 0, focusLen: 25 * 60 };
   try {
     var _sv = JSON.parse(localStorage.getItem(POMO_KEY) || 'null');
-    if (_sv && _sv.len && _sv.mode) pomo = _sv;
+    if (_sv && _sv.len && _sv.mode) { pomo = _sv; if (!(pomo.focusLen >= 60)) pomo.focusLen = 25 * 60; }
   } catch (e) {}
   function pomoSave() { try { localStorage.setItem(POMO_KEY, JSON.stringify(pomo)); } catch (e) {} }
   function pomoLeft() { return pomo.running ? Math.max(0, Math.round((pomo.endTs - Date.now()) / 1000)) : (pomo.pausedLeft || pomo.len); }
@@ -31781,12 +31951,11 @@ window.MX_SPRITE_COORDS = {
       + '<div class="pp-chips">'
       + '<button class="pp-chip" data-len="15">15分</button>'
       + '<button class="pp-chip" data-len="25">25分</button>'
-      + '<button class="pp-chip" data-len="45">45分</button>'
       + '<button class="pp-chip" data-len="5">休息5分</button></div>'
       + '<div style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:8px">'
       + '<input id="pp-len" type="number" min="1" max="180" placeholder="自定义分钟(1-180)"'
       + ' style="width:118px;border:1px solid #ffd9b3;border-radius:8px;padding:3px 8px;font-size:12px"/>'
-      + '<button class="pp-chip" id="pp-len-ok">设为专注</button></div>'
+      + '<button class="pp-chip" id="pp-len-ok">设定时间</button></div>'
       + '<div class="pp-btns">'
       + '<button class="pp-btn pp-main" id="pp-run">▶ 开始</button>'
       + '<button class="pp-btn pp-sub" id="pp-done">✓ 完成</button>'
@@ -31814,8 +31983,11 @@ window.MX_SPRITE_COORDS = {
         settleBreak();
       }
     };
+    /* [#453] 重置：恢复到最近一次设定的专注时间（focusLen），非默认 25 分 */
     panel.querySelector('#pp-reset').onclick = function () {
-      pomo.running = false; pomo.pausedLeft = 0; pomoSave(); paintUi();
+      pomo.running = false; pomo.pausedLeft = 0;
+      pomo.mode = 'focus'; pomo.len = pomo.focusLen || 25 * 60;
+      pomoSave(); paintUi();
     };
     panel.querySelectorAll('.pp-chip[data-len]').forEach(function (b) {
       b.onclick = function () {
@@ -31824,6 +31996,7 @@ window.MX_SPRITE_COORDS = {
         var mn = parseInt(b.getAttribute('data-len'), 10);
         pomo.mode = mn >= 15 ? 'focus' : 'break';
         pomo.len = mn * 60;
+        if (pomo.mode === 'focus') pomo.focusLen = pomo.len;   /* [#453] 记住最近设定的专注时长 */
         pomo.running = false; pomo.pausedLeft = 0;
         pomoSave(); paintUi();
       };
@@ -31835,7 +32008,7 @@ window.MX_SPRITE_COORDS = {
       var mn = parseInt(inp && inp.value, 10);
       if (!(mn >= 1 && mn <= 180)) { try { if (window.showToast) window.showToast('请输入 1~180 的分钟数'); } catch (e) {} return; }
       panel.querySelectorAll('.pp-chip[data-len]').forEach(function (x) { x.classList.remove('on'); });
-      pomo.mode = 'focus'; pomo.len = mn * 60;
+      pomo.mode = 'focus'; pomo.len = mn * 60; pomo.focusLen = pomo.len;   /* [#453] 记住最近设定 */
       pomo.running = false; pomo.pausedLeft = 0;
       pomoSave(); paintUi();
     };
@@ -31865,7 +32038,7 @@ window.MX_SPRITE_COORDS = {
   }
   function settleBreak() {
     try { if (window.showToast) window.showToast('休息结束，继续加油！'); } catch (e) {}
-    pomo.mode = 'focus'; pomo.len = 25 * 60;
+    pomo.mode = 'focus'; pomo.len = pomo.focusLen || 25 * 60;   /* [#453] 回到最近设定的专注时长 */
     pomo.running = false; pomo.pausedLeft = 0;
     pomoSave();
   }
@@ -31936,6 +32109,7 @@ window.MX_SPRITE_COORDS = {
     summaryByDay: summaryByDay,
     curModule: curModule,
     flushNow: flush,
+    setListen: setListen,
     _heartbeat: heartbeat
   };
 })();
