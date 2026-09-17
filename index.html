@@ -3312,6 +3312,13 @@ html, body {
 .ov-card { flex: 1 1 0; min-width: 84px; background: var(--bg-elevated, #f7f9f7); border-radius: 12px; padding: 12px 8px; text-align: center; border-left: 3px solid var(--oa, #7ec850); }
 .ov-card .ov-num { font-size: 24px; font-weight: 800; color: var(--oa, #7ec850); line-height: 1.1; white-space: nowrap; }
 .ov-card .ov-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; white-space: nowrap; }
+/* [#PY463] 手机端统览 8 卡改 4×2 网格，不再横向翻页 */
+@media (max-width: 640px) {
+  .ov-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; overflow-x: visible; }
+  .ov-card { min-width: 0; padding: 8px 2px; border-left-width: 2px; border-radius: 10px; }
+  .ov-card .ov-num { font-size: 19px; }
+  .ov-card .ov-label { font-size: 10px; margin-top: 2px; white-space: normal; line-height: 1.25; }
+}
 
 
 
@@ -12706,11 +12713,17 @@ window.MX_SEED = data;
 
   /** HTML5 Audio 兜底用 TTS */
 
-  function speakTTS(text, lang) {
+  function speakTTS(text, lang, onEnd) {
+
+    let _fired = false;
+
+    const _done = () => { if (_fired) return; _fired = true; if (onEnd) { try { onEnd(); } catch (e2) {} } };
 
     if (!window.SpeechSynthesisUtterance || !window.speechSynthesis) {
 
       if (window.showToast) window.showToast('🔇 当前设备不支持语音');
+
+      _done();
 
       return;
 
@@ -12726,6 +12739,10 @@ window.MX_SEED = data;
 
     u.pitch = 1.1;
 
+    u.onend = _done;
+
+    u.onerror = _done;
+
     window.speechSynthesis.speak(u);
 
   }
@@ -12734,13 +12751,13 @@ window.MX_SEED = data;
 
   /** 核心播放入口：优先本地 MP3，失败回退 TTS */
 
-  function playAudio(text, lang, dir) {
+  function playAudio(text, lang, dir, onEnd) {
 
     const paths = resolveAudioPaths(text, lang, dir);
 
     let audioPlayed = false;
 
-    const fallback = () => { if (audioPlayed) return; audioPlayed = true; speakTTS(text, lang); };
+    const fallback = () => { if (audioPlayed) return; audioPlayed = true; speakTTS(text, lang, onEnd); };
 
 
 
@@ -12762,13 +12779,18 @@ window.MX_SEED = data;
 
       const onFail = () => { if (timer) { clearTimeout(timer); timer = null; } audio.onerror = audio.onplaying = audio.onended = null; tryPlay(i + 1); };
 
-      const onOk = () => { if (timer) { clearTimeout(timer); timer = null; } audioPlayed = true; audio.onerror = audio.onplaying = audio.onended = null; };
+      const onOk = () => { if (timer) { clearTimeout(timer); timer = null; } audioPlayed = true; audio.onerror = audio.onplaying = null; };
 
       audio.onerror = onFail;
 
       audio.onplaying = onOk;
 
-      audio.onended = onOk;
+      audio.onended = () => { onOk(); if (onEnd) { try { onEnd(); } catch (e3) {} } };
+
+      /* [#PY463] 全局互斥：新音频开播前停掉上一条，防连播叠音 */
+      try { if (window.__mxCurAudio && window.__mxCurAudio !== audio && !window.__mxCurAudio.paused) window.__mxCurAudio.pause(); } catch (e4) {}
+
+      window.__mxCurAudio = audio;
 
       audio.src = src;
 
@@ -12795,6 +12817,29 @@ window.MX_SEED = data;
   /** 兼容旧接口 */
 
   function speak(text, lang, dir) { playAudio(text, lang, dir); }
+
+  /* [#PY463] 序列播放：字符串=拼音本地音频；{tts:'文本'}=中文TTS；前一个读完自动接后一个 */
+  function speakSeq(items, lang, dir) {
+
+    if (!items || !items.length) return;
+
+    let i = 0;
+
+    const next = () => {
+
+      if (i >= items.length) return;
+
+      const it2 = items[i++];
+
+      if (it2 && typeof it2 === 'object' && it2.tts) speakTTS(it2.tts, 'zh-CN', next);
+
+      else playAudio(it2, lang, dir, function () { setTimeout(next, 260); });
+
+    };
+
+    next();
+
+  }
 
   window.MXSpeak = playAudio;
   window.mxPlayAudio = playAudio; /* [PY456] 外部模块（拼音生成器等）统一播放入口 */
@@ -12984,7 +13029,7 @@ window.MX_SEED = data;
       '.py-chip.on{background:#e8f5e2;border-color:#7ec850;color:#4a8b2c}' +
       '.py-tone-card{background:#fff8f0;border:1.5px solid #ffd9b3;border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s}' +
       '.py-tone-card:hover{transform:translateY(-2px)}' +
-      '.py-tone-card .t{font-size:34px;font-weight:800;color:#e5484d;line-height:1.15}' +
+      '.py-tone-card .t{font-size:clamp(40px,11vw,58px);font-weight:800;color:#e5484d;line-height:1.15}' +
       '.py-tone-card .n{font-size:12px;color:#9aa;margin-top:4px}';
     document.head.appendChild(st);
   }
@@ -13000,19 +13045,34 @@ window.MX_SEED = data;
       });
     });
   }
+  /* [#PY463] 拼音卡覆盖表：SEQ=发音序列（标调口诀读拼音字母音，不读英文）；ART=图标修正（ǎ=下坡再上坡）；CTX=大卡语境读音 */
+  const PY_SAY_OVR = { '有 a 不放过': ['a'], '没 a 找 o e': ['a', 'o', 'e'] };
+  const PY_ART_OVR = { 'ǎ': '↘️↗️' };
+  function pyCtxPhrase(tip) {
+    let s = String(tip || '').replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim();
+    const m = s.match(/^(.+?)\s*[a-zü]+\s*$/iu);
+    if (!m) return '';
+    const pre = m[1].trim();
+    return (pre && /[^a-zA-Z]/.test(pre)) ? pre : '';
+  }
   function pyCardHtml(it) {
     const m = _pyMaster[it.p] ? ' on' : '';
-    return '<div class="study-card" data-py="' + it.p + '" data-pytip="' + it.tip + '" data-pycat="' + it.cat + '" data-pyday="' + it.day + '" data-pyemoji="' + it.emoji + '" data-speak-zh="' + it.p + '" title="点开看四声大卡">' +
-      '<div class="card-art" style="font-size:42px;width:78px;height:78px">' + it.emoji + '</div>' +
+    const em = PY_ART_OVR[it.p] || it.emoji;
+    const wide = em.replace(/\uFE0F/g, '').length > 1;
+    const seq = PY_SAY_OVR[it.p];
+    return '<div class="study-card" data-py="' + it.p + '" data-pytip="' + it.tip + '" data-pycat="' + it.cat + '" data-pyday="' + it.day + '" data-pyemoji="' + em + '" data-speak-zh="' + it.p + '" title="点开看四声大卡">' +
+      '<div class="card-art" style="font-size:' + (wide ? 26 : 42) + 'px;width:78px;height:78px">' + em + '</div>' +
       '<div class="card-main" style="font-size:32px;color:#e5484d">' + it.p + '</div>' +
       '<div class="card-ext" style="font-size:13px">' + it.tip + '</div>' +
       '<div style="display:flex;gap:5px;width:100%">' +
-      '<button class="speak-btn" data-say="' + it.p + '" data-dir="pinyin" style="flex:1;min-width:0">🔊</button>' +
+      '<button class="speak-btn" data-say="' + it.p + '"' + (seq ? ' data-sayseq="' + seq.join('|') + '"' : '') + ' data-dir="pinyin" style="flex:1;min-width:0">🔊</button>' +
       '<button class="py-master' + m + '" data-pym="' + it.p + '">✓掌握</button>' +
       '<button class="mx-wrong-add" data-wrong-add data-wrong-subject="拼音认读" data-wrong-q="' + it.p + '" style="flex:1;margin-top:0">📕错题</button></div></div>';
   }
   function pyOpenModal(it) {
     pyCloseModal();
+    const em = PY_ART_OVR[it.p] || it.emoji;
+    const wide = em.replace(/\uFE0F/g, '').length > 1;
     const t4 = pyTone4(it.p);
     const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
     let tones = '';
@@ -13031,8 +13091,8 @@ window.MX_SEED = data;
     ov.innerHTML = '<div style="background:var(--card-bg,#fff);border-radius:22px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative">' +
       '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
       '<div style="display:flex;align-items:center;gap:16px">' +
-      '<div style="flex:0 0 92px;width:92px;height:92px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:52px">' + it.emoji + '</div>' +
-      '<div style="min-width:0"><div style="font-size:54px;font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' +
+      '<div style="flex:0 0 104px;width:104px;height:104px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 32 : 58) + 'px">' + em + '</div>' +
+      '<div style="min-width:0"><div style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' +
       '<div style="font-size:14px;color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
@@ -13043,7 +13103,14 @@ window.MX_SEED = data;
     document.body.appendChild(ov);
     ov.addEventListener('click', function (e) { if (e.target === ov) pyCloseModal(); });
     ov.querySelector('#py-modal-x').onclick = pyCloseModal;
-    ov.querySelector('#py-modal-say').onclick = function () { speak(it.p, 'zh-CN', 'pinyin'); };
+    /* [#PY463] 大卡跟我读：优先发音序列（口诀），其次语境读音（阿姨的a），否则单音 */
+    ov.querySelector('#py-modal-say').onclick = function () {
+      const seq = PY_SAY_OVR[it.p];
+      if (seq) { speakSeq(seq, 'zh-CN', 'pinyin'); return; }
+      const ctx = pyCtxPhrase(it.tip);
+      if (ctx) { speakSeq([{ tts: ctx }, it.p], 'zh-CN', 'pinyin'); return; }
+      speak(it.p, 'zh-CN', 'pinyin');
+    };
     ov.querySelectorAll('[data-tone-say]').forEach(function (c) {
       c.onclick = function () { speak(c.getAttribute('data-tone-say'), 'zh-CN', 'pinyin'); };
     });
@@ -13654,6 +13721,11 @@ window.MX_SEED = data;
 
     if (!container) return;
 
+    /* [#PY463] 幂等防叠加：paint() 每次渲染重复调用 bindSpeak 会在同一元素上叠加监听，导致点一次连播 N 遍 */
+    if (container.__spkBound) return;
+
+    container.__spkBound = 1;
+
     container.addEventListener('click', (e) => {
 
       const card = e.target.closest('.study-card');
@@ -13672,7 +13744,10 @@ window.MX_SEED = data;
 
         btn.classList.add('speaking');
 
-        speak(text, lang, dir);
+        /* [#PY463] 支持序列发音（data-sayseq="a|o|e"，标调口诀读拼音字母音） */
+        if (btn.dataset.sayseq) speakSeq(btn.dataset.sayseq.split('|'), lang, dir);
+
+        else speak(text, lang, dir);
 
         setTimeout(() => btn.classList.remove('speaking'), 1200);
 
@@ -13684,7 +13759,15 @@ window.MX_SEED = data;
 
         const sbtn = card.querySelector('.speak-btn');
 
-        if (say) {
+        if (sbtn && sbtn.dataset.sayseq) {
+
+          sbtn.classList.add('speaking');
+
+          speakSeq(sbtn.dataset.sayseq.split('|'), sbtn.dataset.lang || 'zh-CN', sbtn.dataset.dir || '');
+
+          setTimeout(() => sbtn.classList.remove('speaking'), 1200);
+
+        } else if (say) {
 
           if (sbtn) sbtn.classList.add('speaking');
 
