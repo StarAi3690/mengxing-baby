@@ -13038,7 +13038,9 @@ window.MX_SEED = data;
       '.py-tone-card{background:#fff8f0;border:1.5px solid #ffd9b3;border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s}' +
       '.py-tone-card:hover{transform:translateY(-2px)}' +
       '.py-tone-card .t{font-size:clamp(40px,11vw,58px);font-weight:800;color:#e5484d;line-height:1.15}' +
-      '.py-tone-card .n{font-size:12px;color:#9aa;margin-top:4px}';
+      '.py-tone-card .n{font-size:12px;color:#9aa;margin-top:4px}' +
+      /* [PY467] 拼音页标签页：手机端 3 个均分不换行 */
+      '#py-tabs .mx-tab{min-width:0;flex:1;padding:8px 4px;font-size:13.5px}';
     document.head.appendChild(st);
   }
   let PY_FLAT = [];
@@ -13069,7 +13071,7 @@ window.MX_SEED = data;
     const m = _pyMaster[it.p] ? ' on' : '';
     const em = PY_ART_OVR[it.p] || it.emoji;
     const wide = em.replace(/\uFE0F/g, '').length > 1;
-    const seq = PY_SAY_OVR[it.p];
+    const seq = (it.seq && it.seq.length) ? it.seq : PY_SAY_OVR[it.p]; /* [PY467] 音节组合卡片=三段拼读序列 */
     return '<div class="study-card" data-py="' + it.p + '" data-pytip="' + it.tip + '" data-pycat="' + it.cat + '" data-pyday="' + it.day + '" data-pyemoji="' + em + '" data-speak-zh="' + it.p + '" title="点开看四声大卡">' +
       '<div class="card-art" style="font-size:' + (wide ? 26 : 42) + 'px;width:78px;height:78px">' + em + '</div>' +
       '<div class="card-main" style="font-size:32px;color:#e5484d">' + it.p + '</div>' +
@@ -13084,10 +13086,17 @@ window.MX_SEED = data;
     const em = PY_ART_OVR[it.p] || it.emoji;
     const wide = em.replace(/\uFE0F/g, '').length > 1;
     const t4 = pyTone4(it.p);
+    /* [PY467] 音节组合：调级示例行（点四声小卡时大字/图标/示例字一起联动切换） */
+    const isComb = it.cat === '音节组合';
+    let exRow = '';
+    if (isComb) {
+      const exN0 = pycExOf(it.p);
+      if (exN0.txt) exRow = '<div id="py-modal-ex" style="font-size:clamp(20px,5.4vw,28px);font-weight:800;color:#4a8b2c;margin-top:6px">' + exN0.em + ' ' + exN0.txt + '</div>';
+    }
     const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
     let tones = '';
     if (t4) {
-      tones = '<div style="font-size:13px;font-weight:800;color:#789;margin:14px 0 8px">🔤 四声读一读（点小卡发音）</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
+      tones = '<div style="font-size:13px;font-weight:800;color:#789;margin:14px 0 8px">' + (isComb ? '🔤 四声读一读（点小卡：发音 + 换示例字）' : '🔤 四声读一读（点小卡发音）') + '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
         t4.map(function (s, i) { return '<div class="py-tone-card" data-tone-say="' + s + '"><div class="t">' + s + '</div><div class="n">' + tNames[i] + '</div></div>'; }).join('') + '</div>';
     } else if (String(it.p).indexOf(' ') >= 0) {
       tones = '<div style="margin-top:14px;padding:10px 12px;background:#eef7ea;border-radius:12px;font-size:13px;color:#4a8b2c">📖 整行跟读：按顺序把每个读一遍，读熟就算过关！</div>';
@@ -13101,8 +13110,8 @@ window.MX_SEED = data;
     ov.innerHTML = '<div style="background:var(--card-bg,#fff);border-radius:22px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative">' +
       '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
       '<div style="display:flex;align-items:center;gap:16px">' +
-      '<div style="flex:0 0 104px;width:104px;height:104px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 32 : 58) + 'px">' + em + '</div>' +
-      '<div style="min-width:0"><div style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' +
+      '<div id="py-modal-em" style="flex:0 0 104px;width:104px;height:104px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 32 : 58) + 'px">' + em + '</div>' +
+      '<div style="min-width:0"><div id="py-modal-py" style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' + exRow +
       '<div style="font-size:clamp(17px,4.6vw,22px);color:#789;margin-top:6px">' + it.tip + '<br> /* [#PY466] */<b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
@@ -13117,6 +13126,8 @@ window.MX_SEED = data;
     ov.querySelector('#py-modal-say').onclick = function () {
       const seq = PY_SAY_OVR[it.p];
       if (seq) { speakSeq(seq, 'zh-CN', 'pinyin'); return; }
+      /* [PY467] 音节组合跟读：三段拼读 b - ó - bó */
+      if (isComb) { const q4 = pycSeq3(it.p); if (q4) { speakSeq(q4, 'zh-CN', 'pinyin'); return; } }
       const ctx = pyCtxPhrase(it.tip);
       if (ctx) {
         /* [#PY466] 语境读音顺序：先读字母(拼音音)，再读「语境的+字母」——b, 广播的b */
@@ -13125,8 +13136,24 @@ window.MX_SEED = data;
       }
       speak(it.p, 'zh-CN', 'pinyin');
     };
+    /* [PY467] 四声小卡：音节组合=三段拼读 b-ó-bó + 顶部大字/图标/示例字联动 */
     ov.querySelectorAll('[data-tone-say]').forEach(function (c) {
-      c.onclick = function () { speak(c.getAttribute('data-tone-say'), 'zh-CN', 'pinyin'); };
+      c.onclick = function () {
+        const s = c.getAttribute('data-tone-say');
+        if (isComb) {
+          const q3 = pycSeq3(s);
+          if (q3) speakSeq(q3, 'zh-CN', 'pinyin'); else speak(s, 'zh-CN', 'pinyin');
+          const exN = pycExOf(s);
+          const emEl = ov.querySelector('#py-modal-em');
+          const pyEl = ov.querySelector('#py-modal-py');
+          const exEl = ov.querySelector('#py-modal-ex');
+          if (pyEl) pyEl.textContent = s;
+          if (emEl && exN.em) emEl.textContent = exN.em;
+          if (exEl && exN.txt) exEl.textContent = exN.em + ' ' + exN.txt;
+          return;
+        }
+        speak(s, 'zh-CN', 'pinyin');
+      };
     });
     ov.querySelector('#py-modal-master').onclick = function () {
       if (_pyMaster[it.p]) delete _pyMaster[it.p]; else _pyMaster[it.p] = 1;
@@ -13173,6 +13200,68 @@ window.MX_SEED = data;
     if (iu >= 0) return s.slice(0, iu) + PY_TONE[s[iu]][t - 1] + s.slice(iu + 1);
     return s;
   }
+  /* [#PY467] 调级示例表：key=带调音节 -> [汉字, emoji]。点 bō 显「播📻」、点 bó 显「伯🧔」（用户点名）。回退链：PYC_EX2[带调] > PYC_EX[base] > 🧩 */
+  const PYC_EX2 = {
+    'āi': ['挨', '🤝'], 'āo': ['凹', '🕳️'],
+    'bā': ['八', '8️⃣'], 'bá': ['拔', '🥕'], 'bǎ': ['把', '🖐️'], 'bà': ['爸', '👨'],
+    'bǐ': ['笔', '🖊️'], 'bō': ['播', '📻'], 'bó': ['伯', '🧔'], 'bǒ': ['跛', '🦯'], 'bò': ['簸', '🌾'], 'bù': ['不', '🚫'],
+    'cā': ['擦', '🧽'], 'cè': ['测', '📏'], 'chá': ['茶', '🍵'], 'chē': ['车', '🚗'], 'chī': ['吃', '🍚'], 'chū': ['出', '🚪'],
+    'chuō': ['戳', '👆'], 'cì': ['刺', '🦔'], 'cù': ['醋', '🧴'], 'cuò': ['错', '❌'],
+    'dà': ['大', '🐘'], 'dī': ['低', '🧎'], 'dú': ['读', '📖'], 'duō': ['多', '🪷'],
+    'ēi': ['诶', '😲'],
+    'fà': ['发', '💇'], 'fó': ['佛', '🛕'], 'fù': ['付', '💳'],
+    'gā': ['嘎', '🦆'], 'gē': ['哥', '👦'], 'gǔ': ['骨', '🦴'], 'guā': ['瓜', '🍉'], 'guó': ['国', '🇨🇳'],
+    'hā': ['哈', '😂'], 'hē': ['喝', '💧'], 'hǔ': ['虎', '🐯'], 'huā': ['花', '🌸'], 'huǒ': ['火', '🔥'],
+    'jī': ['鸡', '🐔'], 'jiā': ['家', '🏠'], 'jú': ['橘', '🍊'], 'jǜ': ['句', '💬'],
+    'kǎ': ['卡', '🎫'], 'kē': ['科', '🔬'], 'kū': ['哭', '😭'], 'kuā': ['夸', '🏆'], 'kuò': ['扩', '🔍'],
+    'lā': ['拉', '🪵'], 'lù': ['路', '🛣️'], 'luò': ['落', '🍂'],
+    'mā': ['妈', '👩'], 'má': ['麻', '🪢'], 'mǎ': ['马', '🐴'], 'mà': ['骂', '😠'], 'mǐ': ['米', '🥣'], 'mō': ['摸', '✋'], 'mù': ['木', '🌲'],
+    'ná': ['拿', '🤲'], 'nǐ': ['你', '🧑'], 'niū': ['妞', '👧'], 'nuō': ['挪', '🚚'],
+    'ōu': ['鸥', '🕊️'],
+    'pá': ['爬', '🧗'], 'pī': ['披', '🧣'], 'pō': ['坡', '⛰️'], 'pù': ['铺', '🏪'],
+    'qī': ['七', '7️⃣'], 'qiā': ['掐', '🤏'], 'qù': ['去', '🚶'],
+    'rè': ['热', '🥵'], 'rì': ['日', '☀️'], 'ruò': ['弱', '🪶'],
+    'sǎ': ['撒', '🧂'], 'sè': ['色', '🎨'], 'shā': ['沙', '🏖️'], 'shī': ['狮', '🦁'], 'shū': ['书', '📕'],
+    'shuā': ['刷', '🪥'], 'shuō': ['说', '🗣️'], 'sī': ['丝', '🧵'], 'sù': ['速', '💨'], 'suǒ': ['锁', '🔒'],
+    'tā': ['它', '🐾'], 'tè': ['特', '⭐'], 'tī': ['踢', '⚽'], 'tú': ['图', '🖼️'], 'tuō': ['脱', '🧥'],
+    'wā': ['蛙', '🐸'], 'wǒ': ['我', '🙋'], 'wǔ': ['五', '5️⃣'],
+    'xī': ['西', '🌅'], 'xiā': ['虾', '🦐'],
+    'yā': ['鸭', '🦆'], 'yè': ['叶', '🍃'], 'yī': ['一', '1️⃣'], 'yú': ['鱼', '🐟'], 'yuè': ['月', '🌙'],
+    'zá': ['杂', '🧺'], 'zé': ['择', '🤔'],
+    'zhā': ['扎', '📌'], 'zhè': ['这', '👉'], 'zhī': ['知', '🧠'], 'zhū': ['猪', '🐷'], 'zhuā': ['抓', '✊'],
+    'zhuō': ['桌', '🪑'], 'zì': ['字', '🔤'], 'zú': ['足', '🦶'], 'zuò': ['坐', '🧘']
+  };
+  /* [#PY467] 三段拼读：声母白名单（名称音走 MX_PY_NAME_ALT 真人录音） */
+  const PYC_SM_OK = { b: 1, p: 1, m: 1, f: 1, d: 1, t: 1, n: 1, l: 1, g: 1, k: 1, h: 1, j: 1, q: 1, x: 1, zh: 1, ch: 1, sh: 1, r: 1, z: 1, c: 1, s: 1, y: 1, w: 1 };
+  /* [#PY467] 韵母独立录音白名单（a/ai/an/... o/ou + i/u/ü 走 yi/wu/yu）；其余复合韵母无录音退两段 */
+  const PYC_FIN_AUDIO = { a: 1, ai: 1, an: 1, ang: 1, ao: 1, e: 1, ei: 1, en: 1, eng: 1, er: 1, o: 1, ou: 1, i: 1, u: 1, 'ü': 1 };
+  /* [#PY467] 三段拼读序列：bó -> ['@b', '@ó', '@bó']（声母名称音+带调韵母+整音节）
+     韵母无录音时退两段 ['@b', '@bó']；无声母/声母不合法时返回 null（单音兜底） */
+  function pycSeq3(p) {
+    const s = String(p || '').split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+    if (!s) return null;
+    let fin = pycFinalOf(s);
+    if (fin === 'a' && /[iu]a$/.test(s)) fin = s.slice(-2); /* hua/xia 类：pycFinalOf 会误拆出 'a'，修正为 ua/ia */
+    if (fin === 'o' && /uo$/.test(s)) fin = 'uo'; /* duo/tuo/guo 类：误拆出 'o'，修正为 uo */
+    if (fin === 'ao' && /iao$/.test(s)) fin = 'iao'; /* biao/xiao 类：误拆出 'ao'，修正为 iao */
+    if (!fin) return null;
+    const ini = s.slice(0, s.length - fin.length);
+    if (!ini || !PYC_SM_OK[ini]) return null;
+    const finT = String(p).slice(-fin.length);
+    const seq = ['@' + ini];
+    if (PYC_FIN_AUDIO[fin]) seq.push('@' + finT);
+    seq.push('@' + p);
+    return seq;
+  }
+  /* [#PY467] 调级示例查找：PYC_EX2[带调] 优先，回退 PYC_EX[base]（去 emoji 取文字） */
+  function pycExOf(s) {
+    const e2 = PYC_EX2[s];
+    if (e2) return { em: e2[1], txt: e2[0] };
+    const b = String(s || '').split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+    const e1 = PYC_EX[b];
+    if (e1) return { em: pyEmoji(e1), txt: String(e1).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim() };
+    return { em: '', txt: '' };
+  }
   function pyCombInit(cid) {
     const lvChips = document.getElementById('pyc-lv-chips');
     if (!lvChips || lvChips.dataset.done) return;
@@ -13209,9 +13298,11 @@ window.MX_SEED = data;
         const base = tk.slice(0, -1);
         const fin = pycFinalOf(base);
         const ini = fin ? base.slice(0, Math.max(base.length - fin.length, 0)) : base;
-        const ex = PYC_EX[base] || '';
+        /* [PY467] 调级示例：PYC_EX2[带调] 优先，回退 PYC_EX[base]；卡片发音=三段拼读 */
+        const ex2 = PYC_EX2[toned(tk)];
+        const ex = ex2 ? (ex2[1] + ' ' + ex2[0]) : (PYC_EX[base] || '');
         const tip = (ini && fin ? ini + ' + ' + fin : base) + (ex ? ' ｜ ' + ex : '');
-        return pyCardHtml({ p: toned(tk), tip: tip, cat: '音节组合', day: '', emoji: ex ? pyEmoji(ex) : '🧩' });
+        return pyCardHtml({ p: toned(tk), tip: tip, cat: '音节组合', day: '', emoji: ex ? pyEmoji(ex) : '🧩', seq: pycSeq3(toned(tk)) });
       });
       grid.innerHTML = list.join('') || '<div class="empty-tip" style="grid-column:1/-1">这个韵母暂时没有组合～</div>';
       try { bindSpeak(grid); } catch (e) {}
@@ -13233,17 +13324,18 @@ window.MX_SEED = data;
     pyInjectStyle();
     pyBuildFlat();
     const courseHtml = `
+      <div class="mx-tabs" id="py-tabs" style="margin-bottom:14px"><button type="button" class="mx-tab on" data-pytab="21">🗓️ 21天闯关</button><button type="button" class="mx-tab" data-pytab="cat">🏷️ 分类练习</button><button type="button" class="mx-tab" data-pytab="comb">🧩 音节组合</button></div>
       <div class="mx-card" id="pinyin21-card" style="margin-bottom:16px">
         <div class="mx-card-t" style="display:flex;align-items:center;gap:8px">🗓️ 21 天拼音闯关 <span style="font-size:12px;color:#9aa;font-weight:400" id="py21-prog"></span><span style="font-size:12px;color:#c5a572;font-weight:400">（任意天可点）</span></div>
         <div id="py21-days" style="display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px"></div>
         <div id="py21-body"></div>
       </div>
-      <div class="mx-card" style="margin-bottom:16px">
+      <div class="mx-card" id="py-cat-card" style="margin-bottom:16px">
         <div class="mx-card-t">🏷️ 分类练习 <span style="font-size:12px;color:#9aa;font-weight:400">（选分类出卡片 · 点卡片看四声大卡）</span></div>
         <div id="py-cat-chips" style="display:flex;gap:8px;overflow-x:auto;padding:6px 0 12px"></div>
         <div class="study-cards" id="py-cat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>
       </div>
-      <div class="mx-card" style="margin-bottom:16px">
+      <div class="mx-card" id="py-comb-card" style="margin-bottom:16px">
         <div class="mx-card-t">🧩 音节组合 <span style="font-size:12px;color:#9aa;font-weight:400">（声母 × 韵母 · 点卡片看四声大卡）</span></div>
         <div id="pyc-lv-chips" style="display:flex;gap:8px;overflow-x:auto;padding:6px 0 4px"></div>
         <div id="pyc-fin-chips" style="display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px"></div>
@@ -13260,6 +13352,22 @@ window.MX_SEED = data;
       pyMasterLoad(cid).then(function () { pyInit(cid); });
     });
     function pyInit(cid) {
+      /* [PY467] 三模块标签页快捷切换（对齐家长工作台标签页交互） */
+      const tabBar = document.getElementById('py-tabs');
+      if (tabBar && !tabBar.dataset.pyTab) {
+        tabBar.dataset.pyTab = '1';
+        const tabCards = { '21': 'pinyin21-card', 'cat': 'py-cat-card', 'comb': 'py-comb-card' };
+        tabBar.querySelectorAll('[data-pytab]').forEach(function (b) {
+          b.onclick = function () {
+            const t = b.getAttribute('data-pytab');
+            tabBar.querySelectorAll('[data-pytab]').forEach(function (x) { x.classList.toggle('on', x === b); });
+            Object.keys(tabCards).forEach(function (k) {
+              const el = document.getElementById(tabCards[k]);
+              if (el) el.style.display = (k === t) ? '' : 'none';
+            });
+          };
+        });
+      }
       const KEY = 'pinyin21:' + cid;
       let prog = { done: {} };
       let curDay = 1;
