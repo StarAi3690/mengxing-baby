@@ -12639,7 +12639,7 @@ window.MX_SEED = data;
   const MX_PY_TONE_MAP = { 'ā': ['a', '1'], 'á': ['a', '2'], 'ǎ': ['a', '3'], 'à': ['a', '4'], 'ē': ['e', '1'], 'é': ['e', '2'], 'ě': ['e', '3'], 'è': ['e', '4'], 'ī': ['i', '1'], 'í': ['i', '2'], 'ǐ': ['i', '3'], 'ì': ['i', '4'], 'ō': ['o', '1'], 'ó': ['o', '2'], 'ǒ': ['o', '3'], 'ò': ['o', '4'], 'ū': ['u', '1'], 'ú': ['u', '2'], 'ǔ': ['u', '3'], 'ù': ['u', '4'], 'ǖ': ['v', '1'], 'ǘ': ['v', '2'], 'ǚ': ['v', '3'], 'ǜ': ['v', '4'], 'ü': ['v', ''] };
   /* [#PY466] 拼音字母 → 名称音音节候选(《汉语拼音方案》声母名称音: b玻 p坡 m摸 f佛 d得 t特 n讷 l勒 g哥 k科 h喝 j鸡 q欺 x希 zh知 ch吃 sh诗 r日 z资 c雌 s思 y衣 w乌; i/u/ü→yi/wu/yu)。
      真人录音库 audio-cmn 只录音节无独立声母, 裸声母此前全部回退 TTS 读成英文字母音(D4 的 b/p/m/f 实锤)。含数字后缀(fo2)=固定调直接用, 否则拼当前调号 */
-  const MX_PY_NAME_ALT = { 'b': ['bo'], 'p': ['po'], 'm': ['mo'], 'f': ['fo2', 'fo'], 'd': ['de2', 'de'], 't': ['te4', 'te'], 'n': ['ne4', 'ne'], 'l': ['le4', 'le'], 'g': ['ge'], 'k': ['ke'], 'h': ['he'], 'j': ['ji'], 'q': ['qi'], 'x': ['xi'], 'zh': ['zhi'], 'ch': ['chi'], 'sh': ['shi'], 'r': ['ri4'], 'z': ['zi1', 'zi'], 'c': ['ci2', 'ci'], 's': ['si'], 'y': ['yi'], 'w': ['wu'], 'i': ['yi'], 'u': ['wu'], 'v': ['yu'] };
+  const MX_PY_NAME_ALT = { 'b': ['bo'], 'p': ['po'], 'm': ['mo'], 'f': ['fo2', 'fo'], 'd': ['de2', 'de'], 't': ['te4', 'te'], 'n': ['ne4', 'ne'], 'l': ['le4', 'le'], 'g': ['ge'], 'k': ['ke'], 'h': ['he'], 'j': ['ji'], 'q': ['qi'], 'x': ['xi'], 'zh': ['zhi'], 'ch': ['chi'], 'sh': ['shi'], 'r': ['ri4'], 'z': ['zi1', 'zi'], 'c': ['ci1', 'ci2'], 's': ['si'], 'y': ['yi'], 'w': ['wu'], 'i': ['yi'], 'u': ['wu'], 'v': ['yu'], 'in': ['yin'], 'ing': ['ying'], 'un': ['wen'], 'ong': ['weng'], 'ueng': ['weng'], 'ia': ['ya'], 'ua': ['wa'], 'iao': ['yao'], 'uai': ['wai'], 'iu': ['you'], 'ui': ['wei'], 'ie': ['ye'], 'uo': ['wo'], 'ian': ['yan'], 'uan': ['wan'], 'iang': ['yang'], 'uang': ['wang'], 'iong': ['yong'], 've': ['yue'], 'van': ['yuan'], 'vn': ['yun'] }; /* [#PY470] c 呼读音呲(ci1)优先; 复合韵母全部映射 y/w 系真人录音(in→yin/un→wen/vn→yun/iao→yao/uo→wo...) */
 
   function pinyinAudioCandidates(text) {
     let s = String(text == null ? '' : text).trim().toLowerCase();
@@ -12719,7 +12719,16 @@ window.MX_SEED = data;
 
   /** HTML5 Audio 兜底用 TTS */
 
+  /* [#PY470] 拼音 TTS 兜底中文字表：本地音频全失败时 TTS 读中文名称字，绝不读英文字母 */
+  const MX_PY_TTS_CN = { b: '玻', p: '坡', m: '摸', f: '佛', d: '得', t: '特', n: '讷', l: '勒', g: '哥', k: '科', h: '喝', j: '基', q: '欺', x: '希', zh: '知', ch: '吃', sh: '诗', r: '日', z: '资', c: '呲', s: '思', y: '衣', w: '乌', i: '衣', u: '乌', v: '鱼', ü: '鱼', a: '啊', o: '喔', e: '鹅', ai: '爱', ei: '欸', ao: '凹', ou: '欧', an: '安', en: '恩', ang: '昂', eng: '鞥', er: '儿', ia: '呀', ie: '耶', iao: '腰', iu: '优', ian: '烟', in: '因', iang: '央', ing: '英', iong: '雍', ua: '蛙', uo: '窝', uai: '歪', ui: '威', uan: '弯', un: '温', uang: '汪', ueng: '翁', ong: '嗡', 'üe': '约', 'üan': '冤', 'ün': '晕' };
   function speakTTS(text, lang, onEnd) {
+
+    /* [#PY470] 纯拼音串兜底：TTS 读中文名称字（len≤4 防误伤英文单词） */
+    const raw0 = String(text == null ? '' : text).trim();
+    if ((lang || 'zh-CN').indexOf('en') !== 0 && /^[a-züāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]{1,4}$/.test(raw0)) {
+      const deto0 = raw0.split('').map(function (c0) { return PY_DETONE[c0] || c0; }).join('');
+      if (MX_PY_TTS_CN[deto0]) text = MX_PY_TTS_CN[deto0];
+    }
 
     let _fired = false;
 
@@ -13071,7 +13080,7 @@ window.MX_SEED = data;
     const m = _pyMaster[it.p] ? ' on' : '';
     const em = PY_ART_OVR[it.p] || it.emoji;
     const wide = em.replace(/\uFE0F/g, '').length > 1;
-    const seq = (it.seq && it.seq.length) ? it.seq : PY_SAY_OVR[it.p]; /* [PY467] 音节组合卡片=三段拼读序列 */
+    const seq = (it.seq && it.seq.length) ? it.seq : (PY_SAY_OVR[it.p] || pycSeq3(it.p)); /* [#PY470] 三模块通用：闯关/分类拼读卡自动三段拼读 */
     return '<div class="study-card" data-py="' + it.p + '" data-pytip="' + it.tip + '" data-pycat="' + it.cat + '" data-pyday="' + it.day + '" data-pyemoji="' + em + '" data-speak-zh="' + it.p + '" title="点开看四声大卡">' +
       '<div class="card-art" style="font-size:' + (wide ? 26 : 42) + 'px;width:78px;height:78px">' + em + '</div>' +
       '<div class="card-main" style="font-size:32px;color:#e5484d">' + it.p + '</div>' +
@@ -13086,17 +13095,19 @@ window.MX_SEED = data;
     const em = PY_ART_OVR[it.p] || it.emoji;
     const wide = em.replace(/\uFE0F/g, '').length > 1;
     const t4 = pyTone4(it.p);
-    /* [PY467] 音节组合：调级示例行（点四声小卡时大字/图标/示例字一起联动切换） */
-    const isComb = it.cat === '音节组合';
+    /* [#PY470] 通用联动：三模块弹层统一——PYC_EX2 命中显示示例行，四声小卡联动大字/图标/示例 */
+    const hasEx2 = !!PYC_EX2[it.p];
     let exRow = '';
-    if (isComb) {
+    if (hasEx2) {
       const exN0 = pycExOf(it.p);
       if (exN0.txt) exRow = '<div id="py-modal-ex" style="font-size:clamp(20px,5.4vw,28px);font-weight:800;color:#4a8b2c;margin-top:6px">' + exN0.em + ' ' + exN0.txt + '</div>';
     }
+    /* [#PY470] 语境短语常显于大字右侧（用户规格图2标注位置） */
+    const ctxShow = (!hasEx2 && it.tip) ? String(it.tip).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim() : '';
     const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
     let tones = '';
     if (t4) {
-      tones = '<div style="font-size:13px;font-weight:800;color:#789;margin:14px 0 8px">' + (isComb ? '🔤 四声读一读（点小卡：发音 + 换示例字）' : '🔤 四声读一读（点小卡发音）') + '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
+      tones = '<div style="font-size:13px;font-weight:800;color:#789;margin:14px 0 8px">' + '🔤 四声读一读（点小卡：发音 + 换示例字）' + '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
         t4.map(function (s, i) { return '<div class="py-tone-card" data-tone-say="' + s + '"><div class="t">' + s + '</div><div class="n">' + tNames[i] + '</div></div>'; }).join('') + '</div>';
     } else if (String(it.p).indexOf(' ') >= 0) {
       tones = '<div style="margin-top:14px;padding:10px 12px;background:#eef7ea;border-radius:12px;font-size:13px;color:#4a8b2c">📖 整行跟读：按顺序把每个读一遍，读熟就算过关！</div>';
@@ -13111,8 +13122,8 @@ window.MX_SEED = data;
       '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
       '<div style="display:flex;align-items:center;gap:16px">' +
       '<div id="py-modal-em" style="flex:0 0 104px;width:104px;height:104px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 32 : 58) + 'px">' + em + '</div>' +
-      '<div style="min-width:0"><div id="py-modal-py" style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' + exRow +
-      '<div style="font-size:clamp(17px,4.6vw,22px);color:#789;margin-top:6px">' + it.tip + '<br> /* [#PY466] */<b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
+      '<div style="min-width:0"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div id="py-modal-py" style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' + (ctxShow ? '<div style="flex:1;font-size:clamp(15px,4.2vw,20px);color:#4a8b2c;font-weight:700;min-width:0;line-height:1.4">' + ctxShow + '</div>' : '') + '</div>' + exRow +
+      '<div style="font-size:clamp(17px,4.6vw,22px);color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
       '<button id="py-modal-say" style="flex:2;border:0;background:linear-gradient(90deg,#ff9f43,#e67e22);color:#fff;border-radius:12px;padding:11px 0;font-weight:800;font-size:14px;cursor:pointer">🔊 跟我读</button>' +
@@ -13126,8 +13137,8 @@ window.MX_SEED = data;
     ov.querySelector('#py-modal-say').onclick = function () {
       const seq = PY_SAY_OVR[it.p];
       if (seq) { speakSeq(seq, 'zh-CN', 'pinyin'); return; }
-      /* [PY467] 音节组合跟读：三段拼读 b - ó - bó */
-      if (isComb) { const q4 = pycSeq3(it.p); if (q4) { speakSeq(q4, 'zh-CN', 'pinyin'); return; } }
+      /* [#PY470] 通用跟读：拼读卡三段拼读 b - ó - bó（声母/单韵母无序列自动落语境读音） */
+      { const q4 = pycSeq3(it.p); if (q4) { speakSeq(q4, 'zh-CN', 'pinyin'); return; } }
       const ctx = pyCtxPhrase(it.tip);
       if (ctx) {
         /* [#PY466] 语境读音顺序：先读字母(拼音音)，再读「语境的+字母」——b, 广播的b */
@@ -13136,23 +13147,19 @@ window.MX_SEED = data;
       }
       speak(it.p, 'zh-CN', 'pinyin');
     };
-    /* [PY467] 四声小卡：音节组合=三段拼读 b-ó-bó + 顶部大字/图标/示例字联动 */
+    /* [#PY470] 四声小卡通用联动：三段拼读 + 大字/图标/示例行同步切换（三模块统一） */
     ov.querySelectorAll('[data-tone-say]').forEach(function (c) {
       c.onclick = function () {
         const s = c.getAttribute('data-tone-say');
-        if (isComb) {
-          const q3 = pycSeq3(s);
-          if (q3) speakSeq(q3, 'zh-CN', 'pinyin'); else speak(s, 'zh-CN', 'pinyin');
-          const exN = pycExOf(s);
-          const emEl = ov.querySelector('#py-modal-em');
-          const pyEl = ov.querySelector('#py-modal-py');
-          const exEl = ov.querySelector('#py-modal-ex');
-          if (pyEl) pyEl.textContent = s;
-          if (emEl && exN.em) emEl.textContent = exN.em;
-          if (exEl && exN.txt) exEl.textContent = exN.em + ' ' + exN.txt;
-          return;
-        }
-        speak(s, 'zh-CN', 'pinyin');
+        const q3 = pycSeq3(s);
+        if (q3) speakSeq(q3, 'zh-CN', 'pinyin'); else speak(s, 'zh-CN', 'pinyin');
+        const exN = pycExOf(s);
+        const emEl = ov.querySelector('#py-modal-em');
+        const pyEl = ov.querySelector('#py-modal-py');
+        const exEl = ov.querySelector('#py-modal-ex');
+        if (pyEl) pyEl.textContent = s;
+        if (emEl && exN.em) emEl.textContent = exN.em;
+        if (exEl) { if (exN.txt) exEl.textContent = exN.em + ' ' + exN.txt; else exEl.style.display = 'none'; }
       };
     });
     ov.querySelector('#py-modal-master').onclick = function () {
@@ -13234,7 +13241,7 @@ window.MX_SEED = data;
   /* [#PY467] 三段拼读：声母白名单（名称音走 MX_PY_NAME_ALT 真人录音） */
   const PYC_SM_OK = { b: 1, p: 1, m: 1, f: 1, d: 1, t: 1, n: 1, l: 1, g: 1, k: 1, h: 1, j: 1, q: 1, x: 1, zh: 1, ch: 1, sh: 1, r: 1, z: 1, c: 1, s: 1, y: 1, w: 1 };
   /* [#PY467] 韵母独立录音白名单（a/ai/an/... o/ou + i/u/ü 走 yi/wu/yu）；其余复合韵母无录音退两段 */
-  const PYC_FIN_AUDIO = { a: 1, ai: 1, an: 1, ang: 1, ao: 1, e: 1, ei: 1, en: 1, eng: 1, er: 1, o: 1, ou: 1, i: 1, u: 1, 'ü': 1 };
+  const PYC_FIN_AUDIO = { a: 1, ai: 1, an: 1, ang: 1, ao: 1, e: 1, ei: 1, en: 1, eng: 1, er: 1, o: 1, ou: 1, i: 1, u: 1, 'ü': 1, in: 1, un: 1, 'ün': 1, ing: 1, ong: 1, ia: 1, ua: 1, iao: 1, uai: 1, iu: 1, ui: 1, ie: 1, uo: 1, ian: 1, uan: 1, iang: 1, uang: 1, 'üe': 1, 'üan': 1, iong: 1 }; /* [#PY470] 复合韵母经 y/w 替代音全部可播三段 */
   /* [#PY467] 三段拼读序列：bó -> ['@b', '@ó', '@bó']（声母名称音+带调韵母+整音节）
      韵母无录音时退两段 ['@b', '@bó']；无声母/声母不合法时返回 null（单音兜底） */
   function pycSeq3(p) {
