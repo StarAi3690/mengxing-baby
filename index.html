@@ -13044,7 +13044,7 @@ window.MX_SEED = data;
       '.py-master.on{background:#5cb832;color:#fff}' +
       '.py-chip{border:1.5px solid #e3e9e3;background:#fff;color:#67788f;border-radius:14px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;flex:0 0 auto}' +
       '.py-chip.on{background:#e8f5e2;border-color:#7ec850;color:#4a8b2c}' +
-      '.py-tone-card{background:#fff8f0;border:1.5px solid #ffd9b3;border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s}' +
+      '.py-tone-card{background:#fff8f0;border:1.5px solid #ffd9b3;border-radius:14px;padding:19px 6px;text-align:center;cursor:pointer;transition:.15s} /* [#PY472] 加高 */' +
       '.py-tone-card:hover{transform:translateY(-2px)}' +
       '.py-tone-card .t{font-size:clamp(40px,11vw,58px);font-weight:800;color:#e5484d;line-height:1.15}' +
       '.py-tone-card .n{font-size:12px;color:#9aa;margin-top:4px}' +
@@ -13100,10 +13100,12 @@ window.MX_SEED = data;
     let exRow = '';
     if (hasEx2) {
       const exN0 = pycExOf(it.p);
-      if (exN0.txt) exRow = '<div id="py-modal-ex" style="font-size:clamp(20px,5.4vw,28px);font-weight:800;color:#4a8b2c;margin-top:6px">' + exN0.em + ' ' + exN0.txt + '</div>';
+      if (exN0.txt) exRow = '<div id="py-modal-ex" style="font-size:clamp(30px,8vw,46px);font-weight:800;color:#4a8b2c;line-height:1.1">' + exN0.em + ' ' + exN0.txt + '</div>'; /* [#PY472] 汉字放大 */
     }
     /* [#PY470] 语境短语常显于大字右侧（用户规格图2标注位置） */
     const ctxShow = (!hasEx2 && it.tip) ? String(it.tip).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim() : '';
+    /* [#PY472] 双栏左栏主行: 示例卡显示拼读串(g-ē → gē 哥哥), 其余显示语境短语 */
+    const mainLine = hasEx2 ? String(it.tip || '') : ctxShow;
     const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
     let tones = '';
     if (t4) {
@@ -13120,10 +13122,17 @@ window.MX_SEED = data;
     ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(30,40,30,.5);display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML = '<div style="background:var(--card-bg,#fff);border-radius:22px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative">' +
       '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
-      '<div style="display:flex;align-items:center;gap:16px">' +
-      '<div id="py-modal-em" style="flex:0 0 104px;width:104px;height:104px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 32 : 58) + 'px">' + em + '</div>' +
-      '<div style="min-width:0"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div id="py-modal-py" style="font-size:clamp(68px,19vw,108px);font-weight:800;color:#e5484d;line-height:1.05">' + it.p + '</div>' + (ctxShow ? '<div style="flex:1;font-size:clamp(15px,4.2vw,20px);color:#4a8b2c;font-weight:700;min-width:0;line-height:1.4">' + ctxShow + '</div>' : '') + '</div>' + exRow +
-      '<div style="font-size:clamp(17px,4.6vw,22px);color:#789;margin-top:6px">' + it.tip + '<br><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div></div>' +
+      /* [#PY472] 左右双栏布局: 左=图标+汉字+拼读串+分类, 右=大拼音(填满右侧留白) */
+      '<div style="display:flex;align-items:center;gap:20px">' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="display:flex;align-items:center;gap:12px">' +
+      '<div id="py-modal-em" style="flex:0 0 84px;width:84px;height:84px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 28 : 46) + 'px">' + em + '</div>' +
+      exRow +
+      '</div>' +
+      (mainLine ? '<div style="font-size:clamp(21px,6vw,30px);font-weight:800;color:#3d6b23;letter-spacing:2.5px;line-height:1.5;margin-top:12px">' + mainLine + '</div>' : '') +
+      '<div style="font-size:14px;color:#789;margin-top:8px"><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div>' +
+      '<div id="py-modal-py" style="flex:0 0 auto;font-size:clamp(64px,17vw,100px);font-weight:800;color:#e5484d;line-height:1.05;text-align:center">' + it.p + '</div>' +
+      '</div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
       '<button id="py-modal-say" style="flex:2;border:0;background:linear-gradient(90deg,#ff9f43,#e67e22);color:#fff;border-radius:12px;padding:11px 0;font-weight:800;font-size:14px;cursor:pointer">🔊 跟我读</button>' +
