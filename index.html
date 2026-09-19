@@ -13102,21 +13102,15 @@ window.MX_SEED = data;
     const ctxShow = (!hasEx2 && it.tip) ? String(it.tip).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim() : '';
     /* [#PY472] 双栏左栏主行: 示例卡显示拼读串(g-ē → gē 哥哥), 其余显示语境短语 */
     /* [#PY473] mainLine 只保留拼读串(去emoji去尾部例词, 例词由右栏字卡展示) */
-    let mainLine = hasEx2 ? String(it.tip || '') : ctxShow;
-    if (hasEx2 && mainLine.indexOf('→') >= 0) {
-      const mp = mainLine.split('→');
-      const m1 = mp[0].replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim();
-      const m2 = mp.slice(1).join('→').trim().split(/\s+/)[0];
-      mainLine = (m1 + ' → ' + m2).trim();
-    } else if (hasEx2) {
-      mainLine = mainLine.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim();
-    }
+    /* [#PY474] 拼读串由 pycMainOf 精确构造(点四声小卡可复算联动), 不再拆 tip */
+    const mainLine = hasEx2 ? pycMainOf(it.p) : ctxShow;
     /* [#PY473] 右栏浅绿字卡: 示例字大字 + 例词拼音注音 + 例词; 无示例字卡退大图标+语境短语 */
     const wb0 = String(it.p).split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
-    const wd0 = hasEx2 ? pycWordOf(wb0) : null;
+    const exN0 = hasEx2 ? pycExOf(it.p) : null;
+    /* [#PY474] 词行按示例字取词(PYC_CHAR_WORD), 与大字严格对应 */
+    const wd0 = exN0 ? pycWordFor(exN0, wb0) : null;
     let rightCol = '';
     if (hasEx2 && wd0) {
-      const exN0 = pycExOf(it.p);
       const wp0 = wd0.wordpy ? '<div id="py-modal-wordpy" style="font-size:clamp(16px,4vw,21px);font-weight:800;color:#445;margin-top:2px">' + wd0.wordpy + '</div>' : '<div id="py-modal-wordpy" style="display:none"></div>';
       const w0 = (wd0.word && wd0.word !== exN0.txt) ? '<div id="py-modal-word" style="font-size:clamp(24px,6.4vw,32px);font-weight:800;color:#3d9b3d;letter-spacing:8px;margin-top:4px">' + pyWordSp(wd0.word) + '</div>' : '<div id="py-modal-word" style="display:none"></div>';
       rightCol = '<div id="py-modal-ex" style="font-size:clamp(58px,15vw,88px);font-weight:800;color:#3d9b3d;line-height:1.08">' + exN0.txt + '</div>' + wp0 + w0;
@@ -13149,7 +13143,7 @@ window.MX_SEED = data;
       '<div id="py-modal-em" style="flex:0 0 76px;width:76px;height:76px;border-radius:18px;background:#fdeee4;display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 26 : 42) + 'px">' + em + '</div>' +
       '<div id="py-modal-py" style="font-size:clamp(60px,15.5vw,88px);font-weight:800;color:#e5484d;line-height:1.02">' + it.p + '</div>' +
       '</div>' +
-      (mainLine ? '<div style="font-size:clamp(24px,6.4vw,34px);font-weight:800;color:#3d6b23;letter-spacing:2.5px;line-height:1.4;margin-top:10px">' + mainLine + '</div>' : '') +
+      (mainLine ? '<div id="py-modal-main" style="font-size:clamp(24px,6.4vw,34px);font-weight:800;color:#3d6b23;letter-spacing:2.5px;line-height:1.4;margin-top:10px">' + mainLine + '</div>' : '') +
       '<div style="font-size:14px;color:#789;margin-top:10px"><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div>' +
       '<div style="flex:1;min-width:0;background:linear-gradient(160deg,#f2faf0,#e6f5e4);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;text-align:center">' +
       rightCol +
@@ -13194,7 +13188,10 @@ window.MX_SEED = data;
         if (emEl && exN.em) emEl.textContent = exN.em;
         /* [#PY473] 右栏字卡联动: 大字/注音/例词同步切换; 无示例字时右栏退大图标+语境短语 */
         const wb2 = String(s).split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
-        const wd2 = pycWordOf(wb2);
+        /* [#PY474] 词行按示例字取词 + 拼读串同步复算(b-ǎ→bǎ) */
+        const wd2 = exN.txt ? pycWordFor(exN, wb2) : null;
+        const mEl = ov.querySelector('#py-modal-main');
+        if (mEl && exN.txt) { const mn = pycMainOf(s); if (mn) mEl.textContent = mn; }
         if (exEl) {
           if (exN.txt) { exEl.textContent = exN.txt; exEl.style.display = ''; }
           else { exEl.style.display = 'none'; } /* [#PY473] 无示例字不放图标, 右栏只保留语境短语 */
@@ -13331,6 +13328,27 @@ window.MX_SEED = data;
     return seq;
   }
   /* [#PY467] 调级示例查找：PYC_EX2[带调] 优先，回退 PYC_EX[base]（去 emoji 取文字） */
+  /* [#PY474] 示例字→组词映射: 右栏词行按示例字取词(与大字严格对应), 未覆盖回退 base 词 */
+  const PYC_CHAR_WORD = { '挨': ['挨近', 'āi jìn'], '凹': ['凹凸', 'āo tū'], '八': ['八个', 'bā gè'], '拔': ['拔河', 'bá hé'], '把': ['把手', 'bǎ shǒu'], '爸': ['爸爸', 'bà ba'], '笔': ['铅笔', 'qiān bǐ'], '播': ['播放', 'bō fàng'], '伯': ['伯伯', 'bó bo'], '跛': ['跛脚', 'bǒ jiǎo'], '簸': ['簸箕', 'bò ji'], '不': ['不是', 'bú shì'], '擦': ['擦桌子', 'cā zhuō zi'], '测': ['测量', 'cè liáng'], '茶': ['喝茶', 'hē chá'], '车': ['汽车', 'qì chē'], '吃': ['吃饭', 'chī fàn'], '出': ['出门', 'chū mén'], '戳': ['戳破', 'chuō pò'], '刺': ['刺猬', 'cì wei'], '醋': ['米醋', 'mǐ cù'], '错': ['错误', 'cuò wù'], '大': ['大象', 'dà xiàng'], '低': ['低头', 'dī tóu'], '读': ['读书', 'dú shū'], '多': ['多少', 'duō shǎo'], '诶': ['诶呀', 'ēi ya'], '发': ['头发', 'tóu fa'], '佛': ['佛像', 'fó xiàng'], '付': ['付钱', 'fù qián'], '嘎': ['嘎嘎', 'gā gā'], '哥': ['哥哥', 'gē ge'], '骨': ['骨头', 'gǔ tou'], '瓜': ['西瓜', 'xī guā'], '国': ['中国', 'zhōng guó'], '哈': ['哈哈', 'hā hā'], '喝': ['喝水', 'hē shuǐ'], '虎': ['老虎', 'lǎo hǔ'], '花': ['花朵', 'huā duǒ'], '火': ['火苗', 'huǒ miáo'], '鸡': ['小鸡', 'xiǎo jī'], '家': ['家庭', 'jiā tíng'], '橘': ['橘子', 'jú zi'], '剧': ['剧场', 'jù chǎng'], '卡': ['卡片', 'kǎ piàn'], '科': ['科学', 'kē xué'], '哭': ['哭泣', 'kū qì'], '夸': ['夸奖', 'kuā jiǎng'], '扩': ['扩大', 'kuò dà'], '拉': ['拉手', 'lā shǒu'], '鹿': ['小鹿', 'xiǎo lù'], '落': ['落叶', 'luò yè'], '妈': ['妈妈', 'mā ma'], '麻': ['麻绳', 'má shéng'], '马': ['小马', 'xiǎo mǎ'], '骂': ['骂人', 'mà rén'], '米': ['米饭', 'mǐ fàn'], '摸': ['摸一摸', 'mō yi mō'], '木': ['木头', 'mù tou'], '拿': ['拿起', 'ná qǐ'], '你': ['你们', 'nǐ men'], '妞': ['妞妞', 'niū niū'], '挪': ['挪动', 'nuó dòng'], '鸥': ['海鸥', 'hǎi ōu'], '爬': ['爬山', 'pá shān'], '披': ['披上', 'pī shàng'], '坡': ['山坡', 'shān pō'], '铺': ['店铺', 'diàn pù'], '七': ['七个', 'qī gè'], '掐': ['掐住', 'qiā zhù'], '去': ['回去', 'huí qù'], '热': ['热情', 'rè qíng'], '日': ['日出', 'rì chū'], '弱': ['弱小', 'ruò xiǎo'], '撒': ['撒种', 'sǎ zhǒng'], '色': ['颜色', 'yán sè'], '沙': ['沙子', 'shā zi'], '狮': ['狮子', 'shī zi'], '书': ['书本', 'shū běn'], '刷': ['刷牙', 'shuā yá'], '说': ['说话', 'shuō huà'], '丝': ['蚕丝', 'cán sī'], '速': ['速度', 'sù dù'], '锁': ['门锁', 'mén suǒ'], '它': ['它们', 'tā men'], '特': ['特别', 'tè bié'], '踢': ['踢球', 'tī qiú'], '图': ['图画', 'tú huà'], '脱': ['脱鞋', 'tuō xié'], '蛙': ['青蛙', 'qīng wā'], '我': ['我们', 'wǒ men'], '五': ['五个', 'wǔ gè'], '西': ['东西', 'dōng xi'], '虾': ['大虾', 'dà xiā'], '鸭': ['鸭子', 'yā zi'], '叶': ['叶子', 'yè zi'], '衣': ['衣服', 'yī fu'], '鱼': ['小鱼', 'xiǎo yú'], '月': ['月亮', 'yuè liang'], '杂': ['杂技', 'zá jì'], '择': ['选择', 'xuǎn zé'], '扎': ['扎针', 'zhā zhēn'], '这': ['这个', 'zhè ge'], '知': ['知道', 'zhī dào'], '猪': ['小猪', 'xiǎo zhū'], '抓': ['抓住', 'zhuā zhù'], '桌': ['桌子', 'zhuō zi'], '字': ['写字', 'xiě zì'], '足': ['足球', 'zú qiú'], '坐': ['坐下', 'zuò xià'], '格': ['格子', 'gé zi'], '葛': ['葛根', 'gé gēn'], '个': ['个子', 'gè zi'], '呼': ['呼喊', 'hū hǎn'], '湖': ['湖水', 'hú shuǐ'], '护': ['护士', 'hù shì'], '撸': ['撸串', 'lū chuàn'], '炉': ['炉子', 'lú zi'], '鲁': ['鲁国', 'lǔ guó'], '仪': ['仪器', 'yí qì'], '椅': ['椅子', 'yǐ zi'], '亿': ['亿万', 'yì wàn'], '屋': ['房屋', 'fáng wū'], '梧': ['梧桐', 'wú tóng'], '雾': ['云雾', 'yún wù'], '淤': ['淤泥', 'yū ní'], '雨': ['下雨', 'xià yǔ'], '玉': ['玉石', 'yù shí'], '居': ['居住', 'jū zhù'], '举': ['举起', 'jǔ qǐ'], '区': ['小区', 'xiǎo qū'], '渠': ['水渠', 'shuǐ qú'], '娶': ['娶亲', 'qǔ qīn'], '需': ['需要', 'xū yào'], '徐': ['徐徐', 'xú xú'], '许': ['许愿', 'xǔ yuàn'], '絮': ['柳絮', 'liǔ xù'] };
+  function pycWordFor(exN, wb2) {
+    const cw = exN && exN.txt && PYC_CHAR_WORD[exN.txt];
+    if (cw) return { word: cw[0], wordpy: cw[1] || null };
+    return pycWordOf(wb2);
+  }
+  /* [#PY474] 拼读串精确构造: bǎ -> b - ǎ → bǎ（无声母/非声母返回原音节） */
+  function pycMainOf(p) {
+    const s0 = String(p || '').split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+    if (!s0) return '';
+    let f = pycFinalOf(s0);
+    if (f === 'a' && /[iu]a$/.test(s0)) f = s0.slice(-2);
+    if (f === 'o' && /uo$/.test(s0)) f = 'uo';
+    if (f === 'ao' && /iao$/.test(s0)) f = 'iao';
+    if (!f) return String(p);
+    const ini = s0.slice(0, s0.length - f.length);
+    if (!ini || !PYC_SM_OK[ini]) return String(p);
+    const finT = String(p).slice(-f.length);
+    return ini + ' - ' + finT + ' → ' + String(p);
+  }
   function pycExOf(s) {
     const e2 = PYC_EX2[s];
     if (e2) return { em: e2[1], txt: e2[0] };
