@@ -13097,15 +13097,35 @@ window.MX_SEED = data;
     const t4 = pyTone4(it.p);
     /* [#PY470] 通用联动：三模块弹层统一——PYC_EX2 命中显示示例行，四声小卡联动大字/图标/示例 */
     const hasEx2 = !!PYC_EX2[it.p];
-    let exRow = '';
-    if (hasEx2) {
-      const exN0 = pycExOf(it.p);
-      if (exN0.txt) exRow = '<div id="py-modal-ex" style="font-size:clamp(30px,8vw,46px);font-weight:800;color:#4a8b2c;line-height:1.1">' + exN0.em + ' ' + exN0.txt + '</div>'; /* [#PY472] 汉字放大 */
-    }
+    /* [#PY473] 右栏字卡（大示例字+例词注音+例词）在 ctxShow 定义后统一组装 */
     /* [#PY470] 语境短语常显于大字右侧（用户规格图2标注位置） */
     const ctxShow = (!hasEx2 && it.tip) ? String(it.tip).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim() : '';
     /* [#PY472] 双栏左栏主行: 示例卡显示拼读串(g-ē → gē 哥哥), 其余显示语境短语 */
-    const mainLine = hasEx2 ? String(it.tip || '') : ctxShow;
+    /* [#PY473] mainLine 只保留拼读串(去emoji去尾部例词, 例词由右栏字卡展示) */
+    let mainLine = hasEx2 ? String(it.tip || '') : ctxShow;
+    if (hasEx2 && mainLine.indexOf('→') >= 0) {
+      const mp = mainLine.split('→');
+      const m1 = mp[0].replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim();
+      const m2 = mp.slice(1).join('→').trim().split(/\s+/)[0];
+      mainLine = (m1 + ' → ' + m2).trim();
+    } else if (hasEx2) {
+      mainLine = mainLine.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim();
+    }
+    /* [#PY473] 右栏浅绿字卡: 示例字大字 + 例词拼音注音 + 例词; 无示例字卡退大图标+语境短语 */
+    const wb0 = String(it.p).split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+    const wd0 = hasEx2 ? pycWordOf(wb0) : null;
+    let rightCol = '';
+    if (hasEx2 && wd0) {
+      const exN0 = pycExOf(it.p);
+      const wp0 = wd0.wordpy ? '<div id="py-modal-wordpy" style="font-size:clamp(16px,4vw,21px);font-weight:800;color:#445;margin-top:2px">' + wd0.wordpy + '</div>' : '<div id="py-modal-wordpy" style="display:none"></div>';
+      const w0 = (wd0.word && wd0.word !== exN0.txt) ? '<div id="py-modal-word" style="font-size:clamp(24px,6.4vw,32px);font-weight:800;color:#3d9b3d;letter-spacing:8px;margin-top:4px">' + pyWordSp(wd0.word) + '</div>' : '<div id="py-modal-word" style="display:none"></div>';
+      rightCol = '<div id="py-modal-ex" style="font-size:clamp(58px,15vw,88px);font-weight:800;color:#3d9b3d;line-height:1.08">' + exN0.txt + '</div>' + wp0 + w0;
+    } else {
+      /* [#PY473] 无示例字卡: 右栏不放图标(全弹窗仅左栏一处图标), 只放语境短语大字 */
+      rightCol = '<div id="py-modal-ex" style="display:none"></div>' +
+        '<div id="py-modal-wordpy" style="display:none"></div>' +
+        (ctxShow ? '<div id="py-modal-word" style="font-size:clamp(26px,6.8vw,38px);font-weight:800;color:#3d9b3d;line-height:1.45;text-align:center">' + ctxShow + '</div>' : '<div id="py-modal-word" style="display:none"></div>');
+    }
     const tNames = ['一声平', '二声扬', '三声拐弯', '四声降'];
     let tones = '';
     if (t4) {
@@ -13122,16 +13142,18 @@ window.MX_SEED = data;
     ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(30,40,30,.5);display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML = '<div style="background:var(--card-bg,#fff);border-radius:22px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative">' +
       '<button id="py-modal-x" style="position:absolute;top:12px;right:14px;border:0;background:#f0f3f0;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:#67788f">✕</button>' +
-      /* [#PY472] 左右双栏布局: 左=图标+汉字+拼读串+分类, 右=大拼音(填满右侧留白) */
-      '<div style="display:flex;align-items:center;gap:20px">' +
-      '<div style="flex:1;min-width:0">' +
-      '<div style="display:flex;align-items:center;gap:12px">' +
-      '<div id="py-modal-em" style="flex:0 0 84px;width:84px;height:84px;border-radius:18px;background:var(--bg-tertiary,#f4f6f4);display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 28 : 46) + 'px">' + em + '</div>' +
-      exRow +
+      /* [#PY473] C 定稿: 左栏=图标+大拼音+拼读串+分类, 右栏=浅绿字卡(大示例字+例词注音+例词) */
+      '<div style="display:flex;align-items:stretch;gap:18px">' +
+      '<div style="flex:1.15;min-width:0;display:flex;flex-direction:column;justify-content:center">' +
+      '<div style="display:flex;align-items:center;gap:14px">' +
+      '<div id="py-modal-em" style="flex:0 0 76px;width:76px;height:76px;border-radius:18px;background:#fdeee4;display:flex;align-items:center;justify-content:center;font-size:' + (wide ? 26 : 42) + 'px">' + em + '</div>' +
+      '<div id="py-modal-py" style="font-size:clamp(60px,15.5vw,88px);font-weight:800;color:#e5484d;line-height:1.02">' + it.p + '</div>' +
       '</div>' +
-      (mainLine ? '<div style="font-size:clamp(21px,6vw,30px);font-weight:800;color:#3d6b23;letter-spacing:2.5px;line-height:1.5;margin-top:12px">' + mainLine + '</div>' : '') +
-      '<div style="font-size:14px;color:#789;margin-top:8px"><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div>' +
-      '<div id="py-modal-py" style="flex:0 0 auto;font-size:clamp(64px,17vw,100px);font-weight:800;color:#e5484d;line-height:1.05;text-align:center">' + it.p + '</div>' +
+      (mainLine ? '<div style="font-size:clamp(24px,6.4vw,34px);font-weight:800;color:#3d6b23;letter-spacing:2.5px;line-height:1.4;margin-top:10px">' + mainLine + '</div>' : '') +
+      '<div style="font-size:14px;color:#789;margin-top:10px"><b style="color:#4a8b2c">' + it.cat + '</b>' + (it.day ? ' · 第 ' + it.day + ' 天' : '') + '</div></div>' +
+      '<div style="flex:1;min-width:0;background:linear-gradient(160deg,#f2faf0,#e6f5e4);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;text-align:center">' +
+      rightCol +
+      '</div>' +
       '</div>' +
       tones +
       '<div style="display:flex;gap:8px;margin-top:16px">' +
@@ -13166,9 +13188,27 @@ window.MX_SEED = data;
         const emEl = ov.querySelector('#py-modal-em');
         const pyEl = ov.querySelector('#py-modal-py');
         const exEl = ov.querySelector('#py-modal-ex');
+        const wEl = ov.querySelector('#py-modal-word');
+        const wpEl = ov.querySelector('#py-modal-wordpy');
         if (pyEl) pyEl.textContent = s;
         if (emEl && exN.em) emEl.textContent = exN.em;
-        if (exEl) { if (exN.txt) exEl.textContent = exN.em + ' ' + exN.txt; else exEl.style.display = 'none'; }
+        /* [#PY473] 右栏字卡联动: 大字/注音/例词同步切换; 无示例字时右栏退大图标+语境短语 */
+        const wb2 = String(s).split('').map(function (c) { return PY_DETONE[c] || c; }).join('');
+        const wd2 = pycWordOf(wb2);
+        if (exEl) {
+          if (exN.txt) { exEl.textContent = exN.txt; exEl.style.display = ''; }
+          else { exEl.style.display = 'none'; } /* [#PY473] 无示例字不放图标, 右栏只保留语境短语 */
+        }
+        if (wEl) {
+          const showW = !!(exN.txt && wd2 && wd2.word && wd2.word !== exN.txt);
+          wEl.textContent = showW ? pyWordSp(wd2.word) : (exN.txt ? '' : (ctxShow || ''));
+          wEl.style.display = (showW || (!exN.txt && ctxShow)) ? '' : 'none';
+        }
+        if (wpEl) {
+          const showP = !!(exN.txt && wd2 && wd2.wordpy);
+          wpEl.textContent = showP ? wd2.wordpy : '';
+          wpEl.style.display = showP ? '' : 'none';
+        }
       };
     });
     ov.querySelector('#py-modal-master').onclick = function () {
@@ -13255,8 +13295,19 @@ window.MX_SEED = data;
     'yū': ['淤', '🟤'], 'yǔ': ['雨', '🌧️'], 'yù': ['玉', '📿'],
     'jǖ': ['居', '🏡'], 'jǘ': ['橘', '🍊'], 'jǚ': ['举', '🙌'],
     'qǖ': ['区', '🗺️'], 'qǘ': ['渠', '💧'], 'qǚ': ['娶', '💍'], 'qǜ': ['去', '🚶'],
-    'xǖ': ['需', '🧰'], 'xǘ': ['徐', '🐢'], 'xǚ': ['许', '🤝'], 'xǜ': ['絮', '☁️']
-  };
+    'xǖ': ['需', '🧰'], 'xǘ': ['徐', '🐢'], 'xǚ': ['许', '🤝'], 'xǜ': ['絮', '☁️']  };
+
+  /* [#PY473] 例词拼音注音表（弹窗右栏字卡用；缺词自动隐藏注音行） */
+  const PYC_WORD_PY = { '爸爸': 'bà ba', '白色': 'bái sè', '棒棒': 'bàng bàng', '书包': 'shū bāo', '杯子': 'bēi zi', '本子': 'běn zi', '蹦跳': 'bèng tiào', '旁边': 'páng biān', '伯伯': 'bó bo', '擦桌子': 'cā zhuō zi', '猜一猜': 'cāi yi cāi', '参加': 'cān jiā', '藏起来': 'cáng qǐ lái', '小草': 'xiǎo cǎo', '测量': 'cè liáng', '楼层': 'lóu céng', '喝茶': 'hē chá', '拆开': 'chāi kāi', '蝉鸣': 'chán míng', '很长': 'hěn cháng', '超市': 'chāo shì', '汽车': 'qì chē', '清晨': 'qīng chén', '城市': 'chéng shì', '吃饭': 'chī fàn', '虫子': 'chóng zi', '出门': 'chū mén', '小船': 'xiǎo chuán', '吹泡泡': 'chuī pào pao', '春天': 'chūn tiān', '刺猬': 'cì wei', '从来': 'cóng lái', '凑齐': 'còu qí', '翠绿': 'cuì lǜ', '村庄': 'cūn zhuāng', '错误': 'cuò wù', '大的': 'dà de', '戴帽子': 'dài mào zi', '鸡蛋': 'jī dàn', '挡住': 'dǎng zhù', '掉了': 'diào le', '蝴蝶': 'hú dié', '盯着': 'dīng zhe', '丢了': 'diū le', '冬天': 'dōng tiān', '都在': 'dōu zài', '读书': 'dú shū', '很短': 'hěn duǎn', '蹲下': 'dūn xià', '多多': 'duō duō', '头发': 'tóu fa', '米饭': 'mǐ fàn', '房子': 'fáng zi', '飞机': 'fēi jī', '分开': 'fēn kāi', '大风': 'dà fēng', '父亲': 'fù qīn', '改正': 'gǎi zhèng', '干净': 'gān jìng', '钢铁': 'gāng tiě', '鸽子': 'gē zi', '送给': 'sòng gěi', '更快': 'gèng kuài', '公鸡': 'gōng jī', '小狗': 'xiǎo gǒu', '骨头': 'gǔ tou', '西瓜': 'xī guā', '乖乖': 'guāi guāi', '关灯': 'guān dēng', '乌龟': 'wū guī', '中国': 'zhōng guó', '哈哈': 'hā hā', '大海': 'dà hǎi', '汗水': 'hàn shuǐ', '航班': 'háng bān', '好的': 'hǎo de', '喝水': 'hē shuǐ', '黑色': 'hēi sè', '很多': 'hěn duō', '横着': 'héng zhe', '红色': 'hóng sè', '猴子': 'hóu zi', '老虎': 'lǎo hǔ', '花朵': 'huā duǒ', '坏了': 'huài le', '欢乐': 'huān lè', '黄色': 'huáng sè', '结婚': 'jié hūn', '火苗': 'huǒ miáo', '小鸡': 'xiǎo jī', '剪刀': 'jiǎn dāo', '讲话': 'jiǎng huà', '教室': 'jiào shì', '姐姐': 'jiě jie', '金色': 'jīn sè', '眼睛': 'yǎn jing', '九个': 'jiǔ gè', '橘子': 'jú zi', '卷子': 'juàn zi', '决定': 'jué dìng', '军人': 'jūn rén', '卡片': 'kǎ piàn', '开车': 'kāi chē', '反抗': 'fǎn kàng', '考试': 'kǎo shì', '科学': 'kē xué', '天空': 'tiān kōng', '夸奖': 'kuā jiǎng', '宽度': 'kuān dù', '筐子': 'kuāng zi', '困了': 'kùn le', '扩大': 'kuò dà', '拉手': 'lā shǒu', '蓝色': 'lán sè', '老师': 'lǎo shī', '累了': 'lèi le', '鸭梨': 'yā lí', '月亮': 'yuè liang', '聊天': 'liáo tiān', '森林': 'sēn lín', '铃声': 'líng shēng', '恐龙': 'kǒng lóng', '楼房': 'lóu fáng', '小鹿': 'xiǎo lù', '乱了': 'luàn le', '车轮': 'chē lún', '落叶': 'luò yè', '妈妈': 'mā ma', '买东西': 'mǎi dōng xi', '慢慢': 'màn màn', '小猫': 'xiǎo māo', '没有': 'méi yǒu', '大门': 'dà mén', '梦想': 'mèng xiǎng', '面条': 'miàn tiáo', '喵喵': 'miāo miāo', '灭火': 'miè huǒ', '人民': 'rén mín', '明天': 'míng tiān', '摸一摸': 'mō yi mō', '木头': 'mù tou', '牛奶': 'niú nǎi', '男孩': 'nán hái', '大脑': 'dà nǎo', '里面': 'lǐ miàn', '小鸟': 'xiǎo niǎo', '捏住': 'niē zhù', '柠檬': 'níng méng', '黄牛': 'huáng niú', '农村': 'nóng cūn', '暖和': 'nuǎn huo', '爬山': 'pá shān', '拍手': 'pāi shǒu', '盘子': 'pán zi', '跑步': 'pǎo bù', '陪伴': 'péi bàn', '碰撞': 'pèng zhuàng', '拼图': 'pīn tú', '苹果': 'píng guǒ', '山坡': 'shān pō', '瀑布': 'pù bù', '气球': 'qì qiú', '一千': 'yì qiān', '墙壁': 'qiáng bì', '巧妙': 'qiǎo miào', '切开': 'qiē kāi', '弹琴': 'tán qín', '青色': 'qīng sè', '皮球': 'pí qiú', '去上学': 'qù shàng xué', '圆圈': 'yuán quān', '缺一块': 'quē yí kuài', '裙子': 'qún zi', '让开': 'ràng kāi', '绕线': 'rào xiàn', '热的': 'rè de', '人们': 'rén men', '扔垃圾': 'rēng lā jī', '日出': 'rì chū', '软软': 'ruǎn ruǎn', '湿润': 'shī rùn', '弱小': 'ruò xiǎo', '洒水': 'sǎ shuǐ', '赛跑': 'sài pǎo', '三个': 'sān gè', '嗓音': 'sǎng yīn', '扫地': 'sǎo dì', '颜色': 'yán sè', '沙子': 'shā zi', '晒太阳': 'shài tài yáng', '高山': 'gāo shān', '上衣': 'shàng yī', '烧火': 'shāo huǒ', '声音': 'shēng yīn', '狮子': 'shī zi', '小手': 'xiǎo shǒu', '书本': 'shū běn', '刷牙': 'shuā yá', '一双': 'yì shuāng', '顺利': 'shùn lì', '说话': 'shuō huà', '蚕丝': 'cán sī', '送到': 'sòng dào', '搜索': 'sōu suǒ', '速度': 'sù dù', '岁数': 'suì shu', '孙子': 'sūn zi', '一把锁': 'yì bǎ suǒ', '太阳': 'tài yáng', '喝汤': 'hē tāng', '桃子': 'táo zi', '特别': 'tè bié', '踢球': 'tī qiú', '跳跃': 'tiào yuè', '铁轨': 'tiě guǐ', '儿童': 'ér tóng', '涂色': 'tú sè', '脱鞋': 'tuō xié', '娃娃': 'wá wa', '外面': 'wài miàn', '弯弯': 'wān wān', '国王': 'guó wáng', '喂饭': 'wèi fàn', '提问': 'tí wèn', '五个': 'wǔ gè', '大虾': 'dà xiā', '香蕉': 'xiāng jiāo', '写字': 'xiě zì', '星星': 'xīng xing', '修理': 'xiū lǐ', '学习': 'xué xí', '选择': 'xuǎn zé', '寻找': 'xún zhǎo', '鸭子': 'yā zi', '山羊': 'shān yáng', '吃药': 'chī yào', '夜晚': 'yè wǎn', '衣服': 'yī fu', '音符': 'yīn fú', '老鹰': 'lǎo yīng', '用力': 'yòng lì', '小鱼': 'xiǎo yú', '圆形': 'yuán xíng', '白云': 'bái yún', '砸开': 'zá kāi', '再来': 'zài lái', '咱们': 'zán men', '脏袜子': 'zāng wà zi', '早上': 'zǎo shang', '怎么': 'zěn me', '增加': 'zēng jiā', '扎住': 'zhā zhù', '摘花': 'zhāi huā', '车站': 'chē zhàn', '一张纸': 'yì zhāng zhǐ', '找到': 'zhǎo dào', '这个': 'zhè ge', '珍珠': 'zhēn zhū', '正在': 'zhèng zài', '蜘蛛': 'zhī zhū', '小猪': 'xiǎo zhū', '抓住': 'zhuā zhù', '转动': 'zhuàn dòng', '追赶': 'zhuī gǎn', '准备': 'zhǔn bèi', '桌子': 'zhuō zi', '总共': 'zǒng gòng', '走路': 'zǒu lù', '足球': 'zú qiú', '钻孔': 'zuān kǒng', '嘴巴': 'zuǐ ba', '尊敬': 'zūn jìng', '坐下': 'zuò xià' };
+  /* [#PY473] 例词去 emoji；两字词加空格便于指读 */
+  function pyWordSp(w) { return w.length === 2 ? w.split('').join(' ') : w; }
+  function pycWordOf(base) {
+    const raw = PYC_EX[base];
+    if (!raw) return null;
+    const word = String(raw).replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').replace(/[\u200D]/g, '').trim();
+    if (!word) return null;
+    return { word: word, wordpy: PYC_WORD_PY[word] || null };
+  }
   /* [#PY467] 三段拼读：声母白名单（名称音走 MX_PY_NAME_ALT 真人录音） */
   const PYC_SM_OK = { b: 1, p: 1, m: 1, f: 1, d: 1, t: 1, n: 1, l: 1, g: 1, k: 1, h: 1, j: 1, q: 1, x: 1, zh: 1, ch: 1, sh: 1, r: 1, z: 1, c: 1, s: 1, y: 1, w: 1 };
   /* [#PY467] 韵母独立录音白名单（a/ai/an/... o/ou + i/u/ü 走 yi/wu/yu）；其余复合韵母无录音退两段 */
