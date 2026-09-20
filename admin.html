@@ -262,7 +262,7 @@
     <div class="card">
       <h3 style="margin:0 0 4px">🛍️ 商品配置（萌星好物 / 积分兑换）</h3>
       <div class="sub">上架 / 下架、调价、改库存均在此配置，点「发布」后全端生效。数据存于云端 <code>CFG::linkage_config.goods</code>。某分类留空数组 <code>[]</code> = 该分类不展示。孩子端每 3 分钟自动刷新。</div>
-      <div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="loadGoods()">↻ 从云端重新读取</button><span class="hint" style="margin:0">读不到/显示不对时，先刷新页面重新登录再点这里（[AD457] 读取失败不会再拿默认模板冒充云端数据）</span></div>
+      <div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="loadGoods()">↻ 从云端重新读取</button><button class="btn ghost sm" onclick="goodsHistory()">🕘 历史版本</button><span class="hint" style="margin:0">读不到/显示不对时，先刷新页面重新登录再点这里（[AD457] 读取失败不会再拿默认模板冒充云端数据）</span></div>
 
       <div class="row" style="justify-content:space-between;margin-top:6px">
         <h3 style="margin:0">⭐ 积分兑换商品（SHOP_GOODS）</h3>
@@ -1153,6 +1153,46 @@ function goodsBuild(which){
     out.push(rec);
   });
   return { list: out, errs: errs };
+}
+/* [AD477] 商品配置历史版本：列表 + 一键恢复（云端 config_history，保留最近 30 版） */
+async function goodsHistory(){
+  setMsg('goodsMsg','读取历史版本…','sub');
+  const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'history' });
+  if (!r || r.ok === false) { setMsg('goodsMsg','❌ '+((r&&r.msg)||'历史读取失败'),'bad'); return; }
+  const rows = r.history || [];
+  let ov = document.getElementById('adGoodsHistOv');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'adGoodsHistOv';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+    document.body.appendChild(ov); }
+  const viaTxt = function(v){ return v==='restore' ? '⏪ 恢复操作' : (v==='restore_backup' ? '恢复前自动备份' : '📝 发布前快照'); };
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:680px;width:92%;max-height:80vh;overflow:auto;padding:20px">'
+    + '<div style="font-weight:800;font-size:16px;margin-bottom:6px">🕘 商品配置 · 历史版本（保留最近 30 版）</div>'
+    + '<div style="font-size:12px;color:#789;margin-bottom:10px">每次「发布」或「恢复」前都会自动快照当前云端配置；恢复后孩子端 3 分钟内自动生效。</div>'
+    + (rows.length
+      ? '<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:#f2f6f2">'
+        + '<th style="padding:6px;border:1px solid #dde">时间</th><th style="padding:6px;border:1px solid #dde">操作人</th>'
+        + '<th style="padding:6px;border:1px solid #dde">方式</th><th style="padding:6px;border:1px solid #dde">积分/好物</th>'
+        + '<th style="padding:6px;border:1px solid #dde">操作</th></tr>'
+        + rows.map(function(x){ return '<tr>'
+          + '<td style="padding:6px;border:1px solid #dde;white-space:nowrap">'+new Date(x.savedAt).toLocaleString('zh-CN')+'</td>'
+          + '<td style="padding:6px;border:1px solid #dde">'+goodsEsc(x.by)+'</td>'
+          + '<td style="padding:6px;border:1px solid #dde">'+viaTxt(x.via)+'</td>'
+          + '<td style="padding:6px;border:1px solid #dde">'+(x.shopCount===null?'空':x.shopCount)+' / '+(x.mallCount===null?'空':x.mallCount)+'</td>'
+          + '<td style="padding:6px;border:1px solid #dde"><button class="btn ghost sm" onclick="goodsRestore(\''+x.id+'\')">恢复此版本</button></td></tr>'; }).join('')
+        + '</table>'
+      : '<div style="color:#789;font-size:13px">暂无历史版本——下次点「🚀 发布」时会自动生成第一条快照。</div>')
+    + '<div style="margin-top:12px;text-align:right"><button class="btn ghost sm" onclick="document.getElementById(\'adGoodsHistOv\').remove()">关闭</button></div></div>';
+  setMsg('goodsMsg','','');
+}
+async function goodsRestore(id){
+  if (!confirm('确认恢复此历史版本？当前云端配置会先自动快照（之后还能再恢复回来）。')) return;
+  setMsg('goodsMsg','恢复中…','sub');
+  const r = await proxy('mxAdmin', { action:'goods', adminKey: ADMIN_KEY, action2:'restore', historyId: id });
+  if (r && r.ok){
+    setMsg('goodsMsg','✅ 已恢复历史版本（积分 '+(r.goods.shop||[]).length+' 项 / 好物 '+(r.goods.mall||[]).length+' 项），孩子端 3 分钟内自动生效','ok');
+    const ov = document.getElementById('adGoodsHistOv'); if (ov) ov.remove();
+    loadGoods();
+  } else setMsg('goodsMsg','❌ '+((r&&r.msg)||'恢复失败'),'bad');
 }
 async function loadGoods(){
   setMsg('goodsMsg','正在从云端读取…','sub');
