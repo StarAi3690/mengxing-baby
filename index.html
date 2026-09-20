@@ -26242,7 +26242,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 <script src="cloudbase.js"></script>
 <style id="mx-gate-style">
   body.mx-gated .sidebar,body.mx-gated .sidebar-overlay,body.mx-gated .mx-sidebar,body.mx-gated .app-sidebar{display:none!important}
-  #mx-vip-banner{position:fixed;top:0;left:0;right:0;z-index:99990;padding:11px 16px;font-size:14px;font-weight:700;text-align:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  #mx-vip-banner{position:fixed;top:0;left:0;right:0;z-index:99990;padding:8px 12px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.12)} /*[#VIPBANNER]*/
+  #mx-vip-banner .mx-vip-txt{flex:1 1 auto;text-align:center;min-width:0}
+  #mx-vip-banner .mx-vip-ops{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  #mx-vip-banner .mx-vip-btn{border:none;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:800;cursor:pointer;background:linear-gradient(90deg,#ff7a45,#ff5a5f);color:#fff;box-shadow:0 2px 6px rgba(255,90,95,.35);white-space:nowrap}
+  #mx-vip-banner.warn .mx-vip-btn{background:linear-gradient(90deg,#ffb300,#ff8f00);box-shadow:0 2px 6px rgba(255,143,0,.35)}
+  #mx-vip-banner .mx-vip-close{border:none;border-radius:50%;width:26px;height:26px;font-size:13px;line-height:1;cursor:pointer;background:rgba(0,0,0,.18);color:#fff;flex:0 0 auto;padding:0}
+  #mx-vip-banner .mx-vip-close:hover{background:rgba(0,0,0,.34)}
   #mx-vip-banner.warn{background:#fff7d6;color:#8a6d00;border-bottom:1px solid #f0e2a0}
   #mx-vip-banner.over{background:#ff5a5f;color:#fff}
   .mx-modal-mask{position:fixed;inset:0;z-index:99995;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
@@ -27629,6 +27635,41 @@ function downloadResourceFromCloud(resId) {
   }
 
   /* ================= VIP 到期横幅 + 强制撤销 ================= */
+  /* [#VIPBANNER] 续费链接：优先取「萌星好物」里 VIP 月卡商品链接（后台改商品配置即全端生效），取不到退 PURCHASE_URL */
+  function mxVipRenewUrl() {
+    try {
+      var list = (typeof MX_MALL_PRODUCTS === 'function') ? MX_MALL_PRODUCTS() : (window.MX_GOODS_MALL || []);
+      for (var i = 0; i < (list || []).length; i++) {
+        var p = list[i];
+        if (p && p.url && /月卡/.test(String(p.name || ''))) return p.url;
+      }
+    } catch (e) {}
+    return PURCHASE_URL;
+  }
+  /* [#VIPBANNER] 用户点 × 关闭后 24h 内不再弹出（横幅固定顶部会挡内容，不能每次都回来） */
+  function mxVipBannerHidden() {
+    try {
+      var t = parseInt(localStorage.getItem('mengxing_vip_banner_hidden_at') || '0', 10);
+      return t > 0 && (Date.now() - t) < 86400000;
+    } catch (e) { return false; }
+  }
+  /* [#VIPBANNER] 横幅结构：文案 + 「去续费」按钮 + × 关闭按钮（不再整条可点、不再挡死顶部） */
+  function mxBuildVipBanner(cls, txt) {
+    var b = document.createElement('div');
+    b.id = 'mx-vip-banner'; b.className = cls;
+    b.innerHTML = '<span class="mx-vip-txt">' + txt + '</span>' +
+      '<span class="mx-vip-ops">' +
+      '<button type="button" class="mx-vip-btn">去续费</button>' +
+      '<button type="button" class="mx-vip-close" aria-label="关闭提醒">✕</button>' +
+      '</span>';
+    b.querySelector('.mx-vip-btn').onclick = function (ev) { ev.stopPropagation(); try { window.open(mxVipRenewUrl(), '_blank'); } catch (e) {} };
+    b.querySelector('.mx-vip-close').onclick = function (ev) {
+      ev.stopPropagation();
+      try { localStorage.setItem('mengxing_vip_banner_hidden_at', String(Date.now())); } catch (e) {}
+      if (b.parentNode) b.parentNode.removeChild(b);
+    };
+    return b;
+  }
   function checkVipExpiry() {
     var old = document.getElementById('mx-vip-banner');
     if (old && old.parentNode) old.parentNode.removeChild(old);
@@ -27643,24 +27684,17 @@ function downloadResourceFromCloud(resId) {
       /* 以云端为准刷新本地过期时间，避免本地值被篡改/滞后 */
       lsSet('mengxing_expire_at', res.expire_at);
       var days = Math.ceil((new Date(res.expire_at).getTime() - Date.now()) / 86400000);
+      var _noBanner = mxVipBannerHidden(); /* [#VIPBANNER] 关闭后 24h 内静默，撤销/回写逻辑照常执行 */
       if (days <= 0) {
         /* 真正撤销本机 VIP：恢复普通账号，VIP 功能随即关闭 */
         setVip(false);
         try { localStorage.removeItem('mengxing_expire_at'); } catch (e) {}
-        var b = document.createElement('div');
-        b.id = 'mx-vip-banner'; b.className = 'over';
-        b.textContent = '⚠️ 您的 VIP 已过期，已自动恢复为普通账号。点击此处可续费。';
-        b.onclick = function () { window.open(PURCHASE_URL, '_blank'); };
-        document.body.appendChild(b);
+        if (!_noBanner) document.body.appendChild(mxBuildVipBanner('over', '⚠️ 您的 VIP 已过期，已自动恢复为普通账号。'));
         try { if (window.renderAccount) window.renderAccount(); } catch (e) {}
         return;
       }
-      if (days <= 7) {
-        var w = document.createElement('div');
-        w.id = 'mx-vip-banner'; w.className = 'warn';
-        w.textContent = '🔔 您的 VIP 会员将在 ' + days + ' 天后到期。点击此处续费可保持多端数据同步。';
-        w.onclick = function () { window.open(PURCHASE_URL, '_blank'); };
-        document.body.appendChild(w);
+      if (days <= 7 && !_noBanner) {
+        document.body.appendChild(mxBuildVipBanner('warn', '🔔 您的 VIP 会员将在 ' + days + ' 天后到期，续费可保持多端数据同步。'));
       }
     }).catch(function () {});
   }
