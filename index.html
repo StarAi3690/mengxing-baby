@@ -9966,8 +9966,10 @@ function mxVipRecheckNeeded() {
   if (!ts) return true;
   if ((Date.now() - ts) / 3600000 > 24) return true;
   var exp = localStorage.getItem('mengxing_expire_at');
-  if (exp && !isNaN(new Date(exp).getTime())) {
-    if ((new Date(exp).getTime() - Date.now()) / 86400000 <= 7) return true;
+  /* [GATE478B] 数字毫秒字符串 new Date 解析 NaN（临近到期复核曾因此永不触发）→ 统一先转数值 */
+  var expTs = (exp && /^\d{10,14}$/.test(String(exp))) ? Number(exp) : (exp ? new Date(exp).getTime() : NaN);
+  if (exp && !isNaN(expTs)) {
+    if ((expTs - Date.now()) / 86400000 <= 7) return true;
   }
   return false;
 }
@@ -26492,7 +26494,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '</div>' +
         // 卡密面板
         '<div id="mx-gate-card" class="mx-gate-panel">' +
-          '<div style="font-size:13.5px;color:#7b8ba3;line-height:1.7;margin-bottom:18px">请输入您购物获取的 <b style="color:#1f3a5f">卡密</b> 解锁全部学习功能<br>激活一次即可在本设备长期使用</div>' +
+          '<div style="font-size:13.5px;color:#7b8ba3;line-height:1.7;margin-bottom:18px">请输入您购物获取的 <b style="color:#1f3a5f">卡密</b> 解锁全部学习功能<br>有效期以卡种为准：体验卡1天 · 月卡30天 · 本地买断长期</div>' +
           '<input id="mx-gate-code" maxlength="32" placeholder="请输入卡密" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
           '<div id="mx-gate-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
           '<button id="mx-gate-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(63,126,245,.35)">立即激活</button>' +
@@ -26569,7 +26571,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
             if (res.same_device && !res.vip) {
               lsSet(STORAGE.activated, '1');
               lsSet(STORAGE.code, code);
-              mxWriteVipInfo({ vip: 0, vip_level: '1', expire_at: '' });
+              mxWriteVipInfo({ vip: 0, vip_level: '1', expire_at: (res && res.expire_at) ? String(res.expire_at) : '' });
+              lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
               showLocalModePopup(function () { enterApp(false, '✅ 本机已识别，已自动恢复激活状态'); });
               return;
             }
@@ -26587,6 +26590,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         }
         lsSet(STORAGE.activated, '1');
         lsSet(STORAGE.code, code);
+        lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
         if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); });
         else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); });
@@ -26620,6 +26624,105 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
 
   /* afterActivate 逻辑已并入 buildGate 的 proceed 链 */
+  /* ================= [GATE478] 到期锁站遮罩 =================
+     有效期口径：mengxing_expire_at（数字毫秒或 ISO；空/非法=永久卡，不受锁影响）。
+     判定纯本地数字时间戳比较；云端 checkVipExpiry 刷新到期值后回调 mxGateRecheck 复核解锁。 */
+  function mxGateExpMs() {
+    var v = lsGet('mengxing_expire_at');
+    if (!v || v === 'null' || v === 'undefined') return 0;
+    /* [GATE478B] 数字毫秒字符串（checkCard/getVipStatus 写回）new Date 解析为 NaN → 先转数值 */
+    var t = /^\d{10,14}$/.test(v) ? Number(v) : new Date(v).getTime();
+    if (isNaN(t)) return 0;
+    return t;
+  }
+  function mxGateExpired() { var t = mxGateExpMs(); return t > 0 && t <= Date.now(); }
+  function mxGateBuyoutUrl() {
+    try {
+      var list = (typeof MX_MALL_PRODUCTS === 'function') ? MX_MALL_PRODUCTS() : (window.MX_GOODS_MALL || []);
+      for (var i = 0; i < (list || []).length; i++) {
+        var p = list[i];
+        if (p && p.url && /买断/.test(String(p.name || ''))) return p.url;
+      }
+    } catch (e) {}
+    return '';
+  }
+  function mxGateRecheck() {
+    var lock = document.getElementById('mx-lock');
+    if (lock) {
+      if (mxGateExpired()) return; /* 仍过期：维持锁定 */
+      if (lock.parentNode) lock.parentNode.removeChild(lock);
+      document.body.classList.remove('mx-gated');
+      try { if (window.showToast) window.showToast('✅ 检测到有效期已续上，欢迎回来！'); } catch (e) {}
+      return;
+    }
+    if (isActivated() && mxGateExpired() && !document.getElementById('mx-gate')) mxBuildLock();
+  }
+  window.mxGateRecheck = mxGateRecheck;
+  var _mxGateWatchTimer = 0;
+  function mxGateWatch() {
+    if (_mxGateWatchTimer) return;
+    _mxGateWatchTimer = setInterval(function () {
+      try { mxGateRecheck(); } catch (e) {}
+    }, 60000);
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) { try { mxGateRecheck(); } catch (e) {} }
+      });
+    } catch (e) {}
+  }
+  function mxBuildLock() {
+    var old = document.getElementById('mx-lock');
+    if (old) return;
+    var buyUrl = mxGateBuyoutUrl();
+    var vipUrl = '';
+    try { vipUrl = mxVipRenewUrl() || ''; } catch (e) {}
+    var g = document.createElement('div');
+    g.id = 'mx-lock';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;background:linear-gradient(160deg,#fdf6ec,#fdeef0);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;';
+    g.innerHTML =
+      '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(157,63,63,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
+        '<div style="font-size:52px">🔒</div>' +
+        '<div style="font-size:21px;font-weight:800;color:#5f2b2b;margin:10px 0 6px">您的有效期已结束</div>' +
+        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用</div>' +
+        '<input id="mx-lock-code" maxlength="32" placeholder="输入新卡密立即续期" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #f3d9c2;border-radius:12px;outline:none"/>' +
+        '<div id="mx-lock-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
+        '<button id="mx-lock-renew" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.35)">立即续期</button>' +
+        '<div style="display:flex;gap:10px;margin-top:14px">' +
+          (buyUrl ? '<button id="mx-lock-buyout" style="flex:1;padding:12px;border:1.5px solid #ffb74d;background:#fff8ef;border-radius:12px;color:#b26a00;font-size:14px;font-weight:700;cursor:pointer">📀 本地买断版</button>' : '') +
+          (vipUrl ? '<button id="mx-lock-vip" style="flex:1;padding:12px;border:1.5px solid #ffd9b3;background:#fffaf5;border-radius:12px;color:#c77800;font-size:14px;font-weight:700;cursor:pointer">👑 购买 VIP</button>' : '') +
+        '</div>' +
+        '<div style="font-size:12px;color:#b9a7a7;margin-top:16px">买断版=一次购买长期使用本地功能 · VIP=全功能+多端同步<br>客服邮箱：350507945@qq.com</div>' +
+      '</div>';
+    document.body.appendChild(g);
+    var inp = g.querySelector('#mx-lock-code');
+    var btn = g.querySelector('#mx-lock-renew');
+    var msg = g.querySelector('#mx-lock-msg');
+    function doRenew() {
+      var code = (inp.value || '').trim();
+      msg.textContent = '';
+      if (!/^[A-Za-z0-9!#$%&@]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
+      btn.disabled = true; btn.textContent = '校验中…';
+      redeem(code, deviceId()).then(function (res) {
+        btn.disabled = false; btn.textContent = '立即续期';
+        if (!res || !res.ok) { msg.textContent = (res && res.msg) || '续期失败，请重试'; return; }
+        lsSet(STORAGE.code, code);
+        lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
+        mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
+        if (g.parentNode) g.parentNode.removeChild(g);
+        checkVipExpiry();
+        try { if (window.showToast) window.showToast('✅ 续期成功，欢迎回来！'); } catch (e) {}
+        if (res.vip) { try { startVipSync(); } catch (e2) {} }
+      });
+    }
+    btn.addEventListener('click', doRenew);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doRenew(); });
+    var bo = g.querySelector('#mx-lock-buyout');
+    if (bo) bo.onclick = function () { try { window.open(buyUrl, '_blank'); } catch (e) {} };
+    var vv = g.querySelector('#mx-lock-vip');
+    if (vv) vv.onclick = function () { try { window.open(vipUrl, '_blank'); } catch (e) {} };
+    /* 异步云端复核：本地值滞后但实际已续期 → checkVipExpiry 刷新后回调 mxGateRecheck 解锁 */
+    try { checkVipExpiry(); } catch (e) {}
+  }
   function toastSafe(s) { try { if (window.showToast) window.showToast(s); else alert(s); } catch (e) {} }
 
   function gate() {
@@ -26636,6 +26739,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       return;
     }
     if (isActivated()) {
+      /* [GATE478] 门禁：已激活但卡已过期（体验卡/月卡到期且未续）→ 上锁遮罩；永久卡（expire 空）不受影响 */
+      if (mxGateExpired()) { mxBuildLock(); mxGateWatch(); return; }
+      mxGateWatch();
       checkVipExpiry();
       if (lsGet(STORAGE.vip) === '1') {
         ensureUid().then(function (uid) {
@@ -27691,12 +27797,13 @@ function downloadResourceFromCloud(resId) {
         try { localStorage.removeItem('mengxing_expire_at'); } catch (e) {}
         if (!_noBanner) document.body.appendChild(mxBuildVipBanner('over', '⚠️ 您的 VIP 已过期，已自动恢复为普通账号。'));
         try { if (window.renderAccount) window.renderAccount(); } catch (e) {}
+        try { if (window.mxGateRecheck) window.mxGateRecheck(); } catch (eGR) {}
         return;
       }
       if (days <= 7 && !_noBanner) {
         document.body.appendChild(mxBuildVipBanner('warn', '🔔 您的 VIP 会员将在 ' + days + ' 天后到期，续费可保持多端数据同步。'));
       }
-    }).catch(function () {});
+    }).catch(function () {}).then(function () { try { if (window.mxGateRecheck) window.mxGateRecheck(); } catch (e2g) {} });
   }
 
   /* ================= VIP 多端同步(服务端云函数，断网降级) ================= */
