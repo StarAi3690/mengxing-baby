@@ -187,7 +187,7 @@
         <h3 style="margin:0" data-page-node-id="3cVAjHgBI1r87ODbnsnAdG">🔑 卡密绑定设备表 <code data-page-node-id="vxCgmqimBQ1qDKNhv1yXeN">card_activation</code></h3>
         <button class="btn ghost sm" onclick="exportCSV('cardsTable','卡密绑定设备表')" data-page-node-id="eg4WX0ceeEba21k3xDIvUC">⬇ 导出 CSV</button>
       </div>
-      <div class="scroll" data-page-node-id="mcnSblMrYTAJa22JrxTcDr"><table id="cardsTable" data-page-node-id="lk03RtghakFu0WPgN5GWoF"><thead data-page-node-id="eLdvsHpOq3gEfWiQsOmcFl"><tr data-page-node-id="5Ar5kEpuIQobCYaJ9fxZtW"><th data-page-node-id="EMs7CjIJOeD4FRt1J4vkQS">卡号(脱敏)</th><th data-page-node-id="3XBuc7pDGftbr0HfWgSuZ4">类型</th><th data-page-node-id="dmInumrHqmVmUXvGZfCjvT">等级</th><th data-page-node-id="ld13aJ7Cd5uE6lZgffk5WZ">状态</th><th data-page-node-id="UkyYBv5LiR3Kv7nrWNxHCq">绑定UID</th><th data-page-node-id="oFWjCugPak9RNh4r1hgGRl">绑定设备数</th><th data-page-node-id="fe9FhLCEa7aFBc4318BVCG">设备明细</th><th data-page-node-id="Zum50KlZLadkgS5NndB44P">激活时间</th><th data-page-node-id="wwS9YvVcUjnXiYP4OSGGyM">有效期</th><th data-page-node-id="C18MWG0kMVVqrwdGaKCGRG">有效期(天)</th></tr></thead><tbody data-page-node-id="SzxxgR2xNwbOsJCYvT6VSh"></tbody></table></div>
+      <div class="scroll" data-page-node-id="mcnSblMrYTAJa22JrxTcDr"><table id="cardsTable" data-page-node-id="lk03RtghakFu0WPgN5GWoF"><thead data-page-node-id="eLdvsHpOq3gEfWiQsOmcFl"><tr data-page-node-id="5Ar5kEpuIQobCYaJ9fxZtW"><th data-page-node-id="EMs7CjIJOeD4FRt1J4vkQS">卡号(脱敏)</th><th data-page-node-id="3XBuc7pDGftbr0HfWgSuZ4">类型</th><th data-page-node-id="dmInumrHqmVmUXvGZfCjvT">等级</th><th data-page-node-id="ld13aJ7Cd5uE6lZgffk5WZ">状态</th><th data-page-node-id="UkyYBv5LiR3Kv7nrWNxHCq">绑定UID</th><th data-page-node-id="oFWjCugPak9RNh4r1hgGRl">绑定设备数</th><th data-page-node-id="fe9FhLCEa7aFBc4318BVCG">设备明细</th><th data-page-node-id="Zum50KlZLadkgS5NndB44P">激活时间</th><th data-page-node-id="wwS9YvVcUjnXiYP4OSGGyM">有效期</th><th data-page-node-id="C18MWG0kMVVqrwdGaKCGRG">有效期(天)</th><th>操作</th></tr></thead><tbody data-page-node-id="SzxxgR2xNwbOsJCYvT6VSh"></tbody></table></div>
     </div>
 
     <div class="card" data-page-node-id="WVmjCEiopEcUdroVxAUIMm">
@@ -825,11 +825,22 @@ async function loadData(){
 }
 function renderCards(list){
   const tb = $('cardsTable').querySelector('tbody');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="sub">暂无已绑定卡密</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="11" class="sub">暂无已绑定卡密</td></tr>'; return; }
   tb.innerHTML = list.map(function(c){
     const vip = (c.vip === 'VIP') ? '<span class="pill" style="color:var(--ok)">VIP</span>' : '普通';
-    return '<tr><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+esc(c.status)+'</td><td>'+esc(c.ownerUid)+'</td><td><span class="pill" style="background:#eef6ff;color:var(--pri)">'+esc(Number(c.deviceCount)||0)+' 台</span></td><td style="font-family:ui-monospace,Consolas,monospace;font-size:11px;max-width:300px">'+esc((c.devices&&c.devices.length)?c.devices.join(' / '):'—')+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days||0)+'</td></tr>';
+    const frozen = !!c.frozen;
+    const stCell = frozen ? '<span class="pill" style="background:#fdecea;color:#c62828">已冻结</span>' : esc(c.status);
+    const full = esc(c.codeFull || c.code || '');
+    const op = full ? '<button class="btn ghost sm" onclick="mxCardFreeze(\''+full+'\','+(frozen?'false':'true')+')">'+(frozen?'✅ 解冻':'🚫 冻结')+'</button>' : '—';
+    return '<tr'+(frozen?' style="opacity:.55"':'')+'><td>'+esc(c.code)+'</td><td>'+vip+'</td><td>'+esc(c.level)+'</td><td>'+stCell+'</td><td>'+esc(c.ownerUid)+'</td><td><span class="pill" style="background:#eef6ff;color:var(--pri)">'+esc(Number(c.deviceCount)||0)+' 台</span></td><td style="font-family:ui-monospace,Consolas,monospace;font-size:11px;max-width:300px">'+esc((c.devices&&c.devices.length)?c.devices.join(' / '):'—')+'</td><td style="white-space:nowrap">'+esc(c.used_at)+'</td><td>'+esc(c.expire_at)+'</td><td>'+esc(c.valid_days||0)+'</td><td>'+op+'</td></tr>';
   }).join('');
+}
+/* [FREEZE479] 冻结/解冻卡密 */
+async function mxCardFreeze(code, freeze){
+  if(!confirm(freeze ? '确认冻结该卡密？\n该卡在所有设备上会立即失效并锁站。' : '确认解冻该卡密？')) return;
+  const r = await proxy('mxAdmin', { action:'cardFreeze', adminKey: ADMIN_KEY, code: code, freeze: !!freeze });
+  alert((r && r.msg) || (r && r.ok ? '操作成功' : '操作失败'));
+  if (r && r.ok) loadData();
 }
 function renderUsers(list){
   const tb = $('usersTable').querySelector('tbody');

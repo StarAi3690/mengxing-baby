@@ -26659,6 +26659,27 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   window.mxGateRecheck = mxGateRecheck;
   var _mxGateWatchTimer = 0;
+  /* [FREEZE479] 云端冻结复查：启动后静默复查一次已激活卡；被冻结→清本机激活态并立即锁站 */
+  var _mxFrozenChecked = false;
+  function mxGateFrozenCheck() {
+    if (_mxFrozenChecked) return;
+    _mxFrozenChecked = true;
+    var code = '';
+    try { code = lsGet(STORAGE.code) || ''; } catch (e) {}
+    if (!code || !isActivated()) return;
+    redeem(code, deviceId()).then(function (res) {
+      if (res && res.frozen) {
+        try {
+          localStorage.removeItem(STORAGE.activated);
+          localStorage.removeItem(STORAGE.code);
+          localStorage.removeItem('mengxing_expire_at');
+        } catch (e) {}
+        try { mxWriteVipInfo({ vip: 0, vip_level: '0', expire_at: '' }); } catch (e2) {}
+        try { mxBuildLock(true); } catch (e3) {}
+        try { if (window.showToast) window.showToast('⚠️ ' + ((res && res.msg) || '该卡密已被冻结')); } catch (e4) {}
+      }
+    }).catch(function () {});
+  }
   function mxGateWatch() {
     if (_mxGateWatchTimer) return;
     _mxGateWatchTimer = setInterval(function () {
@@ -26669,8 +26690,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (!document.hidden) { try { mxGateRecheck(); } catch (e) {} }
       });
     } catch (e) {}
+    /* [FREEZE479] 启动 3 秒后云端复查冻结状态 */
+    setTimeout(function () { try { mxGateFrozenCheck(); } catch (e) {} }, 3000);
   }
-  function mxBuildLock() {
+  function mxBuildLock(frozenMode) {
     var old = document.getElementById('mx-lock');
     if (old) return;
     var buyUrl = mxGateBuyoutUrl();
@@ -26682,8 +26705,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     g.innerHTML =
       '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(157,63,63,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
         '<div style="font-size:52px">🔒</div>' +
-        '<div style="font-size:21px;font-weight:800;color:#5f2b2b;margin:10px 0 6px">您的有效期已结束</div>' +
-        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用</div>' +
+        '<div style="font-size:21px;font-weight:800;color:#5f2b2b;margin:10px 0 6px">' + (frozenMode ? '⛔ 该卡密已被冻结' : '您的有效期已结束') + '</div>' +
+        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">' + (frozenMode ? '您的卡密已被管理员冻结，如有疑问请联系客服（350507945@qq.com）<br>如有新卡密可直接输入激活，孩子的学习数据已安全保留' : '卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用') + '</div>' +
         '<input id="mx-lock-code" maxlength="32" placeholder="输入新卡密立即续期" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #f3d9c2;border-radius:12px;outline:none"/>' +
         '<div id="mx-lock-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
         '<button id="mx-lock-renew" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.35)">立即续期</button>' +
