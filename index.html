@@ -26409,7 +26409,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   };
   function localRedeem(code, devId) {
     var c = (code || '').trim();
-    if (!/^[A-Za-z0-9!#$%&@]{16,}$/.test(c)) return Promise.resolve({ ok: false, msg: '请输入有效的卡密' });
+    if (!/^[!-~]{16,}$/.test(c)) return Promise.resolve({ ok: false, msg: '请输入有效的卡密' });
     // 永久测试码：限定 5 台设备 + 登录日志（仅本地演示模式）
     if (TEST_CODES[c]) return testCodeRedeem(c, devId);
     var hit = DEMO_CODES[c];
@@ -26560,7 +26560,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     function doActivate() {
       var code = (inp.value || '').trim();
       msg.textContent = '';
-      if (!/^[A-Za-z0-9!#$%&@]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
+      if (!/^[!-~]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
       btn.disabled = true; btn.textContent = '校验中…';
       redeem(code, deviceId()).then(function (res) {
         btn.disabled = false; btn.textContent = '立即激活';
@@ -26700,7 +26700,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     function doRenew() {
       var code = (inp.value || '').trim();
       msg.textContent = '';
-      if (!/^[A-Za-z0-9!#$%&@]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
+      if (!/^[!-~]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
       btn.disabled = true; btn.textContent = '校验中…';
       redeem(code, deviceId()).then(function (res) {
         btn.disabled = false; btn.textContent = '立即续期';
@@ -26868,7 +26868,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   function redeem(code, devId) {
     var c = (code || '').trim();
-    if (!/^[A-Za-z0-9!#$%&@]{16,}$/.test(c)) return Promise.resolve({ ok: false, msg: '请输入有效的卡密' });
+    if (!/^[!-~]{16,}$/.test(c)) return Promise.resolve({ ok: false, msg: '请输入有效的卡密' });
     /* 测试码：本地放行（不联网、不限设备），便于反复测试 */
     if (TEST_CODES[c]) return testCodeRedeem(c, devId);
     /* 直连 CloudBase HTTP 网关的 checkCard，绕开浏览器 CloudBase SDK 的安全域名白名单限制 */
