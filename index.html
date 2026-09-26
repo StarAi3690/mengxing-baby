@@ -26573,6 +26573,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
               lsSet(STORAGE.code, code);
               mxWriteVipInfo({ vip: 0, vip_level: '1', expire_at: (res && res.expire_at) ? String(res.expire_at) : '' });
               lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
+              mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种 */
               showLocalModePopup(function () { enterApp(false, '✅ 本机已识别，已自动恢复激活状态'); });
               return;
             }
@@ -26591,6 +26592,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         lsSet(STORAGE.activated, '1');
         lsSet(STORAGE.code, code);
         lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
+        mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种（formal=到期不锁站） */
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
         if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); });
         else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); });
@@ -26636,6 +26638,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     return t;
   }
   function mxGateExpired() { var t = mxGateExpMs(); return t > 0 && t <= Date.now(); }
+  /* [LOCK480] 权限拆分：本地使用权(控锁) 与 VIP权益(到期只降级+横幅) 分离。
+     正式卡(valid_days!==1：月卡/买断/正式VIP)到期 → 本地使用权永久保留，不锁站；
+     体验卡(valid_days===1)到期 → 锁站；无 kind 记录的旧数据 → 维持旧行为锁站（可用新增「直接登录」自救）。 */
+  function mxCardKind() { var k = ''; try { k = lsGet('mengxing_card_kind') || ''; } catch (e) {} return k; }
+  function mxSetCardKind(vd) { try { lsSet('mengxing_card_kind', Number(vd) === 1 ? 'trial' : 'formal'); } catch (e) {} }
+  function mxGateShouldLock() { return mxGateExpired() && mxCardKind() !== 'formal'; }
   function mxGateBuyoutUrl() {
     try {
       var list = (typeof MX_MALL_PRODUCTS === 'function') ? MX_MALL_PRODUCTS() : (window.MX_GOODS_MALL || []);
@@ -26649,13 +26657,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function mxGateRecheck() {
     var lock = document.getElementById('mx-lock');
     if (lock) {
-      if (mxGateExpired()) return; /* 仍过期：维持锁定 */
+      if (mxGateShouldLock()) return; /* [LOCK480] 仍该锁：维持锁定 */
       if (lock.parentNode) lock.parentNode.removeChild(lock);
       document.body.classList.remove('mx-gated');
       try { if (window.showToast) window.showToast('✅ 检测到有效期已续上，欢迎回来！'); } catch (e) {}
       return;
     }
-    if (isActivated() && mxGateExpired() && !document.getElementById('mx-gate')) mxBuildLock();
+    if (isActivated() && mxGateShouldLock() && !document.getElementById('mx-gate')) mxBuildLock();
   }
   window.mxGateRecheck = mxGateRecheck;
   var _mxGateWatchTimer = 0;
@@ -26668,6 +26676,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     try { code = lsGet(STORAGE.code) || ''; } catch (e) {}
     if (!code || !isActivated()) return;
     redeem(code, deviceId()).then(function (res) {
+      /* [LOCK480] 顺手回填卡种（旧数据无 kind）：ok/already_bound 响应带 valid_days；frozen 响应不带，跳过 */
+      if (res && (res.ok || res.already_bound)) { try { mxSetCardKind(res.valid_days); } catch (eK) {} }
       if (res && res.frozen) {
         try {
           localStorage.removeItem(STORAGE.activated);
@@ -26710,6 +26720,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<input id="mx-lock-code" maxlength="32" placeholder="输入新卡密立即续期" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #f3d9c2;border-radius:12px;outline:none"/>' +
         '<div id="mx-lock-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
         '<button id="mx-lock-renew" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.35)">立即续期</button>' +
+        '<button id="mx-lock-login-toggle" style="width:100%;margin-top:12px;padding:12px;border:1.5px solid #c5d6f2;background:#f4f8ff;border-radius:12px;color:#2b5cb8;font-size:14.5px;font-weight:700;cursor:pointer">🔑 已有账号？直接登录（免输卡密恢复）</button>' +
+        '<div id="mx-lock-login" style="display:none;margin-top:12px;text-align:left">' +
+          '<input id="mx-lock-acc" maxlength="64" placeholder="邮箱或用户名" style="width:100%;box-sizing:border-box;padding:13px 15px;font-size:15.5px;border:2px solid #d5e3f7;border-radius:12px;outline:none;margin-bottom:9px"/>' +
+          '<input id="mx-lock-pass" type="password" maxlength="64" placeholder="密码" style="width:100%;box-sizing:border-box;padding:13px 15px;font-size:15.5px;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
+          '<div id="mx-lock-lmsg" style="font-size:13px;color:#c62828;min-height:18px;margin:8px 0 2px"></div>' +
+          '<button id="mx-lock-login-btn" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#3f8ef5,#2b5cb8);color:#fff;font-size:15px;font-weight:700;cursor:pointer">登录并恢复</button>' +
+          '<div style="font-size:12px;color:#9aa9bd;margin-top:8px;text-align:center">账号名下有正式卡（月卡/买断/VIP）即可直接恢复使用，无需重新输卡密</div>' +
+        '</div>' +
         '<div style="display:flex;gap:10px;margin-top:14px">' +
           (buyUrl ? '<button id="mx-lock-buyout" style="flex:1;padding:12px;border:1.5px solid #ffb74d;background:#fff8ef;border-radius:12px;color:#b26a00;font-size:14px;font-weight:700;cursor:pointer">📀 本地买断版</button>' : '') +
           (vipUrl ? '<button id="mx-lock-vip" style="flex:1;padding:12px;border:1.5px solid #ffd9b3;background:#fffaf5;border-radius:12px;color:#c77800;font-size:14px;font-weight:700;cursor:pointer">👑 购买 VIP</button>' : '') +
@@ -26730,6 +26748,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (!res || !res.ok) { msg.textContent = (res && res.msg) || '续期失败，请重试'; return; }
         lsSet(STORAGE.code, code);
         lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
+        mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种 */
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
         if (g.parentNode) g.parentNode.removeChild(g);
         checkVipExpiry();
@@ -26739,6 +26758,59 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     btn.addEventListener('click', doRenew);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doRenew(); });
+    /* [LOCK480] 直接登录恢复：登录账号 → 云端查名下正式卡 → 恢复本地使用权（formal 卡=永久保留，不锁站） */
+    var lockLoginToggle = g.querySelector('#mx-lock-login-toggle');
+    var lockLoginPanel = g.querySelector('#mx-lock-login');
+    var lockAcc = g.querySelector('#mx-lock-acc');
+    var lockPass = g.querySelector('#mx-lock-pass');
+    var lockLoginBtn = g.querySelector('#mx-lock-login-btn');
+    var lockLoginMsg = g.querySelector('#mx-lock-lmsg');
+    if (lockLoginToggle) lockLoginToggle.onclick = function () {
+      lockLoginPanel.style.display = (lockLoginPanel.style.display === 'none') ? '' : 'none';
+    };
+    function doLockLogin() {
+      var acc = (lockAcc.value || '').trim();
+      var pwd = (lockPass.value || '').trim();
+      lockLoginMsg.textContent = '';
+      if (!acc || !pwd) { lockLoginMsg.textContent = '请输入账号和密码'; return; }
+      lockLoginBtn.disabled = true; lockLoginBtn.textContent = '登录中…';
+      var isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acc);
+      mxSignIn(acc, isEmail, pwd).then(function (j) {
+        if (!j) throw new Error('登录失败，请重试');
+        return ensureUid().then(function (uid) {
+          if (!uid) throw new Error('登录状态未就绪，请重试');
+          return window.mxApiProxy('getVipStatus', { uid: uid });
+        });
+      }).then(function (r) {
+        lockLoginBtn.disabled = false; lockLoginBtn.textContent = '登录并恢复';
+        if (!r || r.ok !== true) {
+          lockLoginMsg.textContent = (r && r.msg === '未找到激活记录') ? '该账号名下暂无正式卡，请输入新卡密激活' : ((r && r.msg) || '网络异常，请重试');
+          return;
+        }
+        if (r.frozen) { lockLoginMsg.textContent = '该账号的卡密已被冻结，请联系客服（350507945@qq.com）'; return; }
+        if (!r.vip && r.formal !== true) {
+          lockLoginMsg.textContent = r.expired ? '该账号名下只有已到期的体验卡，请输入新卡密续期' : '该账号名下暂无正式卡，请输入新卡密激活';
+          return;
+        }
+        /* 恢复：正式卡=本地使用权永久保留（kind=formal，到期也不锁站，VIP 到期只降级） */
+        var rcode = r.code || r.formal_code || '';
+        var rexp = r.vip ? (r.expire_at ? String(r.expire_at) : '') : (r.formal_expire_at ? String(r.formal_expire_at) : '');
+        lsSet(STORAGE.activated, '1');
+        if (rcode) lsSet(STORAGE.code, rcode);
+        lsSet('mengxing_expire_at', rexp);
+        mxSetCardKind('0'); /* 非1 → formal */
+        mxWriteVipInfo({ vip: r.vip ? 1 : 0, vip_level: '1', expire_at: rexp });
+        if (g.parentNode) g.parentNode.removeChild(g);
+        checkVipExpiry();
+        if (r.vip) { try { startVipSync(); } catch (e2) {} }
+        try { if (window.showToast) window.showToast('✅ 登录成功，已恢复使用权限，欢迎回来！'); } catch (e3) {}
+      }).catch(function (err) {
+        lockLoginBtn.disabled = false; lockLoginBtn.textContent = '登录并恢复';
+        lockLoginMsg.textContent = (err && err.message) || '登录失败，请重试';
+      });
+    }
+    if (lockLoginBtn) lockLoginBtn.addEventListener('click', doLockLogin);
+    if (lockPass) lockPass.addEventListener('keydown', function (e) { if (e.key === 'Enter') doLockLogin(); });
     var bo = g.querySelector('#mx-lock-buyout');
     if (bo) bo.onclick = function () { try { window.open(buyUrl, '_blank'); } catch (e) {} };
     var vv = g.querySelector('#mx-lock-vip');
@@ -26762,8 +26834,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       return;
     }
     if (isActivated()) {
-      /* [GATE478] 门禁：已激活但卡已过期（体验卡/月卡到期且未续）→ 上锁遮罩；永久卡（expire 空）不受影响 */
-      if (mxGateExpired()) { mxBuildLock(); mxGateWatch(); return; }
+      /* [GATE478][LOCK480] 门禁：已激活但该锁则锁（体验卡/未知旧数据到期且未续 → 锁；正式卡到期 → 本地使用权保留不锁）；永久卡（expire 空）不受影响 */
+      if (mxGateShouldLock()) { mxBuildLock(); mxGateWatch(); return; }
       mxGateWatch();
       checkVipExpiry();
       if (lsGet(STORAGE.vip) === '1') {
@@ -27809,6 +27881,8 @@ function downloadResourceFromCloud(resId) {
        放开「无 code 即跳过」的早退，让这类账号也能看到过期横幅（避免「同步静默失败却不知原因」） */
     if (!code && !_uid) return;
     window.mxApiProxy('getVipStatus', { code: code, uid: window.__mx_uid__ }).then(function (res) {
+      /* [LOCK480] 名下有正式卡 → 回填卡种 formal（本地使用权永久保留），必须在 expire 早退之前 */
+      if (res && res.ok && res.formal) { try { lsSet('mengxing_card_kind', 'formal'); } catch (eK) {} }
       if (!res || !res.ok || !res.expire_at) return;
       /* 以云端为准刷新本地过期时间，避免本地值被篡改/滞后 */
       lsSet('mengxing_expire_at', res.expire_at);
