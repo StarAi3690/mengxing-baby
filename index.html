@@ -94,7 +94,7 @@ const ENVIRONMENTS = {
 
   DEVELOPMENT: {
 
-    APP_VERSION: '2.4.5',
+    APP_VERSION: '2.4.6',
 
     ENV_NAME: '开发环境',
 
@@ -127,7 +127,7 @@ const ENVIRONMENTS = {
 
   BETA: {
 
-    APP_VERSION: '2.4.5',
+    APP_VERSION: '2.4.6',
 
     ENV_NAME: '内测环境',
 
@@ -156,7 +156,7 @@ const ENVIRONMENTS = {
 
   PRODUCTION: {
 
-    APP_VERSION: '2.4.5',
+    APP_VERSION: '2.4.6',
 
     ENV_NAME: '正式环境',
 
@@ -10243,6 +10243,8 @@ window.DB = {
         { id: 'phonics',  label: '自然拼读',   icon: '🗣️', page: 'page-phonics' },
 
 
+        { id: 'wchallenge', label: '单词闯关', icon: '🏃', page: 'page-wchallenge' },
+
         { id: 'estory',   label: '绘本',       icon: '📚', page: 'page-estory' }
 
       ]
@@ -10338,6 +10340,8 @@ window.DB = {
         { id: 'tool-print',  label: '口算题卡打印', icon: '🖨️', page: 'page-tool-print' },
 
         { id: 'tool-flash',  label: '学习闪卡生成', icon: '🃏', page: 'page-tool-flash' },
+
+        { id: 'tool-wlib', label: '英语单词库', icon: '📗', page: 'page-tool-wlib' },
 
         { id: 'tool-feedback', label: '建议与反馈', icon: '💌', page: 'page-feedback' }
 
@@ -10697,6 +10701,8 @@ window.DB = {
     'page-words':    { title: '生字独立页', desc: '213 个生字卡，含拼音、组词、笔画、点读发音，支持搜索与标记掌握。', icon: '✍️', tag: '已实装' },
 
     'page-estory':   { title: '英语绘本', desc: '英文原版绘本，逐句点读，双语对照模式。', icon: '📚', tag: '阶段四实现' },
+    'page-wchallenge': { title: '单词闯关', desc: '选角色赛跑答题：每轮10题混合题型，答对加速答错摔倒，完成得5积分。', icon: '🏃', tag: '已实装' },
+    'page-tool-wlib':  { title: '英语单词库', desc: '家长自定义单词库：单条录入或 Excel 批量导入，自动接入单词闯关。', icon: '📗', tag: '已实装' },
 
     'page-maththink':{ title: '数学思维', desc: '数感培养、逻辑推理、图形空间等思维训练。', icon: '🧠', tag: '阶段四实现' },
 
@@ -14810,6 +14816,378 @@ window.MX_SEED = data;
 
      ============================================= */
 
+
+
+
+  /* ================= 英语·单词闯关 [WCH481] =================
+     题库 = 内置词库(55词) + 家长自定义(DB setting: wch:customWords)
+     存储：wch:dailyLimit:{cid}=每日上限(默认5,家长台可调)
+          wch:plays:{cid}:{date}=今日已完成轮数
+     规则：每轮10题=题型1听音选图×5 + 题型2听音选词×4 + 题型3问句选图×1；
+          完成即得5积分；答对加速、答错摔倒减速；对手自动前进；
+          首次点击生效；中途退出不计次不发分；达上限拦截开始。 */
+  var WCH_SEED = [
+    { w:'cat',e:'🐱',zh:'猫' },{ w:'dog',e:'🐶',zh:'狗' },{ w:'duck',e:'🦆',zh:'鸭子' },{ w:'fish',e:'🐟',zh:'鱼' },{ w:'bird',e:'🐦',zh:'鸟' },{ w:'pig',e:'🐷',zh:'猪' },{ w:'bear',e:'🐻',zh:'熊' },{ w:'frog',e:'🐸',zh:'青蛙',c:'green' },{ w:'monkey',e:'🐵',zh:'猴子' },{ w:'lion',e:'🦁',zh:'狮子' },{ w:'tiger',e:'🐯',zh:'老虎' },
+    { w:'apple',e:'🍎',zh:'苹果',c:'red' },{ w:'banana',e:'🍌',zh:'香蕉',c:'yellow' },{ w:'orange',e:'🍊',zh:'橙子',c:'orange' },{ w:'grape',e:'🍇',zh:'葡萄',c:'purple' },{ w:'egg',e:'🥚',zh:'鸡蛋',c:'white' },{ w:'bread',e:'🍞',zh:'面包',c:'brown' },{ w:'rice',e:'🍚',zh:'米饭',c:'white' },{ w:'milk',e:'🥛',zh:'牛奶',c:'white' },{ w:'water',e:'💧',zh:'水',c:'blue' },{ w:'cake',e:'🎂',zh:'蛋糕' },{ w:'ice cream',e:'🍦',zh:'冰淇淋',c:'pink' },
+    { w:'sun',e:'☀️',zh:'太阳',c:'yellow' },{ w:'moon',e:'🌙',zh:'月亮',c:'white' },{ w:'star',e:'⭐',zh:'星星',c:'yellow' },{ w:'tree',e:'🌳',zh:'树',c:'green' },{ w:'flower',e:'🌸',zh:'花',c:'pink' },{ w:'cloud',e:'☁️',zh:'云',c:'white' },{ w:'rain',e:'🌧️',zh:'雨',c:'blue' },{ w:'snow',e:'❄️',zh:'雪',c:'white' },
+    { w:'car',e:'🚗',zh:'汽车',c:'red' },{ w:'bus',e:'🚌',zh:'公交车',c:'yellow' },{ w:'ball',e:'⚽',zh:'球',c:'white' },{ w:'book',e:'📖',zh:'书' },{ w:'pen',e:'🖊️',zh:'笔',c:'blue' },{ w:'cup',e:'🍵',zh:'杯子',c:'green' },{ w:'hat',e:'🎩',zh:'帽子',c:'black' },{ w:'shoe',e:'👟',zh:'鞋子',c:'red' },{ w:'sock',e:'🧦',zh:'袜子',c:'white' },{ w:'gift',e:'🎁',zh:'礼物',c:'red' },{ w:'key',e:'🔑',zh:'钥匙',c:'yellow' },{ w:'phone',e:'📱',zh:'手机',c:'black' },
+    { w:'eye',e:'👁️',zh:'眼睛',c:'white' },{ w:'ear',e:'👂',zh:'耳朵',c:'pink' },{ w:'nose',e:'👃',zh:'鼻子',c:'pink' },{ w:'mouth',e:'👄',zh:'嘴巴',c:'red' },{ w:'hand',e:'✋',zh:'手',c:'yellow' },{ w:'foot',e:'🦶',zh:'脚',c:'brown' },
+    { w:'big',e:'🐘',zh:'大的' },{ w:'small',e:'🐜',zh:'小的' },{ w:'hot',e:'🔥',zh:'热的',c:'red' },{ w:'cold',e:'🧊',zh:'冷的',c:'blue' },{ w:'happy',e:'😊',zh:'开心的',c:'yellow' },{ w:'sad',e:'😢',zh:'难过的',c:'blue' },{ w:'red',e:'🔴',zh:'红色',c:'red' },{ w:'blue',e:'🔵',zh:'蓝色',c:'blue' },{ w:'yellow',e:'🟡',zh:'黄色',c:'yellow' },{ w:'green',e:'🟢',zh:'绿色',c:'green' },{ w:'one',e:'1️⃣',zh:'一' },{ w:'two',e:'2️⃣',zh:'二' },{ w:'three',e:'3️⃣',zh:'三' }
+  ];
+  var WCH_ROLES = [ { id:'r1', e:'🐰', name:'小兔' }, { id:'r2', e:'🐢', name:'乌龟' }, { id:'r3', e:'🦊', name:'狐狸' } ];
+  var WCH_PTS = 5, WCH_DAILY_DEFAULT = 5, WCH_TOTAL = 10;
+  window.WCH_DAILY_DEFAULT = WCH_DAILY_DEFAULT;
+  window.speakTTS = speakTTS; /* [WCH481] 补导出：修复多处 window.speakTTS 防御调用恒为空的问题 */
+  var WCH = { round: null };
+
+  function wchDateStr() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  async function wchCid() { try { return (window.DB && await window.DB.getActiveChildId()) || 'default'; } catch (e) { return 'default'; } }
+  async function wchGet(k, fb) { try { return await window.DB.getSetting(k, fb); } catch (e) { return fb; } }
+  async function wchSet(k, v) { try { await window.DB.setSetting(k, v); } catch (e) {} }
+  function wchSpeakEn(t) { try { speakTTS(t, 'en-US'); } catch (e) {} }
+  function wchShuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function wchPick2(pool, not, needC) {
+    var cands = pool.filter(function (x) {
+      if (not.some(function (n) { return n.w === x.w; })) return false;
+      if (needC === 'diff') return true;
+      return true;
+    });
+    return wchShuffle(cands).slice(0, 2);
+  }
+  function wchQ1(stem, pool) { /* 听音选图片：显示单词文本，选图 */
+    var ops = wchShuffle([stem].concat(wchPick2(pool, [stem])));
+    return { type: 1, stem: stem, options: ops, correct: stem.w, say: stem.w };
+  }
+  function wchQ2(stem, pool) { /* 听音选单词：显示图片，选单词 */
+    var ops = wchShuffle([stem].concat(wchPick2(pool, [stem])));
+    return { type: 2, stem: stem, options: ops, correct: stem.w, say: stem.w };
+  }
+  function wchQ3(stem, pool) { /* 问句选图片：What's the X's color? */
+    var dis = wchShuffle(pool.filter(function (x) { return x.c && x.c !== stem.c && x.w !== stem.w; })).slice(0, 2);
+    var ops = wchShuffle([stem].concat(dis));
+    return { type: 3, stem: stem, options: ops, correct: stem.w, say: "What's the " + stem.w + "'s color?" };
+  }
+  function wchBuildRound(pool) {
+    var colored = pool.filter(function (x) { return x.c; });
+    var q3word = null;
+    if (colored.length) {
+      var cand = colored[Math.floor(Math.random() * colored.length)];
+      /* 题型3需要至少2个异色干扰项，否则退回题型1 */
+      if (pool.filter(function (x) { return x.c && x.c !== cand.c && x.w !== cand.w; }).length >= 2) q3word = cand;
+    }
+    var rest = wchShuffle(pool.filter(function (x) { return !q3word || x.w !== q3word.w; }));
+    var stems = rest.slice(0, 9);
+    while (stems.length < 9 && rest.length) stems.push(rest[stems.length % rest.length]);
+    var qs = [];
+    for (var i = 0; i < 5; i++) qs.push(wchQ1(stems[i], pool));
+    for (var j = 5; j < 9; j++) qs.push(wchQ2(stems[j], pool));
+    if (q3word) qs.push(wchQ3(q3word, pool));
+    else qs.push(wchQ1(stems[8 % Math.max(1, stems.length)], pool));
+    return wchShuffle(qs);
+  }
+  function wchPicHtml(word, big) {
+    if (word.e && word.e !== '🔤') return '<span style="font-size:' + (big ? 64 : 52) + 'px;line-height:1">' + word.e + '</span>';
+    return '<span style="display:inline-flex;align-items:center;justify-content:center;width:' + (big ? 84 : 68) + 'px;height:' + (big ? 84 : 68) + 'px;border-radius:16px;background:linear-gradient(135deg,#6ec6ff,#b388ff);color:#fff;font-size:' + (big ? 44 : 34) + 'px;font-weight:800">' + (word.w || '?').charAt(0).toUpperCase() + '</span>';
+  }
+
+  async function renderWChallenge() {
+    var sec = document.getElementById('page-wchallenge');
+    if (!sec) return;
+    var cid = await wchCid();
+    var dateStr = wchDateStr();
+    var limit = parseInt(await wchGet('wch:dailyLimit:' + cid, String(WCH_DAILY_DEFAULT)), 10); if (isNaN(limit) || limit < 1) limit = WCH_DAILY_DEFAULT;
+    var plays = parseInt(await wchGet('wch:plays:' + cid + ':' + dateStr, '0'), 10) || 0;
+    /* 题库：内置 + 自定义（去重，后者优先） */
+    var custom = [];
+    try { custom = JSON.parse(await wchGet('wch:customWords', '[]')) || []; } catch (e) { custom = []; }
+    var seen = {}, pool = [];
+    custom.concat(WCH_SEED).forEach(function (x) {
+      if (!x || !x.w) return;
+      var k = String(x.w).toLowerCase();
+      if (seen[k]) return; seen[k] = 1;
+      pool.push({ w: x.w, e: x.e || '', zh: x.zh || '', c: x.c || '' });
+    });
+
+    if (WCH.round && WCH.round.done !== true && WCH.round.quiz && WCH.round.quiz.length) {
+      wchRenderRace(sec, cid, dateStr, limit, plays, pool); return;
+    }
+    /* ---- 入口：今日进度 + 角色选择 ---- */
+    var blocked = plays >= limit;
+    var html = '<style>' +
+      '.wch-wrap{max-width:720px;margin:0 auto;font-family:inherit}' +
+      '.wch-roles{display:flex;gap:14px;justify-content:center;margin:18px 0}' +
+      '.wch-role{flex:1;max-width:170px;border:3px solid #e3e8f0;border-radius:18px;background:#fff;padding:18px 8px;text-align:center;cursor:pointer;transition:all .15s;user-select:none}' +
+      '.wch-role.sel{border-color:#ff9800;background:#fff8ee;box-shadow:0 6px 18px rgba(255,152,0,.25);transform:translateY(-3px)}' +
+      '.wch-role .re{font-size:52px;line-height:1}' +
+      '.wch-role .rn{font-size:16px;font-weight:700;color:#4a5568;margin-top:6px}' +
+      '.wch-btn{width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.3)}' +
+      '.wch-btn:disabled{background:#cfd8e3;box-shadow:none;cursor:not-allowed}' +
+      '</style>';
+    html += '<div class="wch-wrap"><div style="text-align:center;padding:8px 0 2px"><div style="font-size:40px">🏃‍♂️💨</div><div style="font-size:22px;font-weight:800;color:#37474f">单词闯关</div>' +
+      '<div style="font-size:13.5px;color:#8a93a6;margin-top:4px">答对加速跑，答错会摔倒哦！每轮 10 题，完成得 ' + WCH_PTS + ' 积分</div>' +
+      '<div style="font-size:14px;color:#546e7a;margin-top:6px">今日已闯关 <b style="color:#f4633a">' + plays + '</b> / ' + limit + ' 次（词库 ' + pool.length + ' 词）</div></div>';
+    if (blocked) {
+      html += '<div style="margin:26px auto;max-width:420px;background:#fff3e0;border:2px dashed #ffb74d;border-radius:16px;padding:22px;text-align:center;font-size:17px;font-weight:700;color:#e65100">😵 今天的闯关次数用完啦，明天再来吧！</div>';
+    } else {
+      html += '<div class="wch-roles" id="wch-roles">' + WCH_ROLES.map(function (r) {
+        return '<div class="wch-role" data-rid="' + r.id + '"><div class="re">' + r.e + '</div><div class="rn">' + r.name + '</div></div>';
+      }).join('') + '</div>';
+      html += '<div style="text-align:center;font-size:13px;color:#8a93a6;margin-bottom:10px">选 1 个角色出发，另外 2 个是对手哦</div>';
+      html += '<button class="wch-btn" id="wch-start" disabled>🏃 开始闯关</button>';
+    }
+    html += '</div>';
+    sec.innerHTML = html;
+    if (!blocked) {
+      var selId = null;
+      sec.querySelectorAll('.wch-role').forEach(function (el) {
+        el.onclick = function () {
+          sec.querySelectorAll('.wch-role').forEach(function (x) { x.classList.remove('sel'); });
+          el.classList.add('sel'); selId = el.getAttribute('data-rid');
+          var b = document.getElementById('wch-start'); if (b) b.disabled = false;
+          var me = WCH_ROLES.filter(function (r) { return r.id === selId; })[0];
+          if (me) wchSpeakEn(me.name === '小兔' ? 'rabbit' : (me.name === '乌龟' ? 'turtle' : 'fox'));
+        };
+      });
+      var sb = document.getElementById('wch-start');
+      if (sb) sb.onclick = function () {
+        if (!selId) return;
+        var me = WCH_ROLES.filter(function (r) { return r.id === selId; })[0];
+        var others = WCH_ROLES.filter(function (r) { return r.id !== selId; });
+        WCH.round = { me: me, ops: others, quiz: wchBuildRound(pool), idx: 0, pos: { p: 2, o1: 2, o2: 2 }, correct: 0, wrong: 0, locking: false, done: false };
+        wchSpeakEn('Ready? Go!');
+        renderWChallenge();
+      };
+    }
+  }
+
+  function wchRenderRace(sec, cid, dateStr, limit, plays, pool) {
+    var R = WCH.round;
+    var html = '<style>' +
+      '.wch-track{position:relative;height:64px;background:linear-gradient(180deg,#e8f5e9,#c8e6c9);border-radius:14px;margin:8px 0;overflow:hidden}' +
+      '.wch-lane{position:relative;height:100%}' +
+      '.wch-runner{position:absolute;top:50%;transform:translateY(-50%);font-size:36px;left:2%;transition:left .55s ease;will-change:left;z-index:2}' +
+      '.wch-finish{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:26px;z-index:1}' +
+      '.wch-fall{animation:wchFall .8s ease}' +
+      '@keyframes wchFall{0%{transform:translateY(-50%) rotate(0)}30%{transform:translateY(-50%) rotate(-28deg) translateX(-6px)}55%{transform:translateY(-50%) rotate(20deg)}75%{transform:translateY(-50%) rotate(-10deg)}100%{transform:translateY(-50%) rotate(0)}}' +
+      '.wch-qcard{background:#fff;border-radius:18px;padding:18px 14px;box-shadow:0 4px 16px rgba(0,0,0,.06);text-align:center}' +
+      '.wch-word{font-size:34px;font-weight:800;color:#37474f;letter-spacing:1px}' +
+      '.wch-say{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;border:none;background:#e3f2fd;font-size:22px;cursor:pointer;margin-left:10px;vertical-align:middle}' +
+      '.wch-opts{display:flex;gap:12px;justify-content:center;margin-top:14px;flex-wrap:wrap}' +
+      '.wch-opt{flex:1;min-width:96px;max-width:170px;border:3px solid #e3e8f0;border-radius:16px;background:#fafbfd;padding:14px 6px;cursor:pointer;text-align:center;transition:all .12s;user-select:none}' +
+      '.wch-opt .ow{font-size:19px;font-weight:700;color:#455a64;margin-top:4px;word-break:break-word}' +
+      '.wch-opt.ok{border-color:#66bb6a;background:#e8f5e9}' +
+      '.wch-opt.bad{border-color:#ef5350;background:#ffebee;opacity:.75}' +
+      '.wch-fb{min-height:30px;font-size:17px;font-weight:800;margin-top:10px}' +
+      '.wch-exit{background:none;border:none;color:#b0bec5;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline}' +
+      '</style>';
+    html += '<div class="wch-wrap">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:14px;font-weight:700;color:#546e7a">第 ' + (R.idx + 1) + ' / ' + R.quiz.length + ' 题 · ✅' + R.correct + ' ❌' + R.wrong + '</div><button class="wch-exit" id="wch-exit">退出本轮</button></div>';
+    /* 赛道：3 条道 */
+    var lanes = [
+      { who: R.me, key: 'p', label: '我' },
+      { who: R.ops[0], key: 'o1', label: R.ops[0].name },
+      { who: R.ops[1], key: 'o2', label: R.ops[1].name }
+    ];
+    lanes.forEach(function (L) {
+      html += '<div class="wch-track"><div class="wch-finish">🏁</div><div class="wch-runner" id="wch-r-' + L.key + '" style="left:' + Math.min(92, R.pos[L.key]) + '%">' +
+        '<span style="font-size:36px">' + L.who.e + '</span><span style="font-size:11px;font-weight:700;color:#607d8b;vertical-align:bottom;margin-left:2px">' + L.label + '</span></div></div>';
+    });
+    /* 题区 */
+    var q = R.quiz[R.idx];
+    html += '<div class="wch-qcard" id="wch-qcard">';
+    if (q.type === 1) {
+      html += '<div><span class="wch-word">' + q.stem.w + '</span><button class="wch-say" id="wch-say">🔊</button></div>';
+    } else if (q.type === 2) {
+      html += '<div>' + wchPicHtml(q.stem, true) + '<button class="wch-say" id="wch-say">🔊</button></div>';
+    } else {
+      html += '<div><span class="wch-word" style="font-size:24px">' + q.say + '</span><button class="wch-say" id="wch-say">🔊</button></div>';
+    }
+    html += '<div class="wch-opts">' + q.options.map(function (o, i) {
+      var inner;
+      if (q.type === 2) inner = '<div style="font-size:23px;font-weight:800;color:#455a64;padding:10px 0">' + o.w + '</div>'; /* 题型2：下方只有单词 */
+      else inner = wchPicHtml(o) + '<div class="ow">' + (q.type === 1 ? '' : o.w) + '</div>'; /* 题型1/3：只显示图片 */
+      return '<div class="wch-opt" data-i="' + i + '">' + inner + '</div>';
+    }).join('') + '</div>';
+    html += '<div class="wch-fb" id="wch-fb"></div></div>';
+    html += '</div>';
+    sec.innerHTML = html;
+
+    wchSpeakEn(q.say);
+    var sayBtn = document.getElementById('wch-say');
+    if (sayBtn) sayBtn.onclick = function () { wchSpeakEn(q.say); };
+    var exitBtn = document.getElementById('wch-exit');
+    if (exitBtn) exitBtn.onclick = function () {
+      if (window.confirm('退出将不获得积分，确定退出本轮吗？')) { WCH.round = null; renderWChallenge(); }
+    };
+    var locked = false;
+    sec.querySelectorAll('.wch-opt').forEach(function (el) {
+      el.onclick = function () {
+        if (locked) return; locked = true; /* 只允许第一次作答生效 */
+        var o = q.options[parseInt(el.getAttribute('data-i'), 10)];
+        var ok = o.w === q.correct;
+        var fb = document.getElementById('wch-fb');
+        if (ok) {
+          el.classList.add('ok'); R.correct++;
+          if (fb) fb.innerHTML = '<span style="color:#43a047">✅ 答对啦！加速冲呀～</span>';
+          R.pos.p = Math.min(92, R.pos.p + 8 + Math.floor(Math.random() * 3));
+        } else {
+          el.classList.add('bad');
+          var okEl = Array.prototype.filter.call(sec.querySelectorAll('.wch-opt'), function (x) { return q.options[parseInt(x.getAttribute('data-i'), 10)].w === q.correct; })[0];
+          if (okEl) okEl.classList.add('ok');
+          R.wrong++;
+          if (fb) fb.innerHTML = '<span style="color:#e53935">❌ 哎呀，被石头绊倒了！正确答案：' + q.correct + '</span>';
+          R.pos.p = Math.min(92, R.pos.p + 3);
+          var pr = document.getElementById('wch-r-p');
+          if (pr) { pr.classList.add('wch-fall'); setTimeout(function () { pr.classList.remove('wch-fall'); }, 850); }
+        }
+        /* 对手前进 */
+        R.pos.o1 = Math.min(92, R.pos.o1 + 4 + Math.floor(Math.random() * 5));
+        R.pos.o2 = Math.min(92, R.pos.o2 + 4 + Math.floor(Math.random() * 5));
+        lanes.forEach(function (L) {
+          var el = document.getElementById('wch-r-' + L.key);
+          if (el) el.style.left = Math.min(92, R.pos[L.key]) + '%';
+        });
+        setTimeout(function () {
+          R.idx++;
+          if (R.idx >= R.quiz.length) { wchFinish(sec, cid, dateStr, pool); }
+          else renderWChallenge();
+        }, ok ? 1100 : 1500);
+      };
+    });
+  }
+
+  async function wchFinish(sec, cid, dateStr, pool) {
+    var R = WCH.round;
+    var arr = [{ k: 'p', pos: R.pos.p, who: R.me }, { k: 'o1', pos: R.pos.o1, who: R.ops[0] }, { k: 'o2', pos: R.pos.o2, who: R.ops[1] }];
+    arr.sort(function (a, b) { return b.pos - a.pos; });
+    var rank = arr.findIndex(function (x) { return x.k === 'p'; }) + 1;
+    var rankTxt = ['🥇 第 1 名', '🥈 第 2 名', '🥉 第 3 名'][rank - 1] || '';
+    /* 结算：完成即得积分 + 次数+1 */
+    var newTotal = null;
+    try { newTotal = await window.addPoints(cid, WCH_PTS, '单词闯关完成一轮'); } catch (e) {}
+    var plays2 = (parseInt(await wchGet('wch:plays:' + cid + ':' + dateStr, '0'), 10) || 0) + 1;
+    await wchSet('wch:plays:' + cid + ':' + dateStr, String(plays2));
+    WCH.round = null;
+    try { if (window.showToast) window.showToast('🎉 单词闯关完成，' + WCH_PTS + ' 积分到账！'); } catch (e) {}
+    try { if (window.refreshCoinBanner) window.refreshCoinBanner(); } catch (e) {}
+    var limit2 = parseInt(await wchGet('wch:dailyLimit:' + cid, String(WCH_DAILY_DEFAULT)), 10) || WCH_DAILY_DEFAULT;
+    var html = '<div class="wch-wrap" style="text-align:center;padding:30px 10px">' +
+      '<div style="font-size:52px">' + (rank === 1 ? '🏆' : '🎉') + '</div>' +
+      '<div style="font-size:24px;font-weight:800;color:#37474f;margin:6px 0">闯关完成！</div>' +
+      '<div style="font-size:16px;color:#546e7a">答对 <b style="color:#43a047">' + R.correct + '</b> 题 · 答错 <b style="color:#e53935">' + R.wrong + '</b> 题</div>' +
+      '<div style="font-size:20px;font-weight:800;color:#f4633a;margin:10px 0">' + rankTxt + '</div>' +
+      '<div style="display:inline-block;background:#fff8ee;border:2px solid #ffd54f;border-radius:14px;padding:10px 22px;font-size:17px;font-weight:800;color:#e65100">+' + WCH_PTS + ' 积分' + (newTotal != null ? '（现有 ' + newTotal + ' 分）' : '') + '</div>' +
+      '<div style="font-size:13.5px;color:#8a93a6;margin-top:10px">今日已闯关 ' + plays2 + ' / ' + limit2 + ' 次</div>' +
+      '<div style="margin-top:18px"><button class="wch-btn" id="wch-again"' + (plays2 >= limit2 ? ' disabled' : '') + '>' + (plays2 >= limit2 ? '今天的次数用完啦，明天再来！' : '🏃 再来一轮') + '</button></div>' +
+      '</div>';
+    sec.innerHTML = html;
+    var ab = document.getElementById('wch-again');
+    if (ab && plays2 < limit2) ab.onclick = function () { renderWChallenge(); };
+  }
+
+  /* ================= 智能工具·英语单词库 [WCH481-TOOL] ================= */
+  async function renderWLib() {
+    var sec = document.getElementById('page-tool-wlib');
+    if (!sec) return;
+    var custom = [];
+    try { custom = JSON.parse(await wchGet('wch:customWords', '[]')) || []; } catch (e) { custom = []; }
+    var html = '<style>' +
+      '.wlib-tb{width:100%;border-collapse:collapse;font-size:14px}' +
+      '.wlib-tb th,.wlib-tb td{border-bottom:1px solid #eef1f6;padding:7px 6px;text-align:left}' +
+      '.wlib-del{border:none;background:#ffebee;color:#c62828;border-radius:8px;padding:3px 10px;cursor:pointer;font-size:12.5px}' +
+      '.wlib-in{border:2px solid #e3e8f0;border-radius:10px;padding:8px 10px;font-size:15px;outline:none}' +
+      '.wlib-in:focus{border-color:#ff9800}' +
+      '</style>';
+    html += '<div style="max-width:720px;margin:0 auto">';
+    html += '<div style="text-align:center;padding:4px 0 8px"><div style="font-size:34px">📗</div><div style="font-size:20px;font-weight:800;color:#37474f">英语单词库</div>' +
+      '<div style="font-size:13px;color:#8a93a6">家长在这里添加单词，自动进入「单词闯关」题库。当前：自定义 <b>' + custom.length + '</b> 词 + 内置 <b>' + WCH_SEED.length + '</b> 词</div></div>';
+    /* 单条录入 */
+    html += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05);margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:8px">➕ 添加单词</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<input class="wlib-in" id="wlib-w" placeholder="英文单词（必填）" style="flex:2;min-width:130px">' +
+      '<input class="wlib-in" id="wlib-e" placeholder="图标 emoji（可选）" style="flex:1;min-width:100px">' +
+      '<input class="wlib-in" id="wlib-zh" placeholder="中文意思（可选）" style="flex:1;min-width:100px">' +
+      '<button id="wlib-add" style="border:none;border-radius:10px;background:linear-gradient(90deg,#66bb6a,#43a047);color:#fff;font-weight:800;padding:9px 18px;cursor:pointer">添加</button>' +
+      '</div><div style="font-size:12px;color:#90a4ae;margin-top:6px">没有图标也可以，闯关里会显示首字母卡片；建议配上 emoji 更直观。</div></div>';
+    /* 批量导入 */
+    html += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05);margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:8px">📥 批量导入（Excel / WPS 复制粘贴）</div>' +
+      '<textarea id="wlib-txt" class="wlib-in" style="width:100%;min-height:90px;font-size:13.5px" placeholder="每行一个单词：单词,图标,中文&#10;例：elephant,🐘,大象&#10;也可从 Excel 直接复制多行粘贴；表头会自动跳过"></textarea>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+      '<button id="wlib-imp" style="border:none;border-radius:10px;background:linear-gradient(90deg,#42a5f5,#1e88e5);color:#fff;font-weight:800;padding:9px 18px;cursor:pointer">开始导入</button>' +
+      '<button id="wlib-exp" style="border:none;border-radius:10px;background:#eceff1;color:#455a64;font-weight:700;padding:9px 14px;cursor:pointer">📋 导出全部</button>' +
+      '</div><div id="wlib-msg" style="font-size:13px;color:#2e7d32;margin-top:6px"></div></div>';
+    /* 列表 */
+    html += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05)">' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:6px">📚 我的单词（' + custom.length + '）</div>';
+    if (!custom.length) {
+      html += '<div style="font-size:13.5px;color:#b0bec5;padding:14px 0;text-align:center">还没有自定义单词，用上面两种方式添加吧～（内置 ' + WCH_SEED.length + ' 词已可直接闯关）</div>';
+    } else {
+      html += '<table class="wlib-tb"><tr><th>图标</th><th>单词</th><th>中文</th><th></th></tr>' +
+        custom.map(function (x, i) {
+          return '<tr><td style="font-size:22px">' + (x.e || '🔤') + '</td><td style="font-weight:700">' + x.w + '</td><td>' + (x.zh || '—') + '</td>' +
+            '<td><button class="wlib-del" data-i="' + i + '">删除</button></td></tr>';
+        }).join('') + '</table>';
+    }
+    html += '</div></div>';
+    sec.innerHTML = html;
+
+    async function wlibSave(arr, msg) { await wchSet('wch:customWords', JSON.stringify(arr)); if (msg) { var m = document.getElementById('wlib-msg'); if (m) m.textContent = msg; } }
+    var addBtn = document.getElementById('wlib-add');
+    if (addBtn) addBtn.onclick = async function () {
+      var w = (document.getElementById('wlib-w').value || '').trim();
+      var e = (document.getElementById('wlib-e').value || '').trim();
+      var zh = (document.getElementById('wlib-zh').value || '').trim();
+      if (!w) { if (window.showToast) window.showToast('请先填写英文单词'); return; }
+      var arr = custom.filter(function (x) { return x.w.toLowerCase() !== w.toLowerCase(); });
+      arr.push({ w: w, e: e, zh: zh });
+      await wlibSave(arr, '✅ 已添加「' + w + '」');
+      if (window.showToast) window.showToast('✅ 已加入单词闯关题库');
+      renderWLib();
+    };
+    var impBtn = document.getElementById('wlib-imp');
+    if (impBtn) impBtn.onclick = async function () {
+      var txt = (document.getElementById('wlib-txt').value || '').trim();
+      if (!txt) { if (window.showToast) window.showToast('请先粘贴内容'); return; }
+      var rows = txt.split(/\r?\n/), add = 0, upd = 0, skip = 0, parsed = [];
+      rows.forEach(function (ln) {
+        ln = ln.trim(); if (!ln) return;
+        var cols = ln.split(/\t|,|，/).map(function (s) { return s.trim(); });
+        if (!cols[0]) return;
+        if (/^(单词|word|英文)$/i.test(cols[0])) return; /* 表头 */
+        parsed.push({ w: cols[0], e: cols[1] || '', zh: cols[2] || '' });
+      });
+      var arr = custom.slice();
+      parsed.forEach(function (p) {
+        if (!/^[!-~]{1,40}$/.test(p.w) && !/^[A-Za-z ]{1,40}$/.test(p.w)) { skip++; return; }
+        var hit = arr.filter(function (x) { return x.w.toLowerCase() === p.w.toLowerCase(); })[0];
+        if (hit) { hit.e = p.e || hit.e; hit.zh = p.zh || hit.zh; upd++; }
+        else { arr.push(p); add++; }
+      });
+      await wlibSave(arr, null);
+      await renderWLib(); /* [WCH481fix] 必须 await：否则 msg 写在旧 DOM 上被重渲染清空 */
+      var m2 = document.getElementById('wlib-msg');
+      if (m2) m2.textContent = '✅ 导入完成：新增 ' + add + ' / 更新 ' + upd + ' / 跳过 ' + skip;
+      if (window.showToast) window.showToast('✅ 导入完成：新增 ' + add + '，更新 ' + upd);
+    };
+    var expBtn = document.getElementById('wlib-exp');
+    if (expBtn) expBtn.onclick = function () {
+      var s = custom.map(function (x) { return [x.w, x.e || '', x.zh || ''].join('\t'); }).join('\n');
+      var t = document.getElementById('wlib-txt');
+      if (t) { t.value = s || '（空）'; t.focus(); t.select(); if (window.showToast) window.showToast('已填入文本框，可全选复制或直接粘贴回导入'); }
+    };
+    sec.querySelectorAll('.wlib-del').forEach(function (b) {
+      b.onclick = async function () {
+        var i = parseInt(b.getAttribute('data-i'), 10);
+        custom.splice(i, 1);
+        await wlibSave(custom);
+        renderWLib();
+      };
+    });
+  }
+  /* ================= 单词闯关 [WCH481] 结束 ================= */
+
   const RENDER_MAP = {
 
     'page-pinyin':    renderPinyin,
@@ -14821,6 +15199,8 @@ window.MX_SEED = data;
     'page-abc':       renderAbc,
 
     'page-phonics':   renderPhonics,
+    'page-wchallenge': renderWChallenge,
+    'page-tool-wlib':   renderWLib,
 
     'page-algo':      renderQuiz,
 
@@ -21909,6 +22289,14 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<span class="mx-note-inline">次/天。设置为0则不限制。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-rh-save" style="margin-top:8px">💾 保存节奏盒子设置</button>';
     h += '</div>';
+    /* [WCH481] 英语单词闯关设置 */
+    var __wchToday = (function(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); })();
+    h += '<div class="mx-card no-print"><div class="mx-card-t">🏃 英语单词闯关</div>';
+    h += '<div class="mx-setting-row"><label>每日闯关次数上限</label>';
+    h += '<input type="number" class="mx-input" id="pt-wch-limit" min="1" max="20" value="' + (await sget('wch:dailyLimit:' + c, String(window.WCH_DAILY_DEFAULT || 5))) + '" style="width:70px">';
+    h += '<span class="mx-note-inline">次/天（默认5）。今日已闯关 <b>' + (await sget('wch:plays:' + c + ':' + __wchToday, '0')) + '</b> 次。</span></div>';
+    h += '<button class="mx-btn mx-btn-main" id="pt-wch-save" style="margin-top:8px">💾 保存单词闯关设置</button>';
+    h += '</div>';
 
     /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 / 自主导入 ---- */
     h += '<div class="mx-card no-print"><div class="mx-card-t">🛠️ 家长工具箱</div>';
@@ -22064,6 +22452,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       if (sel) { await window.DB.setSetting('rhythm:speed:' + c, sel.value); }
       if (inp) { var v = parseInt(inp.value, 10); if (isNaN(v)) v = window.RH_DEFAULT_DAILY_LIMIT; await window.DB.setSetting('rhythm:dailyLimit:' + c, String(v)); }
       toast('💾 节奏盒子设置已保存！');
+    };
+    /* [WCH481] 单词闯关设置保存 */
+    var wchSaveBtn = $('pt-wch-save');
+    if (wchSaveBtn) wchSaveBtn.onclick = async function () {
+      var inp = $('pt-wch-limit');
+      if (inp) { var v = parseInt(inp.value, 10); if (isNaN(v) || v < 1) v = window.WCH_DAILY_DEFAULT || 5; await window.DB.setSetting('wch:dailyLimit:' + c, String(v)); }
+      toast('💾 单词闯关设置已保存！');
     };
 
     /* 页签切换：主页/日历/套组 在同一页内切换，不触发 navigateTo，因此不重复弹密码 */
