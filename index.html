@@ -3742,7 +3742,8 @@ html, body {
 
 }
 
-.poem-art img { width: 100%; height: 100%; object-fit: cover; }
+.poem-art img { width: 100%; height: 100%; object-fit: contain; }
+  .poem-head .mx-wrong-add { width: auto; min-height: 26px; padding: 2px 10px; font-size: 12px; border-radius: 8px; flex: none; margin-top: 0; }
 
 .poem-art.no-img { display: block; }
 
@@ -13807,7 +13808,7 @@ window.MX_SEED = data;
 
             <span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span>
 
-            <button class="speak-btn" data-say="${(p.title || '')}" data-dir="poem" title="播放">🔊</button>\n            <button class="speak-btn" data-say="${poemSayAll(p)}" data-lang="zh-CN" title="朗读全诗">▶️</button>
+            <button class="speak-btn" data-say="${poemSayAll(p)}" data-lang="zh-CN" title="朗读全诗">▶️</button>
             <button class="mx-wrong-add" data-wrong-add data-wrong-subject="古诗" data-wrong-q="${(p.title || '')}">📕错题</button>
 
           </div>
@@ -13828,7 +13829,7 @@ window.MX_SEED = data;
 
       <div class="poem-list" id="poem-list">${cards}</div>
 
-      <div class="empty-tip">意境图为占位色块，image_url 非空时自动替换为 AI 插画 · 🔊 点按试听(poem/标题.mp3)</div>`);
+      <div class="empty-tip">意境图为占位色块，image_url 非空时自动替换为插画 · ▶️ 朗读全诗</div>`);
 
     bindSpeak('#poem-list');
 
