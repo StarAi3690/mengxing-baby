@@ -2998,7 +2998,7 @@ html, body {
 
 .speak-btn:active { transform: scale(0.95); }
 
-.speak-btn.speaking { animation: speak-pulse 0.8s infinite; }
+.speak-btn.speaking { animation: speak-pulse 0.8s infinite; background: #e3f6e6; box-shadow: 0 0 0 2px rgba(76,175,80,.35), 0 0 14px 4px rgba(76,175,80,.25); }
 
 
 
@@ -3674,15 +3674,21 @@ html, body {
 
 .poem-content {
 
-  font-size: 30px;
+  font-size: 33px;
 
-  line-height: 2.2;
+  line-height: 2.15;
 
   color: var(--text-primary);
 
   white-space: normal;
 
-  text-align: center;
+  text-align: justify;
+
+  text-align-last: justify;
+
+  -moz-text-align-last: justify;
+
+  padding: 0 4px;
 
 }
 
@@ -3767,7 +3773,7 @@ html, body {
     .poem-card.poem-figure { display: grid; grid-template-columns: 1.05fr 1fr; column-gap: 26px; padding: 18px 22px; align-items: center; }
     .poem-card.poem-figure .poem-body { display: contents; }
     .poem-card.poem-figure .poem-head { grid-column: 1; grid-row: 1; }
-    .poem-card.poem-figure .poem-content { grid-column: 1; grid-row: 2; font-size: 27px; text-align: center; }
+    .poem-card.poem-figure .poem-content { grid-column: 1; grid-row: 2; font-size: 30px; text-align: justify; text-align-last: justify; -moz-text-align-last: justify; }
     .poem-card.poem-figure .poem-art { grid-column: 2; grid-row: 1 / span 2; align-self: center; border-radius: 12px; overflow: hidden; }
     .poem-card.poem-figure .poem-trans { grid-column: 2; grid-row: 3; margin-top: 10px; padding: 10px 2px 0; border-top: 1px dashed var(--border-color, #eee); border-left: none; }
   }
@@ -14059,16 +14065,24 @@ window.MX_SEED = data;
           try { if (window.__mxCurAudio && !window.__mxCurAudio.paused) window.__mxCurAudio.pause(); } catch (e5) {}
           var au = new Audio(); window.__mxCurAudio = au; au.preload = 'auto';
           var _fired488 = false;
-          var _fb488 = function () { if (_fired488) return; _fired488 = true; au.onerror = null; speak(text, lang, dir); };
-          au.onerror = _fb488;
+          /* [#POEM489] 播放动效持续到音频真正结束（或回退 TTS 时限时） */
+          var _end489 = function () { if (_fired488) return; _fired488 = true; btn.classList.remove('speaking'); };
+          var _fb489 = function () {
+            if (_fired488) return; _fired488 = true; au.onerror = null;
+            speak(text, lang, dir);
+            setTimeout(function () { btn.classList.remove('speaking'); }, 3000);
+          };
+          au.onerror = _fb489;
+          au.onended = _end489;
+          au.onpause = function () { if (!_fired488) { _fired488 = true; btn.classList.remove('speaking'); } };
           au.src = btn.dataset.mp3;
           var _pr488 = au.play();
-          if (_pr488 && _pr488.catch) _pr488.catch(_fb488);
+          if (_pr488 && _pr488.catch) _pr488.catch(_fb489);
         }
 
         else speak(text, lang, dir);
 
-        setTimeout(() => btn.classList.remove('speaking'), 1200);
+        if (!btn.dataset.mp3) setTimeout(() => btn.classList.remove('speaking'), 1200);
 
       } else if (card) {
 
