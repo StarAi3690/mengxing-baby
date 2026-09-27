@@ -26169,7 +26169,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var close = document.getElementById('mx22-wclose');
     if (close) close.onclick = function () { modal.remove(); };
     var sp = document.getElementById('mx22-wspeak');
-    if (sp) sp.onclick = function () { if (window.speakTTS) window.speakTTS(w.word + '，' + (w.group || ''), 'zh-CN'); };
+    if (sp) sp.onclick = function () {
+      /* [WORDS480] 与识字/生成器字卡同链路：本地拼音音频优先（playAudio 失败自动 TTS），无拼音整字 TTS */
+      var syls = String(w.pinyin || '').split(/\s+/).filter(Boolean);
+      if (window.mxPlayAudio && syls.length) {
+        syls.forEach(function (s, k) { setTimeout(function () { try { window.mxPlayAudio(s, 'zh-CN', 'pinyin'); } catch (e) { console.error('[WORDS480] 播放失败', e); } }, k * 450); });
+      } else if (window.speakTTS) {
+        window.speakTTS(w.word + '，' + (w.group || ''), 'zh-CN');
+      } else if (window.showToast) {
+        window.showToast('🔇 当前设备不支持语音');
+      }
+    };
     var m = document.getElementById('mx22-wmaster');
     if (m) m.onclick = function () {
       var list = wordsList(), idx = -1;
