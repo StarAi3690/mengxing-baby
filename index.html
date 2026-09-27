@@ -13841,7 +13841,8 @@ window.MX_SEED = data;
 
         <div class="abc-phone">${c.phonetic}</div>
 
-        <button class="speak-btn" data-say="${c.lower}" data-lang="en-US" data-dir="english">🔊</button>
+        <button class="speak-btn" data-say="${c.lower}" data-lang="en-US" data-dir="english" title="读字母">🔊</button>
+        <button class="speak-btn" data-say="${c.word}" data-lang="en-US" data-dir="english" title="读单词">📢</button>
         <button class="mx-wrong-add" data-wrong-add data-wrong-subject="英文26字母" data-wrong-q="${c.word}">📕错题</button>
 
       </div>`).join('');
