@@ -15182,6 +15182,20 @@ window.MX_SEED = data;
 {w:'stop',e:'🛑',zh:'停下',c:'red'}, {w:'wait sign',e:'✋',zh:'等一下',c:'yellow'}, {w:'turn',e:'↩️',zh:'转弯'},
 {w:'straight ahead',e:'⬆️',zh:'直走'}
   ];
+  /* [#WCH491] 难度分级词表（1=初级2~4岁 2=中级4~6岁 3=高级6~10岁），源=单词分级映射表 */
+  var WCH_LV1='cat,dog,duck,fish,bird,pig,bear,frog,monkey,lion,tiger,horse,cow,sheep,goat,mouse,rabbit,fox,wolf,deer,panda,butterfly,bee,ant,worm,chicken,rooster,swan,dove,bat,turtle,crab,apple,banana,orange,egg,bread,rice,milk,water,cake,noodles,soup,pie,juice,tea,meat,salt,corn,eye,ear,nose,mouth,hand,foot,finger,tooth,hair,head,leg,arm,back,knee,face,bone,mama,papa,brother,sister,grandma,grandpa,baby,family,boy,girl,man,cook,king,red,blue,yellow,green,purple,pink,brown,black,white,gray,one,two,three,four,five,six,seven,eight,nine,ten,zero,car,bus,ship,boat,road,sun,moon,star,tree,flower,rain,snow,wind,fog,leaf,sand,fire,soil,cave,night,seed,hat,shoe,sock,coat,belt,door,window,table,chair,bed,sofa,lamp,tv,box,key,lock,rug,cup,bowl,spoon,fork,pot,soap,towel,comb,book,pen,bag,glue,card,ball,doll,kite,gift,drum,bell,dice,eat,run,walk,jump,swim,fly,sing,draw,read,look,talk,cry,hug,kiss,clap,wave,kick,push,pull,open,wash,cut,give,take,buy,play,ride,help,sit,roll,spin,find,know,like,want,big,small,hot,cold,happy,sad,full,fast,slow,tall,long,hard,new,old,sour,home,park,shop,farm,bank,plug,day,morning,noon,coin,gold,ring,pill,sled,rose,nest,paw,up,down,left,top,near,far,half,many,few,all,more,less,same,love,cool,stir,hold,lift,rest,hop,dive,row,surf,camp,meet,win,wet,pond,hail,heat,song,line,dot,joy,wink,poop,mask,bunny,pony,moth,ox,hare,lamb,calf,ram,ewe,doe,stag,cub,tick,beef,ham,cola,chin,neck,rib,lip,sari,wig,yard,gate,wall,roof,mop,oven,jar,can,clip,ink,dart,hill,vine,moss,tide,dew,vet,elf,tent,hut,barn,shed,fist,pray,pat,yoga,peek,boom,pop,buzz,meow,woof,moo,oink,roar,hiss,late,now,soon,wish,go,stop,turn';
+var WCH_LV2='zebra,camel,snail,spider,chick,owl,eagle,parrot,snake,lizard,shrimp,hippo,rhino,otter,skunk,turkey,grape,pizza,cookie,candy,donut,coffee,bacon,cheese,butter,honey,fries,sushi,curry,salad,drink,waffle,melon,peach,lemon,mango,cherry,kiwi,tomato,potato,carrot,pepper,onion,garlic,peanut,tongue,tummy,heart,brain,woman,friend,clown,angel,pirate,witch,truck,bike,train,subway,taxi,plane,wheel,bridge,cloud,grass,stone,sunset,bubble,boots,watch,shirt,dress,pants,skirt,scarf,gloves,crown,bow,button,zipper,fridge,toilet,mirror,pillow,basket,broom,bucket,stair,candle,photo,bottle,plate,knife,pan,kettle,straw,napkin,pencil,crayon,paper,eraser,ruler,paint,letter,globe,blocks,puzzle,swing,slide,piano,guitar,violin,music,chess,marble,yo-yo,sleep,climb,dance,write,listen,laugh,smile,point,throw,catch,close,build,carry,drive,wait,share,clean,stand,hide,think,angry,scared,tired,hungry,sick,hurt,funny,quiet,loud,short,heavy,light,soft,dirty,sweet,spicy,pretty,sleepy,school,zoo,beach,pool,hotel,church,temple,castle,phone,camera,robot,game,remote,money,medal,trophy,stamp,ticket,crutch,tennis,rugby,ski,cactus,bamboo,tulip,lotus,clover,shell,coral,right,front,behind,inside,bottom,whole,first,second,third,shy,bored,calm,tap,wipe,tickle,pinch,twist,bounce,crawl,skate,travel,hurry,return,change,choose,try,salty,warm,bright,dark,shiny,sharp,round,young,rich,easy,safe,free,busy,field,wheat,storm,story,grin,blush,nerd,dizzy,ghost,alien,skull,bandit,vomit,zany,puppy,kitten,donkey,badger,bison,walrus,foal,piglet,cicada,maggot,cereal,cream,bagel,wonton,baozi,toast,liver,olive,durian,papaya,guava,lychee,fig,raisin,radish,turnip,celery,cheek,elbow,wrist,belly,spine,kimono,goggle,purse,wallet,stool,bench,drawer,crib,cradle,fence,floor,switch,socket,heater,vacuum,sponge,hanger,sifter,whisk,ladle,tissue,marker,folder,chalk,puppet,rattle,dolly,target,hockey,golf,sleigh,tuktuk,helong,pebble,cliff,valley,meadow,bush,geyser,reef,frost,icicle,comet,meteor,galaxy,aurora,oasis,swamp,sunny,cloudy,rainy,snowy,windy,humid,barber,hunter,miner,sailor,waiter,singer,dancer,knight,wizard,fairy,genie,zombie,mummy,cabin,igloo,tunnel,pinky,salute,boxing,sniff,taste,touch,knock,beep,honk,splash,crash,quack,cluck,chirp,early,later,always,never,quick,secret,start,finish';
+var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpillar,mosquito,penguin,flamingo,peacock,crocodile,dinosaur,whale,dolphin,shark,octopus,lobster,gorilla,hamster,leopard,jellyfish,ice cream,pasta,dumpling,porridge,sandwich,hamburger,hot dog,chocolate,lollipop,popsicle,fried egg,chicken leg,popcorn,pretzel,croissant,taco,mooncake,pancake,watermelon,pineapple,strawberry,blueberry,coconut,avocado,eggplant,cucumber,cabbage,broccoli,mushroom,pumpkin,chestnut,doctor,nurse,teacher,police,farmer,driver,fireman,soldier,astronaut,princess,superman,orange color,circle,square,triangle,star shape,heart shape,diamond,one hundred,motorbike,high-speed train,police car,ambulance,fire truck,helicopter,rocket,tractor,bulldozer,racing car,scooter,skateboard,traffic light,station,airport,rainbow,lightning,sea,river,lake,mountain,volcano,island,desert,forest,mushroom plant,sunrise,earth,space,planet,umbrella,raincoat,scissors,clock,hourglass,alarm clock,glasses,sunglasses,backpack,pajamas,slipper,kitchen,bathroom,bathtub,blanket,trash can,curtain,chopsticks,toothbrush,scissors cut,blackboard,map,teddy bear,trampoline,balloon,trumpet,microphone,spinning top,rocket toy,drink verb,wake up,brush teeth,comb hair,thirsty,clean adj,delicious,strong,brave,kind,hospital,supermarket,playground,restaurant,city,country,library,birthday,party,festival,lantern,firework,flag,drum festival,new year,christmas,halloween,computer,battery,light bulb,headphone,afternoon,evening,today,tomorrow,yesterday,week,month,year,hour,minute,diamond gem,lipstick,perfume,envelope,luggage,wheelchair,thermometer,bandage,stethoscope,football,basketball,pingpong,badminton,bowling,baseball,volleyball,palm tree,sunflower,maple leaf,pinecone,egg shell,feather,wave sea,iceberg,glacier,moon full,outside,different,excited,surprised,worried,silly,exercise,stretch,beautiful,dangerous,thunder,typhoon,tornado,sunshine,moonlight,midnight,alphabet,picture,color word,shape,number word,count,angel face,monster,pumpkin face,sunglass face,sleeping,sneezing,thinking,shushing,neutral,unamused,heart eyes,goldfish,clownfish,pufferfish,sea turtle,chameleon,scorpion,buffalo,reindeer,vulture,porcupine,firefly,stink bug,muffin,cheesecake,oatmeal,spaghetti,burrito,pudding,custard,rice noodle,french fries,fish and chips,fried chicken,roast duck,sausage,seaweed snack,smoothie,lemonade,hot chocolate,soy milk,yogurt drink,bubble tea,coconut milk,plantain,zucchini,pomegranate,grapefruit,apricot,date fruit,asparagus,spinach,pea pod,bamboo shoot,eyebrow,eyelash,shoulder,uniform,overall,rain boots,lab coat,safety vest,earmuff,headband,hairpin,handbag,bookshelf,cabinet,wardrobe,rocking chair,fireplace,chimney,balcony,garden,bell tower,air conditioner,washing machine,dustpan,microwave,blender,toaster,cutting board,rolling pin,trash bag,notebook,highlighter,stapler,paperclip,pushpin,envelope open,bookmark,windmill,carousel,roller coaster,ferris wheel,slide toy,whistle,stacking rings,chariot,horseshoe,bowling pin,swim ring,goggles swim,flippers,baseball bat,cricket bat,skate shoes,ski pole,helmet bike,medal gold,scoreboard,trophy cup,running shoe,jump rope,stagecoach,handcar,wheelbarrow,lawn mower,harvester,crane machine,excavator,forklift,cement truck,garbage truck,ice cream truck,school bus,double decker,airship,hang glider,seaplane,wheelchair push,boulder,waterfall,hot spring,ice field,constellation,eclipse,crescent,mirage,prairie,jungle,drizzle,downpour,foggy,dry weather,dentist,mailman,fisherman,builder,pilot,lifeguard,salesman,banker,scientist,artist,photographer,magician,mermaid,vampire,dinosaur kid,lighthouse,windmill house,pyramid,tree house,bridge tower,crossing,crosswalk,bus stop,restroom,emergency,first aid,point up,thumbs up,thumbs down,ok hand,victory,high five,cross fingers,clap hands,shake hands,kick ball,throw ball,swing bat,ride bike,roller skate,lift weights,cartwheel,backflip,somersault,hide and seek,ring sound,sometimes,finally,family photo,birthday cake,birthday hat,promise,game over,ready,wait sign,straight ahead';
+  var WCH_LV_NAMES = { 1: '初级 · 2~4岁', 2: '中级 · 4~6岁', 3: '高级 · 6~10岁' };
+  var WCH_LVMAP = null;
+  function wchLvMapAll() {
+    if (WCH_LVMAP) return WCH_LVMAP;
+    WCH_LVMAP = {};
+    [WCH_LV1, WCH_LV2, WCH_LV3].forEach(function (s, i) {
+      s.split(',').forEach(function (w) { if (w && WCH_LVMAP[w] === undefined) WCH_LVMAP[w] = i + 1; });
+    });
+    return WCH_LVMAP;
+  }
   var WCH_ROLES = [ { id:'r1', e:'🐰', name:'小兔' }, { id:'r2', e:'🐢', name:'乌龟' }, { id:'r3', e:'🦊', name:'狐狸' } ];
   /* [#WCH486] 游戏化角色立绘（SVG 卡通形象，非emoji） */
   var WCH_SVG = { r1: '<ellipse cx="44" cy="22" rx="9" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2" transform="rotate(-8 44 22)"/><ellipse cx="76" cy="22" rx="9" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2" transform="rotate(8 76 22)"/><ellipse cx="44" cy="24" rx="4" ry="15" fill="#ffc9d6" transform="rotate(-8 44 24)"/><ellipse cx="76" cy="24" rx="4" ry="15" fill="#ffc9d6" transform="rotate(8 76 24)"/><ellipse cx="60" cy="82" rx="28" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><ellipse cx="60" cy="88" rx="15" ry="13" fill="#ffeef3"/><circle cx="60" cy="44" r="25" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><circle cx="52" cy="43" r="3.4" fill="#5a4a52"/><circle cx="70" cy="43" r="3.4" fill="#5a4a52"/><circle cx="43" cy="53" r="4.5" fill="#ffb3ba" opacity=".85"/><circle cx="77" cy="53" r="4.5" fill="#ffb3ba" opacity=".85"/><circle cx="60" cy="49" r="2.2" fill="#e58aa0"/><path d="M56 53 Q60 57 64 53" stroke="#c77b8f" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="46" y="102" width="13" height="12" rx="6" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><rect x="66" y="102" width="13" height="12" rx="6" fill="#fff" stroke="#e8b7c8" stroke-width="2"/>', r2: '<path d="M30 78 Q30 46 60 46 Q90 46 90 78 Z" fill="#66bb6a" stroke="#43a047" stroke-width="2"/><rect x="26" y="74" width="68" height="10" rx="5" fill="#43a047"/><circle cx="48" cy="62" r="6" fill="#a5d6a7"/><circle cx="70" cy="60" r="6" fill="#a5d6a7"/><circle cx="60" cy="72" r="5" fill="#a5d6a7"/><circle cx="96" cy="72" r="11" fill="#a5d6a7" stroke="#81c784" stroke-width="2"/><circle cx="100" cy="69" r="3.2" fill="#fff"/><circle cx="100" cy="69" r="1.6" fill="#334"/><path d="M24 76 Q16 72 18 66 Q26 66 30 72 Z" fill="#66bb6a"/><rect x="38" y="84" width="12" height="10" rx="5" fill="#81c784"/><rect x="64" y="84" width="12" height="10" rx="5" fill="#81c784"/>', r3: '<path d="M92 88 Q112 84 108 72 Q96 70 88 80 Z" fill="#ff8b3d"/><ellipse cx="58" cy="82" rx="28" ry="23" fill="#ff9d4d"/><ellipse cx="58" cy="88" rx="15" ry="12" fill="#fff3e4"/><path d="M34 32 L30 6 L52 20 Z" fill="#ff8b3d"/><path d="M38 28 L36 14 L48 22 Z" fill="#fff3e4"/><path d="M84 32 L90 6 L66 20 Z" fill="#ff8b3d"/><path d="M80 28 L84 14 L70 22 Z" fill="#fff3e4"/><circle cx="58" cy="46" r="25" fill="#ff9d4d"/><ellipse cx="58" cy="56" rx="13" ry="10" fill="#fff3e4"/><circle cx="48" cy="42" r="7.5" fill="#fff"/><circle cx="68" cy="42" r="7.5" fill="#fff"/><circle cx="49" cy="43" r="3.4" fill="#4a3428"/><circle cx="67" cy="43" r="3.4" fill="#4a3428"/><circle cx="40" cy="52" r="4" fill="#ff8fa0" opacity=".8"/><circle cx="76" cy="52" r="4" fill="#ff8fa0" opacity=".8"/><ellipse cx="58" cy="53" rx="3.4" ry="2.6" fill="#4a3428"/><path d="M53 59 Q58 63 63 59" stroke="#b35a1f" stroke-width="2.2" fill="none" stroke-linecap="round"/><rect x="44" y="101" width="13" height="12" rx="6" fill="#ff8b3d"/><rect x="62" y="101" width="13" height="12" rx="6" fill="#ff8b3d"/>' };
@@ -15258,13 +15272,22 @@ window.MX_SEED = data;
     /* 题库：内置 + 自定义（去重，后者优先） */
     var custom = [];
     try { custom = JSON.parse(await wchGet('wch:customWords', '[]')) || []; } catch (e) { custom = []; }
+    /* [#WCH491] 难度：1初2中3高，默认初级；自定义词不分级全保留 */
+    var wchLv = parseInt(await wchGet('wch:level:' + cid, '1'), 10); if (wchLv !== 1 && wchLv !== 2 && wchLv !== 3) wchLv = 1;
+    var wchAllLv = wchLvMapAll(), wchCustomN = custom.length;
+    var wchLvCnt = { 1: 0, 2: 0, 3: 0 }; for (var wk in wchAllLv) wchLvCnt[wchAllLv[wk]]++;
     var seen = {}, pool = [];
-    custom.concat(WCH_SEED).forEach(function (x) {
+    custom.concat(WCH_SEED).forEach(function (x, xi) {
       if (!x || !x.w) return;
       var k = String(x.w).toLowerCase();
       if (seen[k]) return; seen[k] = 1;
-      pool.push({ w: x.w, e: x.e || '', zh: x.zh || '', c: x.c || '' });
+      /* [#WCH491] lv: 0=自定义(全级别) / 1|2|3=内置分级 */
+      pool.push({ w: x.w, e: x.e || '', zh: x.zh || '', c: x.c || '', lv: xi < wchCustomN ? 0 : (wchAllLv[k] || 0) });
     });
+    /* [#WCH491] 按难度筛词；筛后不足20词回退全量兜底 */
+    var poolAll = pool.slice();
+    pool = pool.filter(function (x) { return x.lv === 0 || x.lv === wchLv; });
+    if (pool.length < 20) pool = poolAll;
 
     if (WCH.round && WCH.round.done !== true && WCH.round.quiz && WCH.round.quiz.length) {
       wchRenderRace(sec, cid, dateStr, limit, plays, pool); return;
@@ -15272,7 +15295,7 @@ window.MX_SEED = data;
     /* ---- 入口：今日进度 + 角色选择 ---- */
     var blocked = plays >= limit;
     var html = '<style>' +
-      '.wch-wrap{max-width:720px;margin:0 auto;font-family:inherit}' +
+      '.wch-wrap{max-width:720px;margin:0 auto;font-family:inherit;position:relative}' +
       '.wch-wrap{max-width:720px;margin:0 auto;background:linear-gradient(180deg,#8fd3ff 0,#c6ecff 118px,#a8e6a3 118px,#7fd47f 100%);border-radius:22px;padding:14px 14px 18px;box-shadow:0 8px 24px rgba(30,80,30,.18)}' +
       '.wch-gtitle{text-align:center;padding:8px 0 2px}' +
       '.wch-gbadge{display:inline-block;background:linear-gradient(180deg,#fff,#ffe9b8);color:#e2540a;font-size:26px;font-weight:900;letter-spacing:2px;padding:8px 24px;border-radius:16px;border:3px solid #fff;box-shadow:0 5px 0 rgba(180,80,0,.3),0 10px 18px rgba(0,0,0,.12);transform:rotate(-1.5deg)}' +
@@ -15302,8 +15325,20 @@ window.MX_SEED = data;
       '.wch-go:active{transform:translateY(7px);box-shadow:0 1px 0 #d97b00,0 4px 10px rgba(120,70,0,.3),inset 0 3px 0 rgba(255,255,255,.65)}' +
       '.wch-go:disabled{filter:grayscale(.7);opacity:.55;animation:none;cursor:not-allowed}' +
       '@keyframes wchBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}' +
+      /* [#WCH491] 难度选择 */
+      '.wch-diffbtn{position:absolute;top:10px;right:10px;z-index:5;background:rgba(255,255,255,.95);border:none;border-radius:999px;padding:8px 13px;font-size:13px;font-weight:800;color:#2b3a55;box-shadow:0 3px 8px rgba(0,60,120,.18);cursor:pointer}' +
+      '.wch-diffbtn:active{transform:scale(.94)}' +
+      '.wch-diffpop{position:absolute;top:48px;right:10px;z-index:6;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,40,80,.28);padding:6px;display:none;min-width:200px}' +
+      '.wch-diffpop.open{display:block}' +
+      '.wch-dopt{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;border:none;background:none;padding:11px 12px;border-radius:10px;font-size:14px;font-weight:800;color:#2b3a55;cursor:pointer;box-sizing:border-box;text-align:left}' +
+      '.wch-dopt small{font-size:11px;font-weight:700;color:#8a93a6}' +
+      '.wch-dopt.cur{background:#e3f2fd;color:#1565c0}' +
       '</style>';
-    html += '<div class="wch-wrap"><div class="wch-gtitle"><span class="wch-gbadge">单词大冲刺</span><div class="wch-gsub">单词闯关 · 答对加速跑，答错会摔倒 · 每轮 10 题得 ' + WCH_PTS + ' 积分</div><span class="wch-pill">今日已闯关 ' + plays + ' / ' + limit + ' 次 · 词库 ' + pool.length + ' 词</span></div>';
+    /* [#WCH491] 右上角难度选择 */
+    var wchDiffBtns = [1, 2, 3].map(function (l) {
+      return '<button class="wch-dopt' + (l === wchLv ? ' cur' : '') + '" data-lv="' + l + '"><span>' + WCH_LV_NAMES[l] + '</span><small>' + wchLvCnt[l] + ' 词</small></button>';
+    }).join('');
+    html += '<div class="wch-wrap"><button class="wch-diffbtn" id="wch-diffbtn">🎚️ ' + WCH_LV_NAMES[wchLv] + '</button><div class="wch-diffpop" id="wch-diffpop">' + wchDiffBtns + '</div><div class="wch-gtitle"><span class="wch-gbadge">单词大冲刺</span><div class="wch-gsub">单词闯关 · 答对加速跑，答错会摔倒 · 每轮 10 题得 ' + WCH_PTS + ' 积分</div><span class="wch-pill">今日已闯关 ' + plays + ' / ' + limit + ' 次 · ' + WCH_LV_NAMES[wchLv] + ' · 词库 ' + pool.length + ' 词</span></div>';
     if (blocked) {
       html += '<div style="margin:26px auto;max-width:420px;background:#fff3e0;border:2px dashed #ffb74d;border-radius:16px;padding:22px;text-align:center;font-size:17px;font-weight:700;color:#e65100">😵 今天的闯关次数用完啦，明天再来吧！</div>';
     } else {
@@ -15315,6 +15350,14 @@ window.MX_SEED = data;
     }
     html += '</div>';
     sec.innerHTML = html;
+    /* [#WCH491] 难度切换事件 */
+    var wchDbtn = document.getElementById('wch-diffbtn'), wchDpop = document.getElementById('wch-diffpop');
+    if (wchDbtn && wchDpop) {
+      wchDbtn.onclick = function () { wchDpop.classList.toggle('open'); };
+      wchDpop.querySelectorAll('.wch-dopt').forEach(function (el) {
+        el.onclick = async function () { await wchSet('wch:level:' + cid, el.getAttribute('data-lv')); renderWChallenge(); };
+      });
+    }
     if (!blocked) {
       var selId = null;
       sec.querySelectorAll('.wch-role').forEach(function (el) {
