@@ -26607,6 +26607,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<div class="mx22-wm-actions">' +
           '<button type="button" class="btn mx22wm-btn" id="mx22-wspeak" style="background:var(--accent-primary,#7ec850);color:#fff;border:none;">🔊 读一读</button>' +
           '<button type="button" class="btn mx22wm-btn" id="mx22-wmaster" style="background:#ffb300;color:#fff;border:none;">' + (w.is_mastered ? '✅ 已掌握' : '☆ 标为已掌握') + '</button>' +
+          '<button type="button" class="btn mx22wm-btn" data-wrong-add data-wrong-subject="识字启蒙" data-wrong-q="' + w.word + '(' + (w.pinyin || '') + ')" style="background:#e57373;color:#fff;border:none;">📕 加错题</button>' +
         '</div>' +
         '<div class="mx22-wm-tip">多读几遍，大声说出来，很快就能记住它啦！</div>' +
       '</div>';
@@ -26634,6 +26635,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       m.innerHTML = w.is_mastered ? '✅ 已掌握' : '☆ 标为已掌握';
       if (window.showToast) window.showToast(w.is_mastered ? '🎉 已标记掌握' : '已取消掌握');
     };
+    /* [#WORDS482] 打开字卡自动朗读（低幼习惯：点字即发声，无需再点读一读） */
+    if (sp) setTimeout(function () { try { sp.click(); } catch (e) {} }, 300);
   }
 
   /* [#454] 生成器专区字卡详情：已掌握 / 加错题 / 删除 (GEN454_START) */
