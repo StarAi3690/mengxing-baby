@@ -3632,12 +3632,21 @@ html, body {
 .pc-p { font-size: 36px; font-weight: 700; color: #3a2a1a; }
 .pc-punc { font-size: 36px; font-weight: 700; color: #3a2a1a; align-self: end; line-height: 1.15; }
 .right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.poem-art { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 150px; background: #fdf5ec; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex: none; }
-.poem-art img { width: 100%; height: 100%; object-fit: cover; }
-.poem-art.no-img { display: block; }
-.poem-art-emoji { font-size: 40px; line-height: 1; }
-.poem-art-title { font-size: 17px; font-weight: 700; color: #7a4a12; }
-.poem-art-tip { font-size: 11px; color: #a96a1f; }
+/* [#POEM493] 配图规范：单容器固定高(PC180/手机160) + cover 不拉伸 + 圆角16 */
+.poem-art { width: 100%; height: 180px; border-radius: 16px; overflow: hidden; flex: none; }
+.poem-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.poem-chip { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex: none; }
+.poem-chip.bx { background: #fdecea; color: #d84315; }
+.poem-chip.kz { background: #e8f5e9; color: #2e7d32; }
+.poem-chip.cz { background: #e3f2fd; color: #1565c0; }
+.poem-toolbar { max-width: 780px; margin: 0 auto 12px; display: flex; flex-direction: column; gap: 8px; }
+.poem-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.poem-tab { border: none; background: #f3ece2; color: #6b5a48; font-size: 14px; font-weight: 700; padding: 8px 16px; border-radius: 18px; cursor: pointer; }
+.poem-tab.active { background: #ff9800; color: #fff; }
+.poem-grades { display: flex; gap: 6px; flex-wrap: wrap; }
+.poem-grade { border: 1px solid #e5d9c8; background: #fff; color: #6b5a48; font-size: 13px; padding: 4px 12px; border-radius: 14px; cursor: pointer; }
+.poem-grade.active { background: #fde3b0; border-color: #f0c070; color: #8a5a00; font-weight: 700; }
+.poem-search { width: 100%; box-sizing: border-box; border: 1px solid #e5d9c8; border-radius: 14px; padding: 10px 14px; font-size: 15px; background: #fff; color: #3a2a1a; outline: none; }
 .poem-trans { font-size: 18px; color: #5a4a3a; line-height: 1.8; background: #fffaf5; border-radius: 14px; padding: 12px 14px; }
 @media (max-width: 600px) {
   .poem-card { padding: 16px 14px; }
@@ -3648,6 +3657,7 @@ html, body {
   .poem-line ruby.pyc { font-size: 30px; }
   .poem-line .pyc rt { font-size: 13px; }
   .poem-trans { font-size: 16px; }
+  .poem-art { height: 160px; }
 }
 
 
@@ -13615,20 +13625,21 @@ window.MX_SEED = data;
 
 
 
-  /** 古诗意境图：有 image_url 显示图片，否则渲染色块占位 */
-
+  /* [#POEM493] 古诗配图：单容器+单img（无图不渲染任何占位块/emoji，onerror 隐藏容器） */
   function poemArt(p) {
+    if (!p.image_url) return '';
+    return `<div class="poem-art"><img src="${p.image_url}" alt="${p.title}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+  }
+  const MX_POEM_CATALOG={'咏鹅':['bx','一年级'],'画':['bx','一年级'],'悯农（其二）':['bx','一年级'],'古朗月行':['bx','一年级'],'风':['bx','一年级'],'赠汪伦':['bx','一年级'],'静夜思':['bx','一年级'],'池上':['bx','一年级'],'小池':['bx','一年级'],'梅花':['bx','二年级'],'小儿垂钓':['bx','二年级'],'登鹳雀楼':['bx','二年级'],'望庐山瀑布':['bx','二年级'],'江雪':['bx','二年级'],'村居':['bx','二年级'],'咏柳':['bx','二年级'],'赋得古原草送别':['bx','二年级'],'绝句':['bx','二年级'],'悯农（其一）':['bx','二年级'],'所见':['bx','三年级'],'山行':['bx','三年级'],'夜书所见':['bx','三年级'],'望天门山':['bx','三年级'],'饮湖上初晴后雨':['bx','三年级'],'望洞庭':['bx','三年级'],'绝句（迟日）':['bx','三年级'],'三衢道中':['bx','三年级'],'忆江南':['bx','三年级'],'元日':['bx','三年级'],'清明':['bx','三年级'],'九月九日忆山东兄弟':['bx','三年级'],'鹿柴':['bx','四年级'],'暮江吟':['bx','四年级'],'题西林壁':['bx','四年级'],'凉州词（其一）':['bx','四年级'],'夏日绝句':['bx','四年级'],'别董大':['bx','四年级'],'示儿':['bx','五年级'],'题临安邸':['bx','五年级'],'六月二十七日望湖楼醉书':['bx','六年级'],'春日':['bx','六年级'],'回乡偶书':['bx','六年级'],'浪淘沙（其一）':['bx','六年级'],'江南春':['bx','六年级'],'石灰吟':['bx','六年级'],'竹石':['bx','六年级'],'送元二使安西':['bx','六年级'],'早春呈水部张十八员外':['bx','六年级'],'游园不值':['bx','六年级'],'江南':['kz','一年级'],'春晓':['kz','一年级'],'寻隐者不遇':['kz','一年级'],'敕勒歌':['kz','二年级'],'晓出净慈寺送林子方':['kz','二年级'],'舟夜书所见':['kz','二年级'],'早发白帝城':['kz','三年级'],'惠崇春江晚景':['kz','三年级'],'滁州西涧':['kz','三年级'],'出塞':['kz','四年级'],'四时田园杂兴（其二十五）':['kz','四年级'],'宿新市徐公店':['kz','四年级'],'蜂':['kz','四年级'],'芙蓉楼送辛渐':['kz','四年级'],'塞下曲':['kz','四年级'],'墨梅':['kz','四年级'],'己亥杂诗':['kz','五年级'],'枫桥夜泊':['kz','五年级'],'观书有感':['kz','五年级'],'四时田园杂兴（其三十一）':['kz','五年级'],'游子吟':['kz','五年级'],'秋夜将晓出篱门迎凉有感':['kz','五年级'],'凉州词（黄河远上）':['kz','五年级'],'黄鹤楼送孟浩然之广陵':['kz','五年级'],'乡村四月':['kz','五年级'],'春夜喜雨':['kz','六年级'],'泊船瓜洲':['kz','六年级']};/*[#POEM494] 目录映射:必备49+拓展27,七步诗/乐游原归拓展·课外*/
 
-    const img = p.image_url;
-
-    if (img) {
-
-      return `<div class="poem-art"><img src="${img}" alt="${p.title}" loading="lazy" onerror="this.parentElement.classList.add('no-img')"><span class="poem-art-emoji">🎨</span></div>`;
-
-    }
-
-    return `<div class="poem-art poem-art-placeholder"><span class="poem-art-emoji">🖼️</span><span class="poem-art-title">${p.title}</span><span class="poem-art-tip">意境图占位 · (image_url 待 AI 插画)</span></div>`;
-
+  function poemMeta(p) {
+    const m = MX_POEM_CATALOG[p.title];
+    return m ? { cat: m[0], grade: m[1] || '' } : { cat: 'kz', grade: '' };
+  }
+  function poemChip(p) {
+    const m = poemMeta(p);
+    const catTxt = m.cat === 'bx' ? '必备' : (m.cat === 'cz' ? '初中' : '拓展');
+    return `<span class="poem-chip ${m.cat}">${catTxt}·${m.grade || '课外'}</span>`;
   }
 
 
@@ -13685,75 +13696,93 @@ window.MX_SEED = data;
   }
 
 
-  async function renderPoems() {
-
-    if (!_poemsLoaded) {
-
-      _poems = await loadSeedData('poems', POEMS_PATH);
-
-      _poemsLoaded = true;
-
-    }
-
+  let _poemFilter = { cat: 'all', grade: 'all', q: '' };
+  function renderPoemList() {
     const poems = _poems;
-
-    if (!poems.length) {
-
-      setSectionContent('page-poem', `
-
-        <div class="content-section-title">📜 古诗集</div>
-
-        <div class="empty-tip">⚠️ 未获取到古诗数据。请确认 js/data/poems_78.json 存在。</div>`);
-
-      return;
-
-    }
-
-    const cards = poems.map(p => `
-
-      <div class="poem-card poem-figure">
-
+    if (!poems.length || !document.getElementById('poem-list')) return;
+    const f = _poemFilter, q = f.q.trim().toLowerCase();
+    const arr = poems.filter(p => {
+      const m = poemMeta(p);
+      if (f.cat !== 'all' && m.cat !== f.cat) return false;
+      if (f.grade !== 'all' && m.grade !== f.grade) return false;
+      if (q && !(((p.title || '') + (p.author || '') + (p.content || '') + (p.trans || '')).toLowerCase().includes(q))) return false;
+      return true;
+    });
+    const list = document.getElementById('poem-list');
+    if (!arr.length) { list.innerHTML = '<div class="empty-tip">🔍 未找到匹配的古诗，换个关键词或切换分类试试～</div>'; return; }
+    list.innerHTML = arr.map(p => `
+      <div class="poem-card poem-figure" title="点击卡片播放全诗">
         <div class="poem-topbar">
-
           <button class="speak-btn" data-say="${poemSayAll(p)}" data-mp3="${AUDIO_BASE}poem/${encodeURIComponent(p.title)}.mp3" data-lang="zh-CN" title="朗读全诗">▶️</button>
           <button class="mx-wrong-add" data-wrong-add data-wrong-subject="古诗" data-wrong-q="${(p.title || '')}">📕 错题</button>
-
         </div>
-
         <div class="poem-body">
-
           <div class="poem-text">
-
-            <div class="poem-header"><span class="poem-title">${p.title}</span><span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span></div>
-
+            <div class="poem-header"><span class="poem-title">${p.title}</span><span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span>${poemChip(p)}</div>
             ${poemRubyHtml(p)}
-
           </div>
-
           <div class="right-column">
-
             ${poemArt(p)}
-
             ${p.trans ? `<div class="poem-trans">💬 ${p.trans}</div>` : ''}
-
           </div>
-
         </div>
-
       </div>`).join('');
-
-
-
-    setSectionContent('page-poem', `
-
-      <div class="content-section-title">📜 古诗集 <span class="sub">图文卡片 · 新课标必背 ${poems.length} 首</span></div>
-
-      <div class="poem-list" id="poem-list">${cards}</div>
-
-      <div class="empty-tip">意境图为占位色块，image_url 非空时自动替换为插画 · ▶️ 朗读全诗</div>`);
-
     bindSpeak('#poem-list');
-
+    /* [#POEM493] 整卡点击播放：排除按钮，手势链内同步触发 speak-btn（iOS 兼容） */
+    if (!list.__pcBound) {
+      list.__pcBound = 1;
+      list.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const card = e.target.closest('.poem-card');
+        if (!card) return;
+        const btn = card.querySelector('.speak-btn');
+        if (btn) btn.click();
+      });
+    }
+  }
+  async function renderPoems() {
+    if (!_poemsLoaded) {
+      _poems = await loadSeedData('poems', POEMS_PATH);
+      _poemsLoaded = true;
+    }
+    const poems = _poems;
+    if (!poems.length) {
+      setSectionContent('page-poem', `
+        <div class="content-section-title">📜 古诗集</div>
+        <div class="empty-tip">⚠️ 未获取到古诗数据。请确认 js/data/poems_78.json 存在。</div>`);
+      return;
+    }
+    /* [#POEM494] 三种检索：分类选项卡 + 年级筛选 + 关键词搜索 */
+    const cnt = { all: poems.length, bx: 0, kz: 0, cz: 0 };
+    poems.forEach(p => { cnt[poemMeta(p).cat]++; });
+    const tabs = [['all', '全部'], ['bx', '小学必备'], ['kz', '小学拓展'], ['cz', '初中']]
+      .map(t => `<button class="poem-tab${_poemFilter.cat === t[0] ? ' active' : ''}" data-cat="${t[0]}">${t[1]} ${cnt[t[0]]}</button>`).join('');
+    const gradeBtns = ['all', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级']
+      .map(g => `<button class="poem-grade${_poemFilter.grade === g ? ' active' : ''}" data-grade="${g}">${g === 'all' ? '全部年级' : g}</button>`).join('');
+    setSectionContent('page-poem', `
+      <div class="content-section-title">📜 古诗集 <span class="sub">共 ${poems.length} 首 · 点击卡片播放</span></div>
+      <div class="poem-toolbar">
+        <div class="poem-tabs" id="poem-tabs">${tabs}</div>
+        <div class="poem-grades" id="poem-grades">${gradeBtns}</div>
+        <input id="poem-search" class="poem-search" type="search" placeholder="🔍 搜索诗名 / 作者 / 诗句" value="${_poemFilter.q.replace(/"/g, '&quot;')}">
+      </div>
+      <div class="poem-list" id="poem-list"></div>
+      <div class="empty-tip">👆 点击卡片任意位置播放全诗 · 分类/年级/搜索三种找诗方式 · 无配图的诗不显示图片区</div>`);
+    document.getElementById('poem-tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('.poem-tab'); if (!b) return;
+      _poemFilter.cat = b.dataset.cat;
+      document.querySelectorAll('#poem-tabs .poem-tab').forEach(x => x.classList.toggle('active', x === b));
+      renderPoemList();
+    });
+    document.getElementById('poem-grades').addEventListener('click', (e) => {
+      const b = e.target.closest('.poem-grade'); if (!b) return;
+      _poemFilter.grade = b.dataset.grade;
+      document.querySelectorAll('#poem-grades .poem-grade').forEach(x => x.classList.toggle('active', x === b));
+      renderPoemList();
+    });
+    const si = document.getElementById('poem-search');
+    si.addEventListener('input', () => { _poemFilter.q = si.value; renderPoemList(); });
+    renderPoemList();
   }
 
 
