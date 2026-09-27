@@ -3612,172 +3612,44 @@ html, body {
 
 
 
-/* 古诗列表 */
-
-.poem-list {
-
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 14px;
-
-  padding: 4px 0;
-
-}
-
-.poem-card {
-
-  background: var(--surface, #fff);
-
-  border: 1px solid var(--border-color, #eee);
-
-  border-radius: 14px;
-
-  padding: 14px 16px;
-
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-
-}
-
-.poem-head {
-
-  display: flex;
-
-  align-items: center;
-
-  gap: 12px;
-
-  margin-bottom: 8px;
-
-}
-
-.poem-title {
-
-  font-size: 22px;
-
-  font-weight: 700;
-
-  color: var(--text-primary);
-
-}
-
-.poem-author {
-
-  flex: 1;
-
-  font-size: var(--font-size-sm);
-
-  color: var(--text-secondary);
-
-}
-
-.poem-content {
-
-  font-size: 33px;
-
-  line-height: 2.15;
-
-  color: var(--text-primary);
-
-  white-space: normal;
-
-  text-align: justify;
-
-  text-align-last: justify;
-
-  -moz-text-align-last: justify;
-
-  padding: 0 4px;
-
-}
-
-.poem-trans {
-
-  margin-top: 8px;
-
-  padding-top: 8px;
-
-  border-top: 1px dashed var(--border-color, #eee);
-
-  font-size: var(--font-size-sm);
-
-  color: var(--text-secondary);
-
-  line-height: 1.7;
-
-}
-
-
-
-/* =============================================
-
-   v1.6.0 · 古诗图文卡片 / 26字母 / 口诀·数感
-
-   ============================================= */
-
-/* 古诗图文卡片：上方意境图 + 中间诗文 + 下方释义 */
-
-.poem-card.poem-figure {
-
-  overflow: hidden;
-
-  padding: 0;
-
-}
-
-.poem-art {
-
-  position: relative;
-
-  width: 100%;
-
-  height: auto;
-
-  aspect-ratio: 16 / 9;
-
-  overflow: hidden;
-
-  background: #f6f1e8;
-
-  display: flex;
-
-  flex-direction: column;
-
-  align-items: center;
-
-  justify-content: center;
-
-  gap: 4px;
-
-}
-
+/* 古诗列表 [#POEM490] 参考 test-gushi.html：grid 对齐行 / 标题入左区居中 / 顶部操作栏 */
+.poem-list { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
+.poem-card { background: var(--surface, #fff); border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); width: 100%; max-width: 780px; margin: 0 auto; padding: 20px 24px; position: relative; }
+.poem-topbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 4px; }
+.poem-topbar .speak-btn { margin-top: 0; width: 40px; height: 40px; font-size: 18px; background: #fef3e7; color: #d35400; flex: none; }
+.poem-topbar .mx-wrong-add { width: auto; min-height: 32px; padding: 0 14px; border-radius: 20px; background: #fdedec; color: #e74c3c; font-size: 14px; flex: none; margin-top: 0; }
+.poem-body { display: flex; flex-direction: row; gap: 22px; align-items: stretch; }
+.poem-text { flex: 1.2; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding-right: 4px; min-width: 0; }
+.poem-header { display: flex; align-items: baseline; gap: 10px; justify-content: center; margin-bottom: 2px; }
+.poem-title { font-size: 26px; font-weight: 800; color: #3a2a1a; }
+.poem-author { font-size: 15px; color: #9e8b7a; font-weight: 400; white-space: nowrap; }
+.poem-line { display: grid; align-items: end; justify-items: center; gap: 2px 4px; }
+.poem-line .pyc { margin: 0 1px; }
+.poem-line .pyc rt { font-size: 15px; color: #8a7a6a; font-weight: 600; }
+.pc-cell { text-align: center; line-height: 1.15; white-space: nowrap; }
+.pc-h { font-size: 36px; font-weight: 700; color: #3a2a1a; line-height: 1.15; }
+.poem-line ruby.pyc { font-size: 36px; font-weight: 700; color: #3a2a1a; }
+.pc-p { font-size: 36px; font-weight: 700; color: #3a2a1a; }
+.pc-punc { font-size: 36px; font-weight: 700; color: #3a2a1a; align-self: end; line-height: 1.15; }
+.right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.poem-art { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 150px; background: #fdf5ec; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex: none; }
 .poem-art img { width: 100%; height: 100%; object-fit: cover; }
-  .poem-head .mx-wrong-add { width: auto; min-height: 26px; padding: 2px 10px; font-size: 12px; border-radius: 8px; flex: none; margin-top: 0; }
-
 .poem-art.no-img { display: block; }
-
 .poem-art-emoji { font-size: 40px; line-height: 1; }
-
-.poem-art-title { font-size: 18px; font-weight: 700; color: #7a4a12; }
-
+.poem-art-title { font-size: 17px; font-weight: 700; color: #7a4a12; }
 .poem-art-tip { font-size: 11px; color: #a96a1f; }
+.poem-trans { font-size: 18px; color: #5a4a3a; line-height: 1.8; background: #fffaf5; border-radius: 14px; padding: 12px 14px; }
+@media (max-width: 600px) {
+  .poem-card { padding: 16px 14px; }
+  .poem-title { font-size: 22px; }
+  .poem-body { flex-direction: column; gap: 14px; }
+  .poem-text { padding-right: 0; }
+  .pc-h, .pc-p, .pc-punc { font-size: 30px; }
+  .poem-line ruby.pyc { font-size: 30px; }
+  .poem-line .pyc rt { font-size: 13px; }
+  .poem-trans { font-size: 16px; }
+}
 
-.poem-body { padding: 12px 16px; }\n  /* [#POEM477S] 逐字拼音 + 双端版式 */
-  .poem-content .pyc rt { font-size: 14px; color: #9098a8; font-weight: 600; }
-  .poem-content .pyc { margin: 0 2px; }
-  .poem-content .pyc { margin: 0 1px; }
-  
-  @media (min-width: 900px) {
-    .poem-list { max-width: 1100px; margin: 0 auto; }
-    .poem-card.poem-figure { display: grid; grid-template-columns: 1.05fr 1fr; column-gap: 26px; padding: 18px 22px; align-items: center; }
-    .poem-card.poem-figure .poem-body { display: contents; }
-    .poem-card.poem-figure .poem-head { grid-column: 1; grid-row: 1; }
-    .poem-card.poem-figure .poem-content { grid-column: 1; grid-row: 2; font-size: 30px; text-align: justify; text-align-last: justify; -moz-text-align-last: justify; }
-    .poem-card.poem-figure .poem-art { grid-column: 2; grid-row: 1 / span 2; align-self: center; border-radius: 12px; overflow: hidden; }
-    .poem-card.poem-figure .poem-trans { grid-column: 2; grid-row: 3; margin-top: 10px; padding: 10px 2px 0; border-top: 1px dashed var(--border-color, #eee); border-left: none; }
-  }
-  /* [#POEM477E] */
 
 
 
@@ -13761,51 +13633,57 @@ window.MX_SEED = data;
 
 
 
-/* [#POEM477S] 古诗逐字拼音 + 全诗朗读 */
+/* [#POEM477S→490] 古诗逐字拼音 + 全诗朗读；每行 grid 对齐（test-gushi 规格：repeat(N,1fr) 0.4fr 标点单独列） */
   function poemRubyHtml(p) {
     var arr = (window.MX_POEM_PY && window.MX_POEM_PY[p.id]) || null;
     var content = p.content || '';
-    /* [#POEM488] 断行规则：句号/问/叹必断；逗号/分号仅当短语≥3字才断（鹅，鹅，鹅 保持一行）；行尾已有断行不重复 → 杜绝空行 */
-    if (!arr || !arr.length) {
-      var out0 = '';
-      var lines0 = content.split('\n');
-      lines0.forEach(function (line, li) {
-        var seg0 = 0;
-        for (var i0 = 0; i0 < line.length; i0++) {
-          var ch0 = line.charAt(i0);
-          out0 += ch0;
-          if (/[。！？]/.test(ch0)) { out0 += '<br>'; seg0 = 0; }
-          else if (ch0 === '，' || ch0 === '；') { if (seg0 >= 3) out0 += '<br>'; seg0 = 0; }
-          else if (!/[，。！？；：、·—…“”‘’（）《》〈〉\s,.!?;:()"'<>]/.test(ch0)) seg0++;
-        }
-        if (li < lines0.length - 1 && !/<br>$/.test(out0)) out0 += '<br>';
-      });
-      return out0.replace(/(<br>\s*)+$/, '');
-    }
-    var idx = 0, out = '';
-    var lines = content.split('\n');
-    lines.forEach(function (line, li) {
-      var seg = 0;
-      for (var i = 0; i < line.length; i++) {
-        var ch = line.charAt(i);
-        if (/[，。！？；：、·—…“”‘’（）《》〈〉\s,.!?;:()"'<>]/.test(ch)) {
-          out += ch;
-          if (/[。！？]/.test(ch)) { out += '<br>'; seg = 0; }
-          else if (ch === '，' || ch === '；') { if (seg >= 3) out += '<br>'; seg = 0; }
-          continue;
-        }
-        var py = arr[idx++] || '';
-        out += '<ruby class="pyc">' + ch + '<rt>' + py + '</rt></ruby>';
-        seg++;
+    /* 先切行：句号/问/叹必断；逗号/分号仅当短语≥3字才断（鹅，鹅，鹅 保持一行） */
+    var lines = [], cur = [], seg = 0, idx = 0;
+    function flush() { if (cur.length) { lines.push(cur); cur = []; } }
+    for (var i = 0; i < content.length; i++) {
+      var ch = content.charAt(i);
+      if (ch === '\n') { flush(); seg = 0; continue; }
+      if (/[，。！？；：、·—…“”‘’（）《》〈〉]/.test(ch)) {
+        cur.push({ t: 'p', c: ch });
+        if (/[。！？]/.test(ch)) { flush(); seg = 0; }
+        else if (ch === '，' || ch === '；') { if (seg >= 3) { flush(); } seg = 0; }
+        continue;
       }
-      if (li < lines.length - 1 && !/<br>$/.test(out)) out += '<br>';
+      if (/\s/.test(ch)) continue;
+      cur.push({ t: 'h', c: ch, py: arr ? (arr[idx++] || '') : null });
+      seg++;
+    }
+    flush();
+    if (!lines.length) return '';
+    var N = 1;
+    lines.forEach(function (L) { var n = 0; L.forEach(function (t) { if (t.t === 'h') n++; }); if (n > N) N = n; });
+    var out = '';
+    lines.forEach(function (L) {
+      var cells = '', endP = '', hn = 0;
+      L.forEach(function (t) { if (t.t === 'h') hn++; });
+      var base = Math.floor(N / Math.max(hn, 1)), rem = N % Math.max(hn, 1), hi = 0;
+      for (var k = 0; k < L.length; k++) {
+        var t = L[k];
+        if (t.t === 'h') {
+          var span = base + (hi < rem ? 1 : 0); hi++;
+          var cell = (t.py != null)
+            ? '<ruby class="pyc">' + t.c + '<rt>' + t.py + '</rt></ruby>'
+            : '<span class="pc-h">' + t.c + '</span>';
+          /* 行中间的标点（如 鹅，鹅，鹅）跟在前字同格内；行尾标点单独占 0.4fr 列 */
+          while (k + 1 < L.length - 1 && L[k + 1].t === 'p') { k++; cell += '<span class="pc-p">' + L[k].c + '</span>'; }
+          cells += '<span class="pc-cell"' + (span > 1 ? ' style="grid-column:span ' + span + '"' : '') + '>' + cell + '</span>';
+        } else if (k === L.length - 1) {
+          endP = '<span class="pc-punc">' + t.c + '</span>';
+        }
+      }
+      out += '<div class="poem-line" style="grid-template-columns:repeat(' + N + ',1fr) 0.4fr">' + cells + endP + '</div>';
     });
-    return out.replace(/(<br>\s*)+$/, '');
+    return out;
   }
   function poemSayAll(p) {
     return ((p.title || '') + '，' + (p.content || '')).replace(/\n/g, '，').replace(/"/g, '');
   }
-  /* [#POEM477E] */
+
 
   async function renderPoems() {
 
@@ -13835,24 +13713,30 @@ window.MX_SEED = data;
 
       <div class="poem-card poem-figure">
 
-        ${poemArt(p)}
+        <div class="poem-topbar">
+
+          <button class="speak-btn" data-say="${poemSayAll(p)}" data-mp3="${AUDIO_BASE}poem/${encodeURIComponent(p.title)}.mp3" data-lang="zh-CN" title="朗读全诗">▶️</button>
+          <button class="mx-wrong-add" data-wrong-add data-wrong-subject="古诗" data-wrong-q="${(p.title || '')}">📕 错题</button>
+
+        </div>
 
         <div class="poem-body">
 
-          <div class="poem-head">
+          <div class="poem-text">
 
-            <span class="poem-title">${p.title}</span>
+            <div class="poem-header"><span class="poem-title">${p.title}</span><span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span></div>
 
-            <span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span>
-
-            <button class="speak-btn" data-say="${poemSayAll(p)}" data-mp3="${AUDIO_BASE}poem/${encodeURIComponent(p.title)}.mp3" data-lang="zh-CN" title="朗读全诗">▶️</button>
-            <button class="mx-wrong-add" data-wrong-add data-wrong-subject="古诗" data-wrong-q="${(p.title || '')}">📕错题</button>
+            ${poemRubyHtml(p)}
 
           </div>
 
-          <div class="poem-content">${poemRubyHtml(p)}</div>
+          <div class="right-column">
 
-          ${p.trans ? `<div class="poem-trans">💬 ${p.trans}</div>` : ''}
+            ${poemArt(p)}
+
+            ${p.trans ? `<div class="poem-trans">💬 ${p.trans}</div>` : ''}
+
+          </div>
 
         </div>
 
@@ -15332,10 +15216,14 @@ window.MX_SEED = data;
     var ops = wchShuffle([stem].concat(wchPick2(pool, [stem])));
     return { type: 2, stem: stem, options: ops, correct: stem.w, say: stem.w };
   }
-  function wchQ3(stem, pool) { /* 问句选图片：What's the X's color? */
-    var dis = wchShuffle(pool.filter(function (x) { return x.c && x.c !== stem.c && x.w !== stem.w; })).slice(0, 2);
-    var ops = wchShuffle([stem].concat(dis));
-    return { type: 3, stem: stem, options: ops, correct: stem.w, say: "What's the " + stem.w + "'s color?" };
+  var WCH_COLORS = { red: '#e53935', blue: '#1e88e5', green: '#43a047', yellow: '#fbc02d', orange: '#fb8c00', purple: '#8e24aa', pink: '#ec407a', black: '#455a64', white: '#f5f5f5', gray: '#9e9e9e', brown: '#795548' };
+  function wchQ3(stem, pool) { /* [#WCH490] 问句选颜色块：What's the X's color? 选项=颜色图块而非名词 */
+    var cols = [];
+    pool.forEach(function (x) { if (x.c && WCH_COLORS[x.c] && cols.indexOf(x.c) < 0) cols.push(x.c); });
+    Object.keys(WCH_COLORS).forEach(function (k) { if (cols.indexOf(k) < 0) cols.push(k); });
+    var dis = wchShuffle(cols.filter(function (c) { return c !== stem.c; })).slice(0, 2).map(function (c) { return { w: c, e: '', zh: '', c: c }; });
+    var ops = wchShuffle([{ w: stem.c, e: '', zh: '', c: stem.c }].concat(dis));
+    return { type: 3, stem: stem, options: ops, correct: stem.c, say: "What's the " + stem.w + "'s color?" };
   }
   function wchBuildRound(pool) {
     var colored = pool.filter(function (x) { return x.c; });
@@ -15475,6 +15363,7 @@ window.MX_SEED = data;
       '.wch-opt .ow{font-size:22px;font-weight:800;color:#2b3a55;margin-top:4px;word-break:break-word}' +
       '.wch-opt.ok{border-color:#66bb6a;background:#e8f5e9}' +
       '.wch-opt.bad{border-color:#ef5350;background:#ffebee;opacity:.75}' +
+      '.wch-cs{width:62px;height:62px;border-radius:14px;margin:0 auto 2px;border:3px solid rgba(0,0,0,.10);box-shadow:inset 0 -6px 10px rgba(0,0,0,.15),inset 0 4px 8px rgba(255,255,255,.4)}' +
       '.wch-fb{min-height:30px;font-size:17px;font-weight:800;margin-top:10px}' +
       '.wch-exit{background:none;border:none;color:#b0bec5;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline}' +
       '</style>';
@@ -15497,13 +15386,17 @@ window.MX_SEED = data;
       html += '<div><span class="wch-word">' + q.stem.w + '</span><button class="wch-say" id="wch-say">🔊</button></div>';
     } else if (q.type === 2) {
       html += '<div>' + wchPicHtml(q.stem, true) + '<button class="wch-say" id="wch-say">🔊</button></div>';
+    } else if (q.type === 3) {
+      /* [#WCH490] 展示题目物品 + 问句，选项为颜色色块 */
+      html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px">' + wchPicHtml(q.stem, true) + '<span class="wch-word" style="font-size:22px">' + q.say + '</span><button class="wch-say" id="wch-say">🔊</button></div>';
     } else {
       html += '<div><span class="wch-word" style="font-size:24px">' + q.say + '</span><button class="wch-say" id="wch-say">🔊</button></div>';
     }
     html += '<div class="wch-opts">' + q.options.map(function (o, i) {
       var inner;
       if (q.type === 2) inner = '<div style="font-size:23px;font-weight:800;color:#455a64;padding:10px 0">' + o.w + '</div>'; /* 题型2：下方只有单词 */
-      else inner = wchPicHtml(o) + '<div class="ow">' + (q.type === 1 ? '' : o.w) + '</div>'; /* 题型1/3：只显示图片 */
+      else if (q.type === 3) inner = '<div class="wch-cs" style="background:' + (WCH_COLORS[o.w] || '#cfd8dc') + '"></div><div class="ow">' + o.w + '</div>'; /* [#WCH490] 颜色图块 */
+      else inner = wchPicHtml(o) + '<div class="ow">' + (q.type === 1 ? '' : o.w) + '</div>'; /* 题型1：只显示图片 */
       return '<div class="wch-opt" data-i="' + i + '">' + inner + '</div>';
     }).join('') + '</div>';
     html += '<div class="wch-fb" id="wch-fb"></div></div>';
