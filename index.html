@@ -3766,15 +3766,21 @@ html, body {
 
 
 
-/* 26 字母网格 */
+/* 26 字母网格 [#ABC482] 手机2列大卡 · 分区点播 · 连续播放 */
 
 .abc-grid {
 
   display: grid;
 
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
 
-  gap: 12px;
+  gap: 14px;
+
+}
+
+@media (min-width: 900px) {
+
+  .abc-grid { grid-template-columns: repeat(4, 1fr); gap: 18px; }
 
 }
 
@@ -3784,9 +3790,9 @@ html, body {
 
   border: 1px solid var(--border-color, #eee);
 
-  border-radius: 14px;
+  border-radius: 18px;
 
-  padding: 14px 12px;
+  padding: 18px 12px 14px;
 
   text-align: center;
 
@@ -3796,15 +3802,40 @@ html, body {
 
 }
 
-.abc-letter { font-size: 34px; font-weight: 800; color: var(--accent-primary); line-height: 1; }
+.abc-zone-letter { font-size: 58px; font-weight: 800; color: var(--accent-primary); line-height: 1.1; }
+.abc-letter { font-size: 58px; font-weight: 800; color: var(--accent-primary); line-height: 1.1; }
 
-.abc-lower { font-size: 18px; font-weight: 600; color: var(--text-secondary); margin-left: 2px; }
+.abc-lower { font-size: 30px; font-weight: 600; color: var(--text-secondary); margin-left: 4px; }
 
-.abc-art { font-size: 30px; margin: 6px 0 4px; }
+.abc-art { font-size: 56px; margin: 10px 0 6px; line-height: 1.1; }
 
-.abc-word { font-size: var(--font-size-md); font-weight: 600; color: var(--text-primary); }
+.abc-word { font-size: 24px; font-weight: 700; color: var(--text-primary); }
 
-.abc-phone { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.abc-phone { font-size: 15px; color: var(--text-secondary); margin-bottom: 6px; }
+
+.abc-zone { border-radius: 12px; padding: 6px 4px 8px; cursor: pointer; transition: background 0.15s; position: relative; }
+
+.abc-zone:active { background: rgba(0,0,0,0.05); }
+
+.abc-zone.speaking { animation: speak-pulse 0.8s infinite; }
+
+.abc-zone-tag { display: inline-block; font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.05); border-radius: 8px; padding: 1px 8px; margin-top: 4px; }
+
+.abc-playall {
+
+  display: block; width: 100%; margin-top: 10px; padding: 10px 0;
+
+  border: none; border-radius: 12px; cursor: pointer;
+
+  background: linear-gradient(135deg, #4caf50, #2e9e44); color: #fff;
+
+  font-size: 16px; font-weight: 700; letter-spacing: 1px;
+
+}
+
+.abc-playall:active { transform: scale(0.97); }
+
+.abc-playall.speaking { animation: speak-pulse 0.8s infinite; opacity: 0.85; }
 
 
 
@@ -13863,31 +13894,49 @@ window.MX_SEED = data;
 
     }
 
+    /* [#ABC482] 大卡版式：字母区/单词区各自点播，底部单按钮连续播放（字母→单词） */
     const cards = letters.map(c => `
 
       <div class="abc-card">
 
-        <div class="abc-letter">${c.letter}<span class="abc-lower">${c.lower}</span></div>
+        <div class="abc-zone abc-zone-letter" data-say="${c.lower}" title="点击读字母">${c.letter}<span class="abc-lower">${c.lower}</span><br><span class="abc-zone-tag">🔊 字母</span></div>
 
         <div class="abc-art">${c.art}</div>
 
-        <div class="abc-word">${c.word}</div>
+        <div class="abc-zone abc-zone-word" data-say="${c.word}" title="点击读单词"><div class="abc-word">${c.word}</div><div class="abc-phone">${c.phonetic}</div><span class="abc-zone-tag">📢 单词</span></div>
 
-        <div class="abc-phone">${c.phonetic}</div>
+        <button class="abc-playall" data-seq="${c.lower}|${c.word}" title="连续播放：字母+单词">▶ 连续播放</button>
 
-        <button class="speak-btn" data-say="${c.lower}" data-lang="en-US" data-dir="english" title="读字母">🔊</button>
-        <button class="speak-btn" data-say="${c.word}" data-lang="en-US" data-dir="english" title="读单词">📢</button>
         <button class="mx-wrong-add" data-wrong-add data-wrong-subject="英文26字母" data-wrong-q="${c.word}">📕错题</button>
 
       </div>`).join('');
 
     setSectionContent('page-abc', `
 
-      <div class="content-section-title">🔠 26 个字母 <span class="sub">大小写 + 示例单词 · 点击 🔊 发音</span></div>
+      <div class="content-section-title">🔠 26 个字母 <span class="sub">点字母区读字母 · 点单词区读单词 · ▶ 连续播放</span></div>
 
       <div class="abc-grid" id="abc-grid">${cards}</div>
 
-      <div class="empty-tip">data-dir=english → assets/audio/english/<字母>.mp3，无本地音频回退英文 TTS</div>`);
+      <div class="empty-tip">音频 assets/audio/english/<字母|单词>.mp3，无本地音频回退英文 TTS</div>`);
+
+    /* [#ABC482] 分区点播（容器每次重渲染为新元素，无叠加风险） */
+    const abcGrid = document.querySelector('#abc-grid');
+    if (abcGrid) {
+      abcGrid.addEventListener('click', (e) => {
+        const zone = e.target.closest('.abc-zone');
+        const pa = e.target.closest('.abc-playall');
+        if (zone) {
+          zone.classList.add('speaking');
+          speak(zone.dataset.say, 'en-US', 'english');
+          setTimeout(() => zone.classList.remove('speaking'), 1200);
+        } else if (pa) {
+          e.stopPropagation();
+          pa.classList.add('speaking');
+          speakSeq(pa.dataset.seq.split('|'), 'en-US', 'english');
+          setTimeout(() => pa.classList.remove('speaking'), 2500);
+        }
+      });
+    }
 
     bindSpeak('#abc-grid');
 
