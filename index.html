@@ -3654,7 +3654,7 @@ html, body {
 
 .poem-title {
 
-  font-size: 18px;
+  font-size: 22px;
 
   font-weight: 700;
 
@@ -3674,13 +3674,15 @@ html, body {
 
 .poem-content {
 
-  font-size: 16px;
+  font-size: 28px;
 
-  line-height: 1.9;
+  line-height: 2.3;
 
   color: var(--text-primary);
 
   white-space: normal;
+
+  text-align: center;
 
 }
 
@@ -3724,7 +3726,7 @@ html, body {
 
   width: 100%;
 
-  height: 140px;
+  height: 200px;
 
   overflow: hidden;
 
@@ -3754,11 +3756,13 @@ html, body {
 .poem-art-tip { font-size: 11px; color: #a96a1f; }
 
 .poem-body { padding: 12px 16px; }\n  /* [#POEM477S] 逐字拼音 + 双端版式 */
-  .poem-content .pyc rt { font-size: 11px; color: #9098a8; font-weight: 600; }
+  .poem-content .pyc rt { font-size: 14px; color: #9098a8; font-weight: 600; }
+  .poem-content .pyc { margin: 0 2px; }
   .poem-content .pyc { margin: 0 1px; }
-  .poem-content { line-height: 2.2; }
+  
   @media (min-width: 900px) {
     .poem-card.poem-figure .poem-body { display: grid; grid-template-columns: 1.25fr 1fr; column-gap: 28px; align-items: start; }
+    .poem-card.poem-figure .poem-content { font-size: 24px; text-align: left; }
     .poem-card.poem-figure .poem-head { grid-column: 1; }
     .poem-card.poem-figure .poem-content { grid-column: 1; }
     .poem-card.poem-figure .poem-trans { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding-left: 20px; border-left: 3px solid #ffe0b2; }
@@ -13763,7 +13767,8 @@ window.MX_SEED = data;
       }
       if (li < lines.length - 1) out += '<br>';
     });
-    return out;
+    /* [#POEM484] 一行一句：逗号/句号后断行（低幼大字版式） */
+    return out.replace(/([，。！？；])/g, '$1<br>').replace(/(<br>\s*)+$/, '');
   }
   function poemSayAll(p) {
     return ((p.title || '') + '，' + (p.content || '')).replace(/\n/g, '，').replace(/"/g, '');
@@ -15242,6 +15247,12 @@ window.MX_SEED = data;
 {w:'straight ahead',e:'⬆️',zh:'直走'}
   ];
   var WCH_ROLES = [ { id:'r1', e:'🐰', name:'小兔' }, { id:'r2', e:'🐢', name:'乌龟' }, { id:'r3', e:'🦊', name:'狐狸' } ];
+  /* [#WCH486] 游戏化角色立绘（SVG 卡通形象，非emoji） */
+  var WCH_SVG = { r1: '<ellipse cx="44" cy="22" rx="9" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2" transform="rotate(-8 44 22)"/><ellipse cx="76" cy="22" rx="9" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2" transform="rotate(8 76 22)"/><ellipse cx="44" cy="24" rx="4" ry="15" fill="#ffc9d6" transform="rotate(-8 44 24)"/><ellipse cx="76" cy="24" rx="4" ry="15" fill="#ffc9d6" transform="rotate(8 76 24)"/><ellipse cx="60" cy="82" rx="28" ry="24" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><ellipse cx="60" cy="88" rx="15" ry="13" fill="#ffeef3"/><circle cx="60" cy="44" r="25" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><circle cx="52" cy="43" r="3.4" fill="#5a4a52"/><circle cx="70" cy="43" r="3.4" fill="#5a4a52"/><circle cx="43" cy="53" r="4.5" fill="#ffb3ba" opacity=".85"/><circle cx="77" cy="53" r="4.5" fill="#ffb3ba" opacity=".85"/><circle cx="60" cy="49" r="2.2" fill="#e58aa0"/><path d="M56 53 Q60 57 64 53" stroke="#c77b8f" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="46" y="102" width="13" height="12" rx="6" fill="#fff" stroke="#e8b7c8" stroke-width="2"/><rect x="66" y="102" width="13" height="12" rx="6" fill="#fff" stroke="#e8b7c8" stroke-width="2"/>', r2: '<path d="M30 78 Q30 46 60 46 Q90 46 90 78 Z" fill="#66bb6a" stroke="#43a047" stroke-width="2"/><rect x="26" y="74" width="68" height="10" rx="5" fill="#43a047"/><circle cx="48" cy="62" r="6" fill="#a5d6a7"/><circle cx="70" cy="60" r="6" fill="#a5d6a7"/><circle cx="60" cy="72" r="5" fill="#a5d6a7"/><circle cx="96" cy="72" r="11" fill="#a5d6a7" stroke="#81c784" stroke-width="2"/><circle cx="100" cy="69" r="3.2" fill="#fff"/><circle cx="100" cy="69" r="1.6" fill="#334"/><path d="M24 76 Q16 72 18 66 Q26 66 30 72 Z" fill="#66bb6a"/><rect x="38" y="84" width="12" height="10" rx="5" fill="#81c784"/><rect x="64" y="84" width="12" height="10" rx="5" fill="#81c784"/>', r3: '<path d="M92 88 Q112 84 108 72 Q96 70 88 80 Z" fill="#ff8b3d"/><ellipse cx="58" cy="82" rx="28" ry="23" fill="#ff9d4d"/><ellipse cx="58" cy="88" rx="15" ry="12" fill="#fff3e4"/><path d="M34 32 L30 6 L52 20 Z" fill="#ff8b3d"/><path d="M38 28 L36 14 L48 22 Z" fill="#fff3e4"/><path d="M84 32 L90 6 L66 20 Z" fill="#ff8b3d"/><path d="M80 28 L84 14 L70 22 Z" fill="#fff3e4"/><circle cx="58" cy="46" r="25" fill="#ff9d4d"/><ellipse cx="58" cy="56" rx="13" ry="10" fill="#fff3e4"/><circle cx="48" cy="42" r="7.5" fill="#fff"/><circle cx="68" cy="42" r="7.5" fill="#fff"/><circle cx="49" cy="43" r="3.4" fill="#4a3428"/><circle cx="67" cy="43" r="3.4" fill="#4a3428"/><circle cx="40" cy="52" r="4" fill="#ff8fa0" opacity=".8"/><circle cx="76" cy="52" r="4" fill="#ff8fa0" opacity=".8"/><ellipse cx="58" cy="53" rx="3.4" ry="2.6" fill="#4a3428"/><path d="M53 59 Q58 63 63 59" stroke="#b35a1f" stroke-width="2.2" fill="none" stroke-linecap="round"/><rect x="44" y="101" width="13" height="12" rx="6" fill="#ff8b3d"/><rect x="62" y="101" width="13" height="12" rx="6" fill="#ff8b3d"/>' };
+  function wchRoleSvg(id, plain) {
+    var body = WCH_SVG[id] || '';
+    return '<svg class="wch-svg" viewBox="0 0 120 120">' + (plain ? body : '<g class="idle">' + body + '</g>') + '</svg>';
+  }
   var WCH_PTS = 5, WCH_DAILY_DEFAULT = 5, WCH_TOTAL = 10;
   window.WCH_DAILY_DEFAULT = WCH_DAILY_DEFAULT;
   window.speakTTS = speakTTS; /* [WCH481] 补导出：修复多处 window.speakTTS 防御调用恒为空的问题 */
@@ -15322,25 +15333,45 @@ window.MX_SEED = data;
     var blocked = plays >= limit;
     var html = '<style>' +
       '.wch-wrap{max-width:720px;margin:0 auto;font-family:inherit}' +
-      '.wch-roles{display:flex;gap:14px;justify-content:center;margin:18px 0}' +
-      '.wch-role{flex:1;max-width:170px;border:3px solid #e3e8f0;border-radius:18px;background:#fff;padding:18px 8px;text-align:center;cursor:pointer;transition:all .15s;user-select:none}' +
-      '.wch-role.sel{border-color:#ff9800;background:#fff8ee;box-shadow:0 6px 18px rgba(255,152,0,.25);transform:translateY(-3px)}' +
-      '.wch-role .re{font-size:52px;line-height:1}' +
-      '.wch-role .rn{font-size:16px;font-weight:700;color:#4a5568;margin-top:6px}' +
-      '.wch-btn{width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.3)}' +
-      '.wch-btn:disabled{background:#cfd8e3;box-shadow:none;cursor:not-allowed}' +
+      '.wch-wrap{max-width:720px;margin:0 auto;background:linear-gradient(180deg,#8fd3ff 0,#c6ecff 118px,#a8e6a3 118px,#7fd47f 100%);border-radius:22px;padding:14px 14px 18px;box-shadow:0 8px 24px rgba(30,80,30,.18)}' +
+      '.wch-gtitle{text-align:center;padding:8px 0 2px}' +
+      '.wch-gbadge{display:inline-block;background:linear-gradient(180deg,#fff,#ffe9b8);color:#e2540a;font-size:26px;font-weight:900;letter-spacing:2px;padding:8px 24px;border-radius:16px;border:3px solid #fff;box-shadow:0 5px 0 rgba(180,80,0,.3),0 10px 18px rgba(0,0,0,.12);transform:rotate(-1.5deg)}' +
+      '.wch-gsub{color:#fff;text-shadow:0 1px 3px rgba(0,90,140,.5);font-size:13px;font-weight:700;margin-top:6px}' +
+      '.wch-pill{display:inline-block;background:rgba(255,255,255,.92);border-radius:999px;padding:5px 14px;font-size:13px;font-weight:800;color:#2b3a55;box-shadow:0 2px 6px rgba(0,0,0,.12);margin-top:6px}' +
+      '.wch-stage{position:relative;background:linear-gradient(180deg,#8bc34a,#689f38);border-radius:18px;padding:8px 0;margin-top:12px;box-shadow:inset 0 4px 14px rgba(0,0,0,.18)}' +
+      '.wch-flag{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:28px;z-index:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}' +
+      '.wch-sline{position:absolute;left:96px;top:8px;bottom:8px;width:4px;background:repeating-linear-gradient(45deg,#fff 0 6px,#555 6px 12px);border-radius:2px;z-index:1}' +
+      '.wch-laneR{position:relative;height:108px;display:flex;align-items:center;padding:0 12px}' +
+      '.wch-laneR + .wch-laneR{border-top:2px dashed rgba(255,255,255,.5)}' +
+      '.wch-lno{position:absolute;left:12px;top:8px;font-size:11px;font-weight:800;color:rgba(255,255,255,.85)}' +
+      '.wch-role{position:relative;margin-left:104px;cursor:pointer;user-select:none;width:100px;text-align:center;z-index:2}' +
+      '.wch-role .wch-svg{width:88px;height:88px;overflow:visible;filter:drop-shadow(0 3px 3px rgba(0,60,0,.25))}' +
+      '.wch-role .rn{font-size:14px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,60,0,.4)}' +
+      '.wch-role .idle{transform-box:fill-box;transform-origin:50% 100%;animation:wchIdle 1.8s ease-in-out infinite}' +
+      '@keyframes wchIdle{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-7px) rotate(1.5deg)}}' +
+      '.wch-role.sel .idle{animation:wchJump .65s ease}' +
+      '@keyframes wchJump{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-36px) scale(1.08)}65%{transform:translateY(0) scale(.92,.88)}80%{transform:translateY(-6px)}100%{transform:translateY(0)}}' +
+      '.wch-ring{position:absolute;left:50%;bottom:-2px;width:64px;height:14px;margin-left:-32px;border-radius:50%;background:radial-gradient(ellipse,rgba(255,196,0,.6),rgba(255,196,0,0) 70%);opacity:0;z-index:0}' +
+      '.wch-role.sel .wch-ring{opacity:1;animation:wchRing .9s infinite}' +
+      '@keyframes wchRing{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.3);opacity:.5}}' +
+      '.wch-tagm,.wch-tago{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px;opacity:0;z-index:3}' +
+      '.wch-tagm{background:#2fb66b;color:#fff}.wch-tago{background:#78909c;color:#fff}' +
+      '.wch-role.sel .wch-tagm{opacity:1}.wch-role.opp .wch-tago{opacity:1}' +
+      '.wch-role.opp .idle{filter:saturate(.5) brightness(.9);animation-duration:2.6s}' +
+      '.wch-go{width:100%;margin-top:14px;padding:15px 0;border:none;border-radius:20px;font-size:24px;font-weight:900;letter-spacing:3px;color:#7a3c00;background:linear-gradient(180deg,#ffd54d,#ff9d1f);cursor:pointer;box-shadow:0 8px 0 #d97b00,0 14px 26px rgba(120,70,0,.3),inset 0 3px 0 rgba(255,255,255,.65);animation:wchBreathe 1.6s ease-in-out infinite}' +
+      '.wch-go:active{transform:translateY(7px);box-shadow:0 1px 0 #d97b00,0 4px 10px rgba(120,70,0,.3),inset 0 3px 0 rgba(255,255,255,.65)}' +
+      '.wch-go:disabled{filter:grayscale(.7);opacity:.55;animation:none;cursor:not-allowed}' +
+      '@keyframes wchBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}' +
       '</style>';
-    html += '<div class="wch-wrap"><div style="text-align:center;padding:8px 0 2px"><div style="font-size:40px">🏃‍♂️💨</div><div style="font-size:22px;font-weight:800;color:#37474f">单词闯关</div>' +
-      '<div style="font-size:13.5px;color:#8a93a6;margin-top:4px">答对加速跑，答错会摔倒哦！每轮 10 题，完成得 ' + WCH_PTS + ' 积分</div>' +
-      '<div style="font-size:14px;color:#546e7a;margin-top:6px">今日已闯关 <b style="color:#f4633a">' + plays + '</b> / ' + limit + ' 次（词库 ' + pool.length + ' 词）</div></div>';
+    html += '<div class="wch-wrap"><div class="wch-gtitle"><span class="wch-gbadge">单词大冲刺</span><div class="wch-gsub">单词闯关 · 答对加速跑，答错会摔倒 · 每轮 10 题得 ' + WCH_PTS + ' 积分</div><span class="wch-pill">今日已闯关 ' + plays + ' / ' + limit + ' 次 · 词库 ' + pool.length + ' 词</span></div>';
     if (blocked) {
       html += '<div style="margin:26px auto;max-width:420px;background:#fff3e0;border:2px dashed #ffb74d;border-radius:16px;padding:22px;text-align:center;font-size:17px;font-weight:700;color:#e65100">😵 今天的闯关次数用完啦，明天再来吧！</div>';
     } else {
-      html += '<div class="wch-roles" id="wch-roles">' + WCH_ROLES.map(function (r) {
-        return '<div class="wch-role" data-rid="' + r.id + '"><div class="re">' + r.e + '</div><div class="rn">' + r.name + '</div></div>';
+      html += '<div class="wch-stage" id="wch-roles"><div class="wch-flag">🏁</div><div class="wch-sline"></div>' + WCH_ROLES.map(function (r, i) {
+        return '<div class="wch-laneR"><span class="wch-lno">' + (i + 1) + '号赛道</span><div class="wch-role" data-rid="' + r.id + '"><span class="wch-tagm">我来啦！</span><span class="wch-tago">对手</span><span class="wch-ring"></span>' + wchRoleSvg(r.id) + '<div class="rn">' + r.name + '</div></div></div>';
       }).join('') + '</div>';
-      html += '<div style="text-align:center;font-size:13px;color:#8a93a6;margin-bottom:10px">选 1 个角色出发，另外 2 个是对手哦</div>';
-      html += '<button class="wch-btn" id="wch-start" disabled>🏃 开始闯关</button>';
+      html += '<div style="text-align:center;font-size:13px;color:#33691e;font-weight:700;margin:8px 0 0">选 1 个角色出发，另外 2 个是对手哦</div>';
+      html += '<button class="wch-go" id="wch-start" disabled>GO！开始比赛<small style="display:block;font-size:11px;letter-spacing:1px;color:#9a5b0a">点选角色后出发 · 共 10 题</small></button>';
     }
     html += '</div>';
     sec.innerHTML = html;
@@ -15348,8 +15379,9 @@ window.MX_SEED = data;
       var selId = null;
       sec.querySelectorAll('.wch-role').forEach(function (el) {
         el.onclick = function () {
-          sec.querySelectorAll('.wch-role').forEach(function (x) { x.classList.remove('sel'); });
+          sec.querySelectorAll('.wch-role').forEach(function (x) { x.classList.remove('sel', 'opp'); });
           el.classList.add('sel'); selId = el.getAttribute('data-rid');
+          sec.querySelectorAll('.wch-role').forEach(function (x) { if (x !== el) x.classList.add('opp'); });
           var b = document.getElementById('wch-start'); if (b) b.disabled = false;
           var me = WCH_ROLES.filter(function (r) { return r.id === selId; })[0];
           if (me) wchSpeakEn(me.name === '小兔' ? 'rabbit' : (me.name === '乌龟' ? 'turtle' : 'fox'));
@@ -15370,18 +15402,25 @@ window.MX_SEED = data;
   function wchRenderRace(sec, cid, dateStr, limit, plays, pool) {
     var R = WCH.round;
     var html = '<style>' +
-      '.wch-track{position:relative;height:64px;background:linear-gradient(180deg,#e8f5e9,#c8e6c9);border-radius:14px;margin:8px 0;overflow:hidden}' +
+      '.wch-wrap{max-width:720px;margin:0 auto;background:linear-gradient(180deg,#cdefff 0,#e8f7ff 130px,#f5fbf5 130px);border-radius:20px;padding:12px 12px 16px}' +
+      '.wch-track{position:relative;height:70px;background:linear-gradient(180deg,#8bc34a,#689f38);border-radius:14px;margin:8px 0;overflow:hidden;box-shadow:inset 0 3px 10px rgba(0,0,0,.15)}' +
       '.wch-lane{position:relative;height:100%}' +
-      '.wch-runner{position:absolute;top:50%;transform:translateY(-50%);font-size:36px;left:2%;transition:left .55s ease;will-change:left;z-index:2}' +
+      '.wch-runner{position:absolute;top:50%;transform:translateY(-50%);left:2%;transition:left .55s ease;will-change:left;z-index:2}' +
+      '.wch-rb{display:inline-flex;align-items:flex-end;gap:3px;animation:wchBob .5s ease-in-out infinite}' +
+      '.wch-rb .wch-svg{width:46px;height:46px;overflow:visible;filter:drop-shadow(0 3px 3px rgba(0,60,0,.25))}' +
+      '.wch-rb .wch-lb{font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,60,0,.4);padding-bottom:3px}' +
+      '@keyframes wchBob{0%,100%{transform:translateY(-46%) rotate(-3deg)}50%{transform:translateY(-60%) rotate(3deg)}}' +
       '.wch-finish{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:26px;z-index:1}' +
       '.wch-fall{animation:wchFall .8s ease}' +
       '@keyframes wchFall{0%{transform:translateY(-50%) rotate(0)}30%{transform:translateY(-50%) rotate(-28deg) translateX(-6px)}55%{transform:translateY(-50%) rotate(20deg)}75%{transform:translateY(-50%) rotate(-10deg)}100%{transform:translateY(-50%) rotate(0)}}' +
       '.wch-qcard{background:#fff;border-radius:18px;padding:18px 14px;box-shadow:0 4px 16px rgba(0,0,0,.06);text-align:center}' +
-      '.wch-word{font-size:34px;font-weight:800;color:#37474f;letter-spacing:1px}' +
-      '.wch-say{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;border:none;background:#e3f2fd;font-size:22px;cursor:pointer;margin-left:10px;vertical-align:middle}' +
+      '.wch-word{font-size:40px;font-weight:900;color:#2b3a55;letter-spacing:1px}' +
+      '.wch-say{display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;border:none;background:radial-gradient(circle at 32% 28%,#7ed49a,#2fb66b 70%);color:#fff;font-size:26px;cursor:pointer;margin-left:10px;vertical-align:middle;box-shadow:0 5px 0 #1d8a50,0 8px 14px rgba(0,0,0,.15)}' +
+      '.wch-say:active{transform:translateY(4px);box-shadow:0 1px 0 #1d8a50}' +
       '.wch-opts{display:flex;gap:12px;justify-content:center;margin-top:14px;flex-wrap:wrap}' +
-      '.wch-opt{flex:1;min-width:96px;max-width:170px;border:3px solid #e3e8f0;border-radius:16px;background:#fafbfd;padding:14px 6px;cursor:pointer;text-align:center;transition:all .12s;user-select:none}' +
-      '.wch-opt .ow{font-size:19px;font-weight:700;color:#455a64;margin-top:4px;word-break:break-word}' +
+      '.wch-opt{flex:1;min-width:96px;max-width:170px;border:3px solid #e3e8f0;border-radius:16px;background:#fff;padding:16px 6px;cursor:pointer;text-align:center;transition:all .12s;user-select:none;box-shadow:0 4px 0 #dfe6f3}' +
+      '.wch-opt:active{transform:translateY(3px);box-shadow:0 1px 0 #dfe6f3}' +
+      '.wch-opt .ow{font-size:22px;font-weight:800;color:#2b3a55;margin-top:4px;word-break:break-word}' +
       '.wch-opt.ok{border-color:#66bb6a;background:#e8f5e9}' +
       '.wch-opt.bad{border-color:#ef5350;background:#ffebee;opacity:.75}' +
       '.wch-fb{min-height:30px;font-size:17px;font-weight:800;margin-top:10px}' +
@@ -15397,7 +15436,7 @@ window.MX_SEED = data;
     ];
     lanes.forEach(function (L) {
       html += '<div class="wch-track"><div class="wch-finish">🏁</div><div class="wch-runner" id="wch-r-' + L.key + '" style="left:' + Math.min(92, R.pos[L.key]) + '%">' +
-        '<span style="font-size:36px">' + L.who.e + '</span><span style="font-size:11px;font-weight:700;color:#607d8b;vertical-align:bottom;margin-left:2px">' + L.label + '</span></div></div>';
+        '<span class="wch-rb">' + wchRoleSvg(L.who.id, true) + '<span class="wch-lb">' + L.label + '</span></span></div></div>';
     });
     /* 题区 */
     var q = R.quiz[R.idx];
