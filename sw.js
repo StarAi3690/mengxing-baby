@@ -17,7 +17,7 @@
    兼容性：iPhone / iPad(iOS Safari) · Android · HarmonyOS(ArkWeb) · Windows · macOS
    注意：file:// 双击离线版无法使用 SW（浏览器安全限制），页面侧已做保护性跳过。
    ========================================================================== */
-var MX_CACHE = 'mx-assets-v1.0.0';
+var MX_CACHE = 'mx-assets-v1.0.1';
 
 /* 只缓存「静态资源」；HTML / JS / CSS / version.json / 接口一律直通。
    注意：图片改动后若发现用户仍看到旧图 → 页面侧在版本变化时会自动清一次缓存，

@@ -3674,9 +3674,9 @@ html, body {
 
 .poem-content {
 
-  font-size: 28px;
+  font-size: 30px;
 
-  line-height: 2.3;
+  line-height: 2.2;
 
   color: var(--text-primary);
 
@@ -3726,11 +3726,13 @@ html, body {
 
   width: 100%;
 
-  height: 200px;
+  height: auto;
+
+  aspect-ratio: 16 / 9;
 
   overflow: hidden;
 
-  background: linear-gradient(135deg, #ffe0b2, #ffcc80, #ffb74d);
+  background: #f6f1e8;
 
   display: flex;
 
@@ -3744,7 +3746,7 @@ html, body {
 
 }
 
-.poem-art img { width: 100%; height: 100%; object-fit: contain; }
+.poem-art img { width: 100%; height: 100%; object-fit: cover; }
   .poem-head .mx-wrong-add { width: auto; min-height: 26px; padding: 2px 10px; font-size: 12px; border-radius: 8px; flex: none; margin-top: 0; }
 
 .poem-art.no-img { display: block; }
@@ -3761,11 +3763,13 @@ html, body {
   .poem-content .pyc { margin: 0 1px; }
   
   @media (min-width: 900px) {
-    .poem-card.poem-figure .poem-body { display: grid; grid-template-columns: 1.25fr 1fr; column-gap: 28px; align-items: start; }
-    .poem-card.poem-figure .poem-content { font-size: 24px; text-align: left; }
-    .poem-card.poem-figure .poem-head { grid-column: 1; }
-    .poem-card.poem-figure .poem-content { grid-column: 1; }
-    .poem-card.poem-figure .poem-trans { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding-left: 20px; border-left: 3px solid #ffe0b2; }
+    .poem-list { max-width: 1100px; margin: 0 auto; }
+    .poem-card.poem-figure { display: grid; grid-template-columns: 1.05fr 1fr; column-gap: 26px; padding: 18px 22px; align-items: center; }
+    .poem-card.poem-figure .poem-body { display: contents; }
+    .poem-card.poem-figure .poem-head { grid-column: 1; grid-row: 1; }
+    .poem-card.poem-figure .poem-content { grid-column: 1; grid-row: 2; font-size: 27px; text-align: center; }
+    .poem-card.poem-figure .poem-art { grid-column: 2; grid-row: 1 / span 2; align-self: center; border-radius: 12px; overflow: hidden; }
+    .poem-card.poem-figure .poem-trans { grid-column: 2; grid-row: 3; margin-top: 10px; padding: 10px 2px 0; border-top: 1px dashed var(--border-color, #eee); border-left: none; }
   }
   /* [#POEM477E] */
 
@@ -13755,20 +13759,42 @@ window.MX_SEED = data;
   function poemRubyHtml(p) {
     var arr = (window.MX_POEM_PY && window.MX_POEM_PY[p.id]) || null;
     var content = p.content || '';
-    if (!arr || !arr.length) return content.replace(/\n/g, '<br>');
+    /* [#POEM488] 断行规则：句号/问/叹必断；逗号/分号仅当短语≥3字才断（鹅，鹅，鹅 保持一行）；行尾已有断行不重复 → 杜绝空行 */
+    if (!arr || !arr.length) {
+      var out0 = '';
+      var lines0 = content.split('\n');
+      lines0.forEach(function (line, li) {
+        var seg0 = 0;
+        for (var i0 = 0; i0 < line.length; i0++) {
+          var ch0 = line.charAt(i0);
+          out0 += ch0;
+          if (/[。！？]/.test(ch0)) { out0 += '<br>'; seg0 = 0; }
+          else if (ch0 === '，' || ch0 === '；') { if (seg0 >= 3) out0 += '<br>'; seg0 = 0; }
+          else if (!/[，。！？；：、·—…“”‘’（）《》〈〉\s,.!?;:()"'<>]/.test(ch0)) seg0++;
+        }
+        if (li < lines0.length - 1 && !/<br>$/.test(out0)) out0 += '<br>';
+      });
+      return out0.replace(/(<br>\s*)+$/, '');
+    }
     var idx = 0, out = '';
     var lines = content.split('\n');
     lines.forEach(function (line, li) {
+      var seg = 0;
       for (var i = 0; i < line.length; i++) {
         var ch = line.charAt(i);
-        if (/[，。！？；：、·—…“”‘’（）《》〈〉\s,.!?;:()"'<>]/.test(ch)) { out += ch; continue; }
+        if (/[，。！？；：、·—…“”‘’（）《》〈〉\s,.!?;:()"'<>]/.test(ch)) {
+          out += ch;
+          if (/[。！？]/.test(ch)) { out += '<br>'; seg = 0; }
+          else if (ch === '，' || ch === '；') { if (seg >= 3) out += '<br>'; seg = 0; }
+          continue;
+        }
         var py = arr[idx++] || '';
         out += '<ruby class="pyc">' + ch + '<rt>' + py + '</rt></ruby>';
+        seg++;
       }
-      if (li < lines.length - 1) out += '<br>';
+      if (li < lines.length - 1 && !/<br>$/.test(out)) out += '<br>';
     });
-    /* [#POEM484] 一行一句：逗号/句号后断行（低幼大字版式） */
-    return out.replace(/([，。！？；])/g, '$1<br>').replace(/(<br>\s*)+$/, '');
+    return out.replace(/(<br>\s*)+$/, '');
   }
   function poemSayAll(p) {
     return ((p.title || '') + '，' + (p.content || '')).replace(/\n/g, '，').replace(/"/g, '');
@@ -13813,7 +13839,7 @@ window.MX_SEED = data;
 
             <span class="poem-author">${p.dynasty || ''} · ${p.author || ''}</span>
 
-            <button class="speak-btn" data-say="${poemSayAll(p)}" data-lang="zh-CN" title="朗读全诗">▶️</button>
+            <button class="speak-btn" data-say="${poemSayAll(p)}" data-mp3="${AUDIO_BASE}poem/${encodeURIComponent(p.title)}.mp3" data-lang="zh-CN" title="朗读全诗">▶️</button>
             <button class="mx-wrong-add" data-wrong-add data-wrong-subject="古诗" data-wrong-q="${(p.title || '')}">📕错题</button>
 
           </div>
@@ -14027,6 +14053,18 @@ window.MX_SEED = data;
 
         /* [#PY463] 支持序列发音（data-sayseq="a|o|e"，标调口诀读拼音字母音） */
         if (btn.dataset.sayseq) speakSeq(btn.dataset.sayseq.split('|'), lang, dir);
+
+        else if (btn.dataset.mp3) {
+          /* [#POEM488] 本地整诗音频优先，失败回退 TTS 全文（手机端 TTS 不可用也能播） */
+          try { if (window.__mxCurAudio && !window.__mxCurAudio.paused) window.__mxCurAudio.pause(); } catch (e5) {}
+          var au = new Audio(); window.__mxCurAudio = au; au.preload = 'auto';
+          var _fired488 = false;
+          var _fb488 = function () { if (_fired488) return; _fired488 = true; au.onerror = null; speak(text, lang, dir); };
+          au.onerror = _fb488;
+          au.src = btn.dataset.mp3;
+          var _pr488 = au.play();
+          if (_pr488 && _pr488.catch) _pr488.catch(_fb488);
+        }
 
         else speak(text, lang, dir);
 
