@@ -13542,7 +13542,7 @@ window.MX_SEED = data;
 
         <div class="card-ext">${w.group || ''}</div>
 
-        <button class="speak-btn" data-say="${w.word}" data-dir="pinyin">🔊</button>
+        <button class="speak-btn" data-say="${w.word}" data-syls="${(w.pinyin || '').trim().split(/\s+/).filter(Boolean).join('|')}" data-sayzh="${w.word}" data-dir="pinyin">🔊</button>
         <button class="mx-wrong-add" data-wrong-add data-wrong-subject="识字启蒙" data-wrong-q="${w.word}">📕错题</button>
 
       </div>`;
@@ -13972,6 +13972,15 @@ window.MX_SEED = data;
 
         /* [#PY463] 支持序列发音（data-sayseq="a|o|e"，标调口诀读拼音字母音） */
         if (btn.dataset.sayseq) speakSeq(btn.dataset.sayseq.split('|'), lang, dir);
+
+        else if (btn.dataset.syls) {
+          /* [#WORDS496] 识字卡：拼音音节本地音频优先（同生字弹窗链路，iOS 手势内可播），无音节回退 TTS 读汉字 */
+          var _syls496 = btn.dataset.syls.split('|').filter(Boolean);
+          var _zh496 = btn.dataset.sayzh || text;
+          if (_syls496.length && window.mxPlayAudio) {
+            _syls496.forEach(function (s, k) { setTimeout(function () { try { window.mxPlayAudio(s, 'zh-CN', 'pinyin'); } catch (e496) { console.error('[WORDS496] 播放失败', e496); } }, k * 450); });
+          } else { speak(_zh496, lang, dir); }
+        }
 
         else if (btn.dataset.mp3) {
           /* [#POEM488] 本地整诗音频优先，失败回退 TTS 全文（手机端 TTS 不可用也能播） */
