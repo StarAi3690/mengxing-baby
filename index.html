@@ -23385,18 +23385,34 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
   }
 
-  /* ==================== [MANUAL498] 客户使用手册页 ==================== */
+  /* ==================== [MANUAL498][MANUAL499] 客户使用手册页 ==================== */
   function renderManual() {
     var s = sec('page-manual');
     var h = '';
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">📖 使用手册</div>' +
-      '<div class="mx-tool-actions"><span style="font-size:12px;color:#9aa">萌星宝宝 · 幼小衔接 家长指南</span></div></div>';
+      '<div class="mx-tool-actions"><span style="font-size:12px;color:#9aa">萌星宝宝 · 家长指南（启蒙 · 幼小衔接 · 小学 · 初中）</span></div></div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">🚀 三步快速上手</div>' +
       '<div style="font-size:13.5px;line-height:2;color:#456">' +
-      '① <b>激活</b>：打开后输入购物获取的<b>卡密</b>完成激活（体验卡1天 / 月卡30天 / 本地买断长期）；<br>' +
-      '② <b>建档</b>：按提示创建宝宝档案（名字+头像），可在家长工作台添加多个孩子；<br>' +
-      '③ <b>开学</b>：回到首页点「今日打卡」开始学习，完成每日任务拿积分。</div></div>';
+      '① <b>激活</b>：打开平台输入购物获取的<b>卡密</b>完成激活（体验卡1天 / 月卡30天 / 本地买断长期）；<br>' +
+      '② <b>建档</b>：按提示创建宝宝档案（名字+头像），家长工作台可添加多个孩子；<br>' +
+      '③ <b>开学</b>：首页「今日打卡」已自动排好每天任务，点一条即开始，完成得积分。</div>' +
+      '<div style="font-size:12.5px;color:#789;margin-top:6px">网址：https://StarAi3690.github.io/mengxing-baby/</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">📲 装到手机桌面（像 App 一样用）</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '<b>不用下载、不占内存</b>，加到桌面后一点就开、全屏运行，和正常 App 一样：<br>' +
+      '· <b>第 0 步</b>：复制网址，用<b>手机自带浏览器</b>打开（⚠️ 微信里加不了桌面：先点微信右上角「···」→「在浏览器打开」）；<br>' +
+      '· <b>🍎 iPhone/iPad</b>（必须 Safari）：点底部中间「分享」↑ → 上滑找到「添加到主屏幕」→ 点「添加」；<br>' +
+      '· <b>🌸 鸿蒙/华为</b>：华为浏览器 → 底部「菜单」≡ → 「添加到桌面」；<br>' +
+      '· <b>🤖 安卓其他</b>（小米/OPPO/vivo/三星…）：浏览器右上角「⋮」→「添加到主屏幕」→ 按提示添加/安装。<br>' +
+      '· 桌面出现绿色星星图标即成功；图标是网页截图时，删掉后刷新页面重新添加一次。</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:12px">' + '<div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <rect x="10" y="8" width="170" height="26" rx="13" fill="#ededed"/> <text x="95" y="26" text-anchor="middle" font-size="12" fill="#555">网页标题 · 萌星宝宝</text> <circle cx="163" cy="21" r="13" fill="#e0533d" opacity=".18"/> <circle cx="163" cy="21" r="13" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="163" y="26" text-anchor="middle" font-size="13" font-weight="bold" fill="#e0533d">···</text> <path d="M163 38 L163 62" stroke="#e0533d" stroke-width="2.5" stroke-dasharray="5 4"/> <path d="M157 56 L163 64 L169 56" fill="none" stroke="#e0533d" stroke-width="2.5"/> <rect x="35" y="76" width="120" height="150" rx="12" fill="#fafafa" stroke="#ddd"/> <line x1="50" y1="100" x2="140" y2="100" stroke="#eee" stroke-width="8"/> <line x1="50" y1="122" x2="140" y2="122" stroke="#eee" stroke-width="8"/> <rect x="44" y="140" width="102" height="30" rx="8" fill="#e0533d" opacity=".15"/> <rect x="44" y="140" width="102" height="30" rx="8" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="95" y="160" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">在浏览器打开</text> <line x1="50" y1="188" x2="140" y2="188" stroke="#eee" stroke-width="8"/> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">微信「···」→ 在浏览器打开</div></div><div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <rect x="75" y="12" width="40" height="8" rx="4" fill="#e8e8e8"/> <rect x="24" y="34" width="142" height="150" rx="10" fill="#f2f8ee"/> <text x="95" y="100" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text> <text x="95" y="120" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text> <rect x="10" y="190" width="170" height="40" fill="#f5f5f5"/> <line x1="10" y1="190" x2="180" y2="190" stroke="#ddd"/> <path d="M45 198 h20 v14 h-20 z M55 192 l-7 7 h4 v10 h6 v-10 h4 z" fill="#888"/> <circle cx="55" cy="205" r="17" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="95" y="210" text-anchor="middle" font-size="11" fill="#888">↗</text> <text x="130" y="210" text-anchor="middle" font-size="11" fill="#888">＋</text> <text x="55" y="240" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">① 点分享按钮</text> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">Safari 底部 · 点分享按钮</div></div><div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <rect x="28" y="26" width="134" height="30" rx="9" fill="#f0f0f0"/> <text x="95" y="46" text-anchor="middle" font-size="11.5" fill="#555">拷贝 打印</text> <rect x="28" y="62" width="134" height="30" rx="9" fill="#f0f0f0"/> <text x="95" y="82" text-anchor="middle" font-size="11.5" fill="#555">存储到「文件」</text> <rect x="26" y="99" width="138" height="32" rx="9" fill="#e0533d" opacity=".15"/> <rect x="26" y="99" width="138" height="32" rx="9" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="95" y="120" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">添加到主屏幕</text> <rect x="28" y="138" width="134" height="30" rx="9" fill="#f0f0f0"/> <text x="95" y="158" text-anchor="middle" font-size="11.5" fill="#555">添加到阅读列表</text> <path d="M95 180 L95 202" stroke="#3e9e42" stroke-width="2.5" stroke-dasharray="5 4"/> <path d="M89 196 L95 204 L101 196" fill="none" stroke="#3e9e42" stroke-width="2.5"/> <text x="95" y="226" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">② 上滑找到这一项</text> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">分享菜单 · 点「添加到主屏幕」</div></div><div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <circle cx="95" cy="22" r="4" fill="#e8e8e8"/> <rect x="24" y="40" width="142" height="130" rx="10" fill="#f2f8ee"/> <text x="95" y="98" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text> <text x="95" y="118" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text> <rect x="10" y="196" width="170" height="34" fill="#f5f5f5"/> <line x1="10" y1="196" x2="180" y2="196" stroke="#ddd"/> <circle cx="45" cy="213" r="10" fill="none" stroke="#888" stroke-width="2"/> <line x1="45" y1="223" x2="45" y2="227" stroke="#888" stroke-width="2"/> <rect x="82" y="204" width="26" height="18" rx="3" fill="none" stroke="#888" stroke-width="2"/> <circle cx="122" cy="213" r="11" fill="none" stroke="#888" stroke-width="2"/> <text x="122" y="218" text-anchor="middle" font-size="12" fill="#888">⇪</text> <circle cx="158" cy="213" r="14" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="158" y="218" text-anchor="middle" font-size="13" font-weight="bold" fill="#e0533d">≡</text> <text x="95" y="243" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">① 点右下角「菜单」</text> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">华为浏览器 · 点右下角「菜单」</div></div><div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <rect x="24" y="28" width="142" height="34" rx="10" fill="#f2f8ee"/> <text x="95" y="50" text-anchor="middle" font-size="11" fill="#7ec850" font-weight="bold">萌星宝宝·幼小衔接</text> <rect x="24" y="74" width="142" height="150" rx="14" fill="#fafafa" stroke="#ddd"/> <text x="52" y="102" text-anchor="middle" font-size="12" fill="#555">🔍 搜索</text> <text x="138" y="102" text-anchor="middle" font-size="12" fill="#555">⭐ 收藏</text> <rect x="34" y="120" width="122" height="30" rx="8" fill="#e0533d" opacity=".15"/> <rect x="34" y="120" width="122" height="30" rx="8" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="95" y="140" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#e0533d">添加到桌面</text> <text x="52" y="176" text-anchor="middle" font-size="12" fill="#555">📖 书签</text> <text x="138" y="176" text-anchor="middle" font-size="12" fill="#555">⚙️ 设置</text> <text x="95" y="243" text-anchor="middle" font-size="10" fill="#e0533d" font-weight="bold">② 点「添加到桌面」</text> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">菜单面板 · 点「添加到桌面」</div></div><div style="text-align:center;flex:0 0 auto"><div style="border:1px solid #e3ecdc;border-radius:12px;padding:8px;background:#fbfdf9"><svg style="width:140px;height:auto;display:block;margin:0 auto" viewBox="0 0 190 250" xmlns="http://www.w3.org/2000/svg"> <rect x="10" y="8" width="170" height="234" rx="20" fill="#fff" stroke="#c9d6c2" stroke-width="2"/> <circle cx="95" cy="22" r="4" fill="#e8e8e8"/> <rect x="24" y="36" width="122" height="26" rx="13" fill="#f0f0f0"/> <text x="85" y="53" text-anchor="middle" font-size="10" fill="#777">🔍 mengxing-baby</text> <circle cx="160" cy="49" r="14" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="160" y="55" text-anchor="middle" font-size="15" font-weight="bold" fill="#e0533d">⋮</text> <rect x="24" y="78" width="142" height="120" rx="10" fill="#f2f8ee"/> <text x="95" y="132" text-anchor="middle" font-size="13" fill="#7ec850" font-weight="bold">萌星宝宝</text> <text x="95" y="152" text-anchor="middle" font-size="10" fill="#9bb89d">学习看板加载中…</text> <rect x="46" y="208" width="98" height="26" rx="13" fill="#e0533d" opacity=".15"/> <rect x="46" y="208" width="98" height="26" rx="13" fill="none" stroke="#e0533d" stroke-width="2.5"/> <text x="95" y="226" text-anchor="middle" font-size="12" font-weight="bold" fill="#e0533d">添加到主屏幕</text> </svg></div><div style="font-size:11.5px;color:#789;margin-top:4px">Chrome 右上角 ⋮ → 添加到主屏幕</div></div>' + '</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">🧒 两种模式</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>🧒 儿童模式</b>（默认）：孩子日常学习、游戏、赚积分；首页顶部实时显示积分 / 宠物状态 / 云端同步徽标；<br>' +
+      '· <b>👨 家长工作台</b>：右上角模式框点击切换（首次进入设置手势或数字密码，可配安全问题找回），管理任务、多孩、错题与数据。</div></div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">📚 学习模块一览</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
@@ -23411,7 +23427,26 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '· 学习与打卡得<b>积分</b>，到<b>积分商城</b>兑换奖励（实物券由家长联系发货）；<br>' +
       '· 六大小游戏：植物大战僵尸（6天推进 + 第7天守卫战）、冰雪奇缘、小马宝莉、汪汪队迷宫、AI山海经连连看、节奏盒子公演；<br>' +
-      '· <b>宠物养成</b>：喂养升级，首页右上角随时查看。</div></div>';
+      '· <b>宠物养成</b>：喂养升级，首页右上角随时查看；<br>' +
+      '· 🎮 <b>非 VIP 游戏规则（6 选 3）</b>：每款游戏可免费试玩 1 次，用完后从 6 个里<b>选定 3 个</b>长期畅玩（家长工作台 → 游戏模块选择可改选）；<b>VIP 解锁全部 6 款</b>。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">👑 本地卡 vs VIP</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px;color:#456;margin-top:6px">' +
+      '<tr style="background:#f2f8ee"><th style="padding:7px 6px;text-align:left">项目</th><th style="text-align:left">本地卡（买断）</th><th style="text-align:left">VIP</th></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>游戏</b></td><td style="border-top:1px solid #eee"><b>只能选 3 个</b>（6 选 3）</td><td style="border-top:1px solid #eee">全部 6 款畅玩</td></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>多孩管理</b></td><td style="border-top:1px solid #eee">最多 2 个孩子</td><td style="border-top:1px solid #eee">最多 5 个孩子</td></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>数据保存</b></td><td style="border-top:1px solid #eee">仅本机（可手动备份导出）</td><td style="border-top:1px solid #eee"><b>多端云同步</b>，换设备登录即恢复</td></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>资源中心</b></td><td style="border-top:1px solid #eee">仅存本机（20MB 配额）</td><td style="border-top:1px solid #eee">云端存储 + 多端同步</td></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>到期后</b></td><td style="border-top:1px solid #eee" colspan="2">正式卡（月卡/买断）到期后<b>本地使用权永久保留</b>不锁站；体验卡到期锁站，可登录账号恢复权限</td></tr>' +
+      '</table>' +
+      '<div style="margin-top:10px;padding:11px 12px;border-radius:12px;background:linear-gradient(90deg,#fff8e6,#fffbf0);border:1px solid #f0dfae;font-size:13.5px;color:#8a6d00">⬆️ <b>升级 VIP 点此链接</b>：<a href="https://m.tb.cn/h.8rn9HPM" target="_blank" style="color:#e8890c;font-weight:700">https://m.tb.cn/h.8rn9HPM</a>（VIP 月卡 · 积分商城「萌星好物」里也有）</div>' +
+      '<div style="font-size:12.5px;color:#789;margin-top:8px">卡密规则：一张卡绑定一个账号（最多 5 台设备）；VIP 到期会显示续费横幅（点 ✕ 可静默 24 小时）。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">🔐 账号 · 卡密 · 数据</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>注册登录</b>（邮箱或用户名 + 密码，需邮箱验证码）：开通<b>多端云同步</b>，换设备/清缓存后登录即恢复；<br>' +
+      '· <b>同步徽标</b>：右上角 绿色「云端」正常 / 灰色「本地」仅本机 / 红色「失败」点击诊断并一键重试；<br>' +
+      '· <b>备份</b>：系统设置 → 数据备份，可随时导出/导入。</div></div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">📥 资源中心（家长专属）</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
@@ -23420,21 +23455,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
     h += '<div class="mx-card"><div class="mx-card-t">👨‍👩‍👧 家长工作台</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
-      '入口：右上角「👨‍👩‍👧 家长」按钮（需密码验证）。可做：<b>多孩管理</b>、<b>真实学习时长</b>统计（进入模块自动计时，闲置3分钟不计时）、<b>错题集</b>、<b>学习任务套组</b>（自定义每日任务数量）、<b>打印周报</b>、资源管理。</div></div>';
+      '入口：右上角「👨‍👩‍👧 家长」按钮（需密码验证）。可做：<b>多孩管理</b>（本地卡 2 个 / VIP 5 个）、<b>真实学习时长</b>统计（进入模块自动计时，闲置3分钟不计时）、<b>错题集</b>、<b>学习任务套组</b>（自定义每日任务数量）、<b>打印周报</b>、资源管理。</div></div>';
 
-    h += '<div class="mx-card"><div class="mx-card-t">🔐 账号 · 卡密 · 数据</div>' +
+    h += '<div class="mx-card"><div class="mx-card-t">💬 建议反馈 · 我们的承诺</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
-      '· <b>注册登录</b>（邮箱或用户名 + 密码，需邮箱验证码）：开通<b>多端云同步</b>，换设备/清缓存后登录即恢复；<br>' +
-      '· <b>卡密规则</b>：一张卡绑定一个账号（最多5台设备）；正式卡（月卡/买断）到期后<b>本地使用权永久保留</b>不锁站，体验卡到期锁站；<br>' +
-      '· <b>VIP 到期</b>会显示续费横幅（点 ✕ 可静默24小时）；<br>' +
-      '· <b>备份</b>：系统设置 → 数据备份，可随时导出/导入。</div></div>';
+      '· <b>提建议</b>：左侧菜单「💌 建议与反馈」直接留言，每一条我们都会认真看；<br>' +
+      '· <b>持续更新</b>：工作日几乎<b>每 3 天</b>都有功能更新；<br>' +
+      '· <b>我们的愿景</b>：把萌星宝宝打造成<b>启蒙 · 幼小衔接 · 小学 · 初中</b>都能用的学习平台，功能不断壮大，欢迎家长多提建议；<br>' +
+      '· <b>郑重承诺</b>：本平台<b>永远无小视频广告</b>，让孩子安心学习。</div></div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">❓ 常见问题</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '· <b>点喇叭没声音？</b>请再点一次（首次点击是浏览器授权），苹果手机同样支持；<br>' +
-      '· <b>换手机数据还在吗？</b>注册登录并开启云同步即自动恢复；未注册用户同设备输原卡密即可恢复；<br>' +
-      '· <b>忘记密码？</b>登录面板走「忘记密码」重置，或联系客服；<br>' +
-      '· <b>联系客服</b>：350507945@qq.com</div></div>';
+      '· <b>换手机数据还在吗？</b>VIP 注册登录后自动从云端恢复；未注册用户同设备输原卡密即可恢复；<br>' +
+      '· <b>忘记密码？</b>登录面板走「忘记密码」重置；<br>' +
+      '· <b>想清除本机数据？</b>账号中心 →「清除本机数据」二次确认（仅清本机，云端备份不受影响）；<br>' +
+      '· <b>联系客服</b>：vx:daquan88666</div></div>';
 
     s.innerHTML = h;
   }
@@ -27691,7 +27727,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(157,63,63,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
         '<div style="font-size:52px">🔒</div>' +
         '<div style="font-size:21px;font-weight:800;color:#5f2b2b;margin:10px 0 6px">' + (frozenMode ? '⛔ 该卡密已被冻结' : '您的有效期已结束') + '</div>' +
-        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">' + (frozenMode ? '您的卡密已被管理员冻结，如有疑问请联系客服（350507945@qq.com）<br>如有新卡密可直接输入激活，孩子的学习数据已安全保留' : '卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用') + '</div>' +
+        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">' + (frozenMode ? '您的卡密已被管理员冻结，如有疑问请联系客服（vx:daquan88666）<br>如有新卡密可直接输入激活，孩子的学习数据已安全保留' : '卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用') + '</div>' +
         '<input id="mx-lock-code" maxlength="32" placeholder="输入新卡密立即续期" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #f3d9c2;border-radius:12px;outline:none"/>' +
         '<div id="mx-lock-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
         '<button id="mx-lock-renew" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.35)">立即续期</button>' +
@@ -27707,7 +27743,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           (buyUrl ? '<button id="mx-lock-buyout" style="flex:1;padding:12px;border:1.5px solid #ffb74d;background:#fff8ef;border-radius:12px;color:#b26a00;font-size:14px;font-weight:700;cursor:pointer">📀 本地买断版</button>' : '') +
           (vipUrl ? '<button id="mx-lock-vip" style="flex:1;padding:12px;border:1.5px solid #ffd9b3;background:#fffaf5;border-radius:12px;color:#c77800;font-size:14px;font-weight:700;cursor:pointer">👑 购买 VIP</button>' : '') +
         '</div>' +
-        '<div style="font-size:12px;color:#b9a7a7;margin-top:16px">买断版=一次购买长期使用本地功能 · VIP=全功能+多端同步<br>客服邮箱：350507945@qq.com</div>' +
+        '<div style="font-size:12px;color:#b9a7a7;margin-top:16px">买断版=一次购买长期使用本地功能 · VIP=全功能+多端同步<br>客服微信：vx:daquan88666</div>' +
       '</div>';
     document.body.appendChild(g);
     var inp = g.querySelector('#mx-lock-code');
@@ -27762,7 +27798,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           lockLoginMsg.textContent = (r && r.msg === '未找到激活记录') ? '该账号名下暂无正式卡，请输入新卡密激活' : ((r && r.msg) || '网络异常，请重试');
           return;
         }
-        if (r.frozen) { lockLoginMsg.textContent = '该账号的卡密已被冻结，请联系客服（350507945@qq.com）'; return; }
+        if (r.frozen) { lockLoginMsg.textContent = '该账号的卡密已被冻结，请联系客服（vx:daquan88666）'; return; }
         if (!r.vip && r.formal !== true) {
           lockLoginMsg.textContent = r.expired ? '该账号名下只有已到期的体验卡，请输入新卡密续期' : '该账号名下暂无正式卡，请输入新卡密激活';
           return;
