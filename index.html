@@ -10293,6 +10293,7 @@ window.DB = {
 
     /* 家长工作台独立化：单一一级菜单，内部以页签控制台呈现（主页 / 个人日历·日程 / 学习任务·套组） */
     { id: 'parent', label: '👨‍👩‍👧 家长工作台', icon: '📊', page: 'page-parent' },
+    { id: 'manual', label: '📖 使用手册', icon: '📖', page: 'page-manual' },
     { id: 'account', label: '账号中心', icon: '👤', page: 'page-account' },
         { id: 'settings', label: '系统设置', icon: '⚙️', page: 'page-settings' }
 
@@ -10701,6 +10702,7 @@ window.DB = {
     'page-tool-flash':  { title: '学习闪卡生成', desc: '基于识字/拼音/单词/古诗内容自动生成复习闪卡，正反面预览，支持打印。', icon: '🃏', tag: '智能工具' },
 
     'page-parent':   { title: '家长工作台', desc: '多孩切换 · 周学习时长统计 · 各学科掌握进度 · 错题分布，支持打印周报。', icon: '👨', tag: '家长后台' },
+    'page-manual':   { title: '使用手册', desc: '家长操作手册：三步上手 · 学习模块 · 资源中心 · 家长工作台 · 账号与数据 · 常见问题。', icon: '📖', tag: '新手必读' },
     'page-feedback': { title: '建议与反馈', desc: '提交使用建议与联系方式，本地留存并可同步云端 Feedback 表。', icon: '💌', tag: '智能工具' },
     'page-account':  { title: '账号中心', desc: '本地/云端账号、5设备限制、卡密VIP。', icon: '👤', tag: '阶段五实现' },
         'page-settings': { title: '系统设置', desc: '模块顺序自定义 · 主题切换（V1/V2/V3 共38套） · 账号/数据/公告等已归口家长工作台与管理后台', icon: '⚙️', tag: '阶段四实现' }
@@ -22633,9 +22635,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<select class="mx-sel" id="pt-kid">' +
       kids.map(function (k) { return '<option value="' + k.id + '"' + (k.id === c ? ' selected' : '') + '>' + (k.name || k.id) + '</option>'; }).join('') +
       '</select>' +
+      '<button class="mx-btn mx-btn-ghost" id="pt-manual">📖 使用手册</button>' +
       '<button class="mx-btn mx-btn-ghost" id="pt-print">🖨️ 打印周报</button></div></div>';
 
     var RANGE_LABEL = { today: '今日', week: '本周', month: '本月', quarter: '本季度', year: '本年' };
+    /* [MANUAL498] 醒目手册引导条 */
+    h += '<div class="mx-card no-print" style="cursor:pointer;background:linear-gradient(90deg,#fff8e6,#fffbf0);border:1px solid #f0dfae;margin-bottom:10px" onclick="if(window.navigateTo)window.navigateTo(\'page-manual\')"><div style="font-size:13.5px;font-weight:600;color:#8a6d00;padding:2px 0">📖 新手？点此查看<b>《使用手册》</b>：三步上手 · 全模块功能说明 · 常见问题<span style="float:right;color:#b8860b">查看 →</span></div></div>';
     h += '<div class="mx-seg no-print" id="pt-ranges">' +
       ['today', 'week', 'month', 'quarter', 'year'].map(function (r) {
         return '<button type="button" class="mx-seg-btn' + (r === ptRange ? ' on' : '') + '" data-r="' + r + '">' + RANGE_LABEL[r] + '</button>';
@@ -22898,6 +22903,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
     var pb = $('pt-print');
     if (pb) pb.onclick = function () { window.print(); };
+    /* [MANUAL498] 手册入口按钮 */
+    var pm = $('pt-manual');
+    if (pm) pm.onclick = function () { if (window.navigateTo) window.navigateTo('page-manual'); };
 
     /* 家长验证设置：设置/修改安全问题 */
     var setSecBtn = $('pt-setsec');
@@ -23377,9 +23385,93 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
   }
 
+  /* ==================== [MANUAL498] 客户使用手册页 ==================== */
+  function renderManual() {
+    var s = sec('page-manual');
+    var h = '';
+    h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">📖 使用手册</div>' +
+      '<div class="mx-tool-actions"><span style="font-size:12px;color:#9aa">萌星宝宝 · 幼小衔接 家长指南</span></div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">🚀 三步快速上手</div>' +
+      '<div style="font-size:13.5px;line-height:2;color:#456">' +
+      '① <b>激活</b>：打开后输入购物获取的<b>卡密</b>完成激活（体验卡1天 / 月卡30天 / 本地买断长期）；<br>' +
+      '② <b>建档</b>：按提示创建宝宝档案（名字+头像），可在家长工作台添加多个孩子；<br>' +
+      '③ <b>开学</b>：回到首页点「今日打卡」开始学习，完成每日任务拿积分。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">📚 学习模块一览</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>拼音</b>：拼音拼读器（字母呼读音 · 四声大卡 · 三段拼读 · 点调四声联动）、音节组合、21天闯关；<br>' +
+      '· <b>识字/生字</b>：点喇叭发音（真人拼音音节音频，苹果手机同样可用），生字卡可一键进错题集；<br>' +
+      '· <b>古诗</b>：内置157首（小学必备 / 拓展 / 初中 三个标签 + 年级筛选 + 搜索），点击整个卡片自动朗读，大字一行一句、逐字拼音；<br>' +
+      '· <b>英语</b>：26字母（念字母+念单词）、单词闯关（进入前右上角可选<b>初级2~4岁 / 中级4~6岁 / 高级6~10岁</b>三档词库）；<br>' +
+      '· <b>数学</b>：数学思维闯关、数独、口算题卡 A4 打印；<br>' +
+      '· <b>学习闪卡</b>：自动生成识字/拼音/单词/古诗复习卡，支持打印。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">🎮 积分 · 游戏 · 宠物</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· 学习与打卡得<b>积分</b>，到<b>积分商城</b>兑换奖励（实物券由家长联系发货）；<br>' +
+      '· 六大小游戏：植物大战僵尸（6天推进 + 第7天守卫战）、冰雪奇缘、小马宝莉、汪汪队迷宫、AI山海经连连看、节奏盒子公演；<br>' +
+      '· <b>宠物养成</b>：喂养升级，首页右上角随时查看。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">📥 资源中心（家长专属）</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '家长工作台 → 📥 资源中心：上传本地音频/视频/图片/PDF，<b>自动归类</b>到古诗/识字/拼音/英语/数学/熏听等模块；<br>' +
+      '支持「熏听排期」定时播放；VIP 文件可上云多端同步（普通用户仅存本机，20MB 配额）。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">👨‍👩‍👧 家长工作台</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '入口：右上角「👨‍👩‍👧 家长」按钮（需密码验证）。可做：<b>多孩管理</b>、<b>真实学习时长</b>统计（进入模块自动计时，闲置3分钟不计时）、<b>错题集</b>、<b>学习任务套组</b>（自定义每日任务数量）、<b>打印周报</b>、资源管理。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">🔐 账号 · 卡密 · 数据</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>注册登录</b>（邮箱或用户名 + 密码，需邮箱验证码）：开通<b>多端云同步</b>，换设备/清缓存后登录即恢复；<br>' +
+      '· <b>卡密规则</b>：一张卡绑定一个账号（最多5台设备）；正式卡（月卡/买断）到期后<b>本地使用权永久保留</b>不锁站，体验卡到期锁站；<br>' +
+      '· <b>VIP 到期</b>会显示续费横幅（点 ✕ 可静默24小时）；<br>' +
+      '· <b>备份</b>：系统设置 → 数据备份，可随时导出/导入。</div></div>';
+
+    h += '<div class="mx-card"><div class="mx-card-t">❓ 常见问题</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>点喇叭没声音？</b>请再点一次（首次点击是浏览器授权），苹果手机同样支持；<br>' +
+      '· <b>换手机数据还在吗？</b>注册登录并开启云同步即自动恢复；未注册用户同设备输原卡密即可恢复；<br>' +
+      '· <b>忘记密码？</b>登录面板走「忘记密码」重置，或联系客服；<br>' +
+      '· <b>联系客服</b>：350507945@qq.com</div></div>';
+
+    s.innerHTML = h;
+  }
+
+  /* [MANUAL498] 首次激活后的功能速览弹窗（一次性，仅卡密激活成功链触发） */
+  function showManualHintOnce() {
+    try { if (lsGet('mengxing_manual_hint_done') === '1') return; } catch (e) { return; }
+    setTimeout(function () {
+      var m = modal(
+        '<div style="font-size:46px">🎉</div>' +
+        '<div style="font-size:19px;font-weight:800;color:#1f3a5f;margin:8px 0 10px">激活成功！欢迎使用萌星宝宝</div>' +
+        '<div style="font-size:13.5px;color:#456;line-height:1.9;text-align:left;background:#f6f9ff;border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
+        '<b>平台都有什么？</b><br>' +
+        '📚 拼音 · 识字 · 古诗157首 · 英语字母/单词闯关 · 数学思维<br>' +
+        '🎮 六大小游戏 + 宠物养成 + 积分商城<br>' +
+        '📥 资源中心：上传自己的音视频自动归类学习<br>' +
+        '👨‍👩‍👧 家长工作台：时长统计 / 错题集 / 每日任务安排</div>' +
+        '<div style="font-size:12.5px;color:#b8860b;margin-bottom:12px">📖 完整教程：左侧菜单「使用手册」或 家长工作台 → 📖 使用手册</div>' +
+        '<button id="mx-mh-go" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#2fd07f,#23b56d);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px">📖 立即查看使用手册</button>' +
+        '<button id="mx-mh-ok" style="width:100%;padding:11px;border:1px solid #d5e3f7;border-radius:12px;background:#f3f6fb;color:#5b6b80;font-size:14px;cursor:pointer">开始体验</button>'
+      );
+      var done = function () { try { lsSet('mengxing_manual_hint_done', '1'); } catch (e) {} m.close(); };
+      m.querySelector('#mx-mh-ok').onclick = done;
+      m.querySelector('#mx-mh-go').onclick = function () {
+        done();
+        try {
+          if (window.navigateTo) window.navigateTo('page-manual');
+          else if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('navigation', { detail: { page: 'page-manual' } }));
+        } catch (e) {}
+      };
+    }, 1500);
+  }
+
   /* ==================== 11. 路由 ==================== */
   var MAP = {
     'page-parent': renderParent,
+    'page-manual': renderManual,
     'page-errors': renderErrors,
     'page-tool-math': renderToolMath,
     'page-tool-print': renderToolPrint,
@@ -27477,8 +27569,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
         mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种（formal=到期不锁站） */
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
-        if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); });
-        else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); });
+        if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); showManualHintOnce(); });
+        else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); showManualHintOnce(); });
       });
     }
     btn.addEventListener('click', doActivate);
