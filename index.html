@@ -21762,7 +21762,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         '<button type="button" class="btn" id="mx-acct-unbind" style="background:#fff;border:1px solid #ff9800;color:#ef6c00">🔓 解绑本机账号（保留数据·可换码）</button>'+
         '<button type="button" class="btn" id="mx-acct-redeem2" style="background:#ff9800;color:#fff;border:none">🎫 重新输入兑换码 / 续费</button>'+
         '<button type="button" class="btn" id="mx-acct-wipe" style="background:#c62828;color:#fff;border:none">🗑️ 清除本机数据并重来</button>'+
+        '<button type="button" class="btn" id="mx-acct-frefresh" style="background:#1f7ae0;color:#fff;border:none">🔄 强制刷新（更新到最新版）</button>'+
       '</div></div>';
+    var frb = page.querySelector('#mx-acct-frefresh');
+    if(frb) frb.onclick = function(){
+      var m = window.__mxModal(
+        '<div style="font-size:40px">🔄</div>'+
+        '<div style="font-size:18px;font-weight:800;color:#1f7ae0;margin:6px 0 8px">强制刷新</div>'+
+        '<div style="font-size:13px;color:#5b6b80;line-height:1.8;text-align:left;background:#f0f6ff;border:1px solid #d5e3f7;border-radius:12px;padding:12px 14px;margin-bottom:14px">清除本机缓存并重新加载最新版本（<b>不影响孩子的学习数据</b>）。适用于：桌面图标打开显示旧版 / 白屏 / 功能异常。</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button id="mx-fr-cancel" style="flex:1;padding:11px;border:1px solid #d5e3f7;border-radius:12px;background:#f3f6fb;color:#5b6b80;font-size:14px;cursor:pointer">取消</button>'+
+          '<button id="mx-fr-ok" style="flex:1.4;padding:11px;border:none;border-radius:12px;background:#1f7ae0;color:#fff;font-size:14px;font-weight:700;cursor:pointer">立即刷新</button>'+
+        '</div>'
+      );
+      m.querySelector('#mx-fr-cancel').onclick = function(){ m.close(); };
+      m.querySelector('#mx-fr-ok').onclick = function(){ m.close(); if(window.mxForceRefresh) window.mxForceRefresh(); };
+    };
     var rl = page.querySelector('#mx-acct-relogin');
     if(rl) rl.onclick = function(){
       if(window.mxSignOut) window.mxSignOut().then(function(){}).catch(function(){});
@@ -29578,6 +29593,12 @@ function downloadResourceFromCloud(resId) {
   /* ================= 共享助手：清数据 / 改名 / 删孩子 / 解绑（供账号中心·家长工作台·系统设置复用） ================= */
   function mxEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+  /* [UPD499] 强制刷新：清 SW 缓存 + 注销重注册 + 重载（PWA 主屏图标拉最新版；不动用户数据） */
+  window.mxForceRefresh = function(){
+    try { if (window.caches && caches.keys) caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k); }); }); } catch (e) {}
+    try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ if (r.unregister) r.unregister(); }); }); } catch (e) {}
+    setTimeout(function(){ location.reload(); }, 400);
+  };
   /* 彻底清除本机数据：删 localStorage + 删 IndexedDB 库 + 刷新（重新走激活流程） */
   function performFullWipe() {
     try {
