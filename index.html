@@ -28010,6 +28010,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           limit: !!res.limit,
           has_vip: !!res.has_vip,
           already_bound: !!res.already_bound,
+          /* [FIX500] 包装器补传 same_device 等标记位（#447 漏补，致本机自动恢复分支失效） */
+          same_device: !!res.same_device,
+          frozen: !!res.frozen,
+          trial_limit: !!res.trial_limit,
           bound_account_masked: res.bound_account_masked || '',
           msg: res.msg || (res.ok ? '激活成功' : '激活失败')
         };
