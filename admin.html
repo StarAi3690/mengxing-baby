@@ -413,6 +413,7 @@
 const GW = 'https://my-kb-d9grepb0u2ac94dc7-1253756551.ap-shanghai.app.tcloudbase.com';
 const PROXY = GW + '/proxy';
 let ADMIN_KEY = localStorage.getItem('mx_admin_key') || '';
+let curAnnId = null, curAnnEnabled = false; /* [ANN510] 当前生效公告（明细状态判定唯一依据） */
 
 function proxy(fn, data){
   return fetch(PROXY, { method:'POST', headers:{'Content-Type':'application/json'},
@@ -490,10 +491,12 @@ function switchTab(t){
   if (t==='resops') loadResOps();
 }
 
+/* [ANN510] 当前生效公告缓存：明细状态动态判定用 */
 async function loadAnnounce(){
   try {
     const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY });
     const a = (r && r.announcement) || {};
+    curAnnId = a.id || null; curAnnEnabled = !!a.enabled;
     $('annText').value = a.text || ''; $('annUrl').value = a.url || '';
     $('annEnabled').checked = !!a.enabled;
     setMsg('annMsg', (r&&r.ok)?'已读取当前公告':'读取失败', 'sub');
@@ -505,7 +508,7 @@ async function saveAnnounce(){
   setMsg('annMsg','发布中…','sub');
   const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY, action2:'set',
     announcement: { text: text, url: $('annUrl').value.trim(), enabled: $('annEnabled').checked } });
-  if (r && r.ok) { setMsg('annMsg','✅ 已发布，全站用户即将看到','ok'); loadAnnLog(); }
+  if (r && r.ok) { curAnnId = (r.announcement||{}).id || curAnnId; curAnnEnabled = !!(r.announcement||{}).enabled; /* [ANN510] 同步刷新生效缓存 */ setMsg('annMsg','✅ 已发布，全站用户即将看到','ok'); loadAnnLog(); }
   else setMsg('annMsg','❌ ' + ((r&&r.msg)||'发布失败'),'bad');
 }
 
@@ -514,6 +517,9 @@ async function loadAnnLog(){
   try {
     const r = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY, action2:'log' });
     const log = (r && r.log) || [];
+    /* [ANN510] 状态动态判定数据源：每次刷新明细都重新取当前生效公告（防他端停用/改公告后本页用旧缓存） */
+    try { const c = await proxy('mxAdmin', { action:'announce', adminKey: ADMIN_KEY });
+      const ca = (c && c.announcement) || {}; curAnnId = ca.id || null; curAnnEnabled = !!ca.enabled; } catch(e){}
     const tb = $('annLogBody');
     if (!log.length) { tb.innerHTML = '<tr><td colspan="4" style="padding:8px;color:#9aa">暂无归档（首次发布后自动生成）</td></tr>'; return; }
     tb.innerHTML = log.map(function(x){
@@ -522,7 +528,7 @@ async function loadAnnLog(){
         '<td style="padding:6px 8px;font-family:monospace">' + (x.id||'—') + '</td>' +
         '<td style="padding:6px 8px">' + (t||'—') + '</td>' +
         '<td style="padding:6px 8px">' + String(x.text||'').replace(/</g,'&lt;').slice(0,80) + '</td>' +
-        '<td style="padding:6px 8px">' + (x.enabled?'<span style="color:#2e9e5b;font-weight:700">生效中</span>':'<span style="color:#9aa">已停用</span>') + '</td></tr>';
+        '<td style="padding:6px 8px">' + ((curAnnEnabled && x.id === curAnnId) ? '<span style="color:#2e9e5b;font-weight:700">生效中</span>' : '<span style="color:#9aa">已失效</span>') + '</td></tr>'; /* [ANN510] */
     }).join('');
     setMsg('annLogMsg','共 ' + log.length + ' 条','sub');
   } catch(e){ setMsg('annLogMsg','读取失败：'+String(e.message||e),'bad'); }
