@@ -15419,7 +15419,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
         return '<button class="wch-dopt' + (String(wchSel) === String(s.id) ? ' cur' : '') + '" data-set="' + wchEsc(s.id) + '"><span>📚 ' + wchEsc(s.name) + '</span><small>' + n + ' 词</small></button>';
       }).join('');
     }
-    html += '<div class="wch-wrap"><button class="wch-diffbtn" id="wch-diffbtn">🎚️ ' + wchSelLabel + '</button><div class="wch-diffpop" id="wch-diffpop">' + wchDiffBtns + '</div><div class="wch-gtitle"><span class="wch-gbadge">单词大冲刺</span><div class="wch-gsub">单词闯关 · 答对加速跑，答错会摔倒 · 每轮 10 题得 ' + WCH_PTS + ' 积分</div><span class="wch-pill">今日已闯关 ' + plays + ' / ' + limit + ' 次 · ' + wchSelLabel + ' · 词库 ' + pool.length + ' 词</span><div style="margin-top:8px"><button id="wch-libbtn" style="border:none;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:800;color:#1565c0;background:#e3f2fd;cursor:pointer;box-shadow:0 2px 6px rgba(0,60,120,.15)">📚 自定义词库（家长设置 →）</button></div></div>';
+    html += '<div class="wch-wrap"><button class="wch-diffbtn" id="wch-diffbtn">🎚️ ' + wchSelLabel + '</button><div class="wch-diffpop" id="wch-diffpop">' + wchDiffBtns + '</div><div class="wch-gtitle"><span class="wch-gbadge">单词大冲刺</span><div class="wch-gsub">单词闯关 · 答对加速跑，答错会摔倒 · 每轮 10 题得 ' + WCH_PTS + ' 积分</div><span class="wch-pill">今日已闯关 ' + plays + ' / ' + limit + ' 次 · ' + wchSelLabel + ' · 词库 ' + pool.length + ' 词</span><div style="margin-top:8px"><button id="wch-libbtn" style="border:none;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:800;color:#1565c0;background:#e3f2fd;cursor:pointer;box-shadow:0 2px 6px rgba(0,60,120,.15)">📚 自定义词库（去管理 →）</button></div></div>';
     if (blocked) {
       html += '<div style="margin:26px auto;max-width:420px;background:#fff3e0;border:2px dashed #ffb74d;border-radius:16px;padding:22px;text-align:center;font-size:17px;font-weight:700;color:#e65100">😵 今天的闯关次数用完啦，明天再来吧！</div>';
     } else {
@@ -15440,7 +15440,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       });
     }
     var wchLibBtn = document.getElementById('wch-libbtn');
-    if (wchLibBtn) wchLibBtn.onclick = function () { if (window.navigateTo) window.navigateTo('page-parent'); };
+    if (wchLibBtn) wchLibBtn.onclick = function () { if (window.navigateTo) window.navigateTo('page-tool-wlib'); };
     if (!blocked) {
       var selId = null;
       sec.querySelectorAll('.wch-role').forEach(function (el) {
@@ -15632,6 +15632,13 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
   h += '<div style="text-align:center;padding:4px 0 8px"><div style="font-size:34px">📚</div><div style="font-size:20px;font-weight:800;color:#37474f">英语词库管理</div>' +
     '<div style="font-size:13px;color:#8a93a6">自定义单词套组（即难度/词库），自动接入「单词闯关」。内置 ' + WCH_SEED.length + ' 词可直接闯关。</div></div>';
   h += '<div style="background:' + (isV ? '#fff8e1' : '#eef4ff') + ';border:1px solid ' + (isV ? '#f0d98a' : '#cfd8e8') + ';border-radius:12px;padding:10px 12px;font-size:13px;color:#455a64;margin-bottom:12px">' + quotaTxt + '</div>';
+  // [WLIB529-B1]
+  h += '<div style="background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#455a64;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+    '<span style="font-weight:800">⏱️ 每日闯关上限（家长管控）</span>' +
+    '<input type="number" id="wlib-dlimit" min="1" max="20" value="' + (parseInt(await wchGet('wch:dailyLimit:' + cid, String(window.WCH_DAILY_DEFAULT || 5)), 10) || (window.WCH_DAILY_DEFAULT || 5)) + '" style="width:70px;border:2px solid #e3e8f0;border-radius:8px;padding:6px 8px;font-size:14px;font-weight:700">' +
+    '<span style="color:#8a93a6">次/天（默认 ' + (window.WCH_DAILY_DEFAULT || 5) + '）。与「家长工作台 → 英语单词闯关」同一设置。</span>' +
+    '<button id="wlib-dlimit-save" style="border:none;border-radius:10px;background:linear-gradient(90deg,#66bb6a,#43a047);color:#fff;font-weight:800;padding:7px 14px;cursor:pointer">💾 保存上限</button>' +
+    '<span id="wlib-dlimit-msg" style="color:#2e7d32;font-weight:700"></span></div>';
   var canNew = used < MAX;
   h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">' +
     '<button id="wlib-new" ' + (canNew ? '' : 'disabled') + ' style="border:none;border-radius:10px;background:linear-gradient(90deg,#7c5cff,#5a3fe0);color:#fff;font-weight:800;padding:9px 16px;cursor:' + (canNew ? 'pointer' : 'not-allowed') + (canNew ? '' : ';opacity:.5') + '">➕ 新建套组</button>' +
@@ -15758,6 +15765,18 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       cur.words.splice(i, 1); cur.updatedAt = Date.now(); await saveSets(); renderWLib();
     };
   });
+
+  // [WLIB529-B2]
+  var dlimitBtn = sec.querySelector('#wlib-dlimit-save');
+  if (dlimitBtn) dlimitBtn.onclick = async function () {
+    var inp = sec.querySelector('#wlib-dlimit');
+    var v = parseInt(inp ? inp.value : '0', 10);
+    if (isNaN(v) || v < 1) v = window.WCH_DAILY_DEFAULT || 5;
+    await wchSet('wch:dailyLimit:' + cid, String(v));
+    var m3 = sec.querySelector('#wlib-dlimit-msg');
+    if (m3) m3.textContent = '✅ 已保存：每日最多 ' + v + ' 次';
+    if (window.showToast) window.showToast('✅ 每日闯关上限已保存：' + v + ' 次');
+  };
 }
 
   /* ================= 单词闯关 [WCH481] 结束 ================= */
@@ -23510,6 +23529,21 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function renderManual() {
     var s = sec('page-manual');
     var h = '';
+    // [WLIB529-D1] 更新内容页签切换（全局函数，无需重渲染）
+    window.toggleManual = function (n) {
+      var u = document.getElementById('manual-use'), p = document.getElementById('manual-update');
+      var b1 = document.getElementById('mtab-use'), b2 = document.getElementById('mtab-update');
+      if (!u || !p) return;
+      u.style.display = n === 1 ? 'none' : '';
+      p.style.display = n === 1 ? '' : 'none';
+      if (b1) { b1.style.background = n === 1 ? '#fff' : '#7c5cff'; b1.style.color = n === 1 ? '#455a64' : '#fff'; }
+      if (b2) { b2.style.background = n === 1 ? '#7c5cff' : '#fff'; b2.style.color = n === 1 ? '#fff' : '#455a64'; }
+    };
+    h += '<div style="display:flex;gap:8px;margin:10px 0 14px">' +
+      '<button id="mtab-use" onclick="toggleManual(0)" style="border:2px solid #7c5cff;border-radius:999px;padding:8px 18px;font-size:14px;font-weight:800;background:#7c5cff;color:#fff;cursor:pointer">📖 使用说明</button>' +
+      '<button id="mtab-update" onclick="toggleManual(1)" style="border:2px solid #7c5cff;border-radius:999px;padding:8px 18px;font-size:14px;font-weight:800;background:#fff;color:#455a64;cursor:pointer">🆕 更新内容</button>' +
+      '</div>';
+    h += '<div id="manual-use">';
     h += '<div class="mx-tool-head no-print"><div class="mx-tool-title">📖 使用手册</div>' +
       '<div class="mx-tool-actions"><span style="font-size:12px;color:#9aa">萌星宝宝 · 家长指南（启蒙 · 幼小衔接 · 小学 · 初中）</span></div></div>';
 
@@ -23603,6 +23637,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '· <b>我们的愿景</b>：把萌星宝宝打造成<b>启蒙 · 幼小衔接 · 小学 · 初中</b>都能用的学习平台，功能不断壮大，欢迎家长多提建议；<br>' +
       '· <b>郑重承诺</b>：本平台<b>永远无小视频广告</b>，让孩子安心学习。</div></div>';
 
+    // [WLIB529-C]
+    h += '<div class="mx-card"><div class="mx-card-t">📚 英语·单词闯关 自定义词库（家长导入）</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '家长可<b>自建单词套组</b>作为闯关题库，比内置词库更贴合自家孩子：' +
+      '<br><b>① 入口</b>：英语 → 单词闯关，点顶部「📚 自定义词库（去管理 →）」；或 智能工具 → 📚 英语词库管理；' +
+      '<br><b>② 建套组</b>：点「➕ 新建套组」命名（如「初级 / 2026年 / 旅行词汇」），相当于一套难度词库；' +
+      '<br><b>③ 批量导入</b>：在套组里点「📥 批量导入」，粘贴 Excel/WPS 复制的多行（<b>单词,释义,音标,例句</b>），一键导入；也可手动「➕ 添加单词」；' +
+      '<br><b>④ 接入闯关</b>：自建套组会自动出现在单词闯关的「🎚️ 难度」选择里，选它即按你的词库出题；' +
+      '<br><b>⑤ 每日上限</b>：同一看板可设「⏱️ 每日闯关上限（家长管控）」，与「家长工作台 → 英语单词闯关」同一设置、互相同步；' +
+      '<br><b>名额</b>：普通用户 <b>1</b> 个套组（批量导入仅 1 次，之后可手动加词），VIP <b>5</b> 个套组、导入与修改不限。' +
+      '</div></div>';
     h += '<div class="mx-card"><div class="mx-card-t">❓ 常见问题</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '· <b>点喇叭没声音？</b>请再点一次（首次点击是浏览器授权），苹果手机同样支持；<br>' +
@@ -23611,6 +23656,30 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '· <b>想清除本机数据？</b>账号中心 →「清除本机数据」二次确认（仅清本机，云端备份不受影响）；<br>' +
       '· <b>联系客服</b>：vx:daquan88666</div></div>';
 
+    h += '</div>';  // [WLIB529-D2] 关闭 manual-use
+    h += '<div id="manual-update" style="display:none">' +
+      '<div class="mx-card"><div class="mx-card-t">🆕 近期更新概览（面向用户端）</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">我们持续打磨体验，以下是<b>面向孩子与家长</b>的主要更新（后台配置类更新不在此列）：</div></div>' +
+      '<div class="mx-card"><div class="mx-card-t">📅 2026-09-27</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>单词闯关 · 难度三档</b>：右上角 🎚️ 可选 初级(2~4岁)/中级(4~6岁)/高级(6~10岁) 词库，按孩子水平出题；<br>' +
+      '· <b>单词闯关 · 自定义词库</b>：家长可在「英语词库管理」批量导入 Excel/CSV 自建单词套组，自动接入闯关；<br>' +
+      '· <b>古诗</b>：逐字拼音 + 手机/电脑双端版式 + 全诗朗读；<br>' +
+      '· <b>英语 26 字母</b>：每个字母真人发音（念字母 + 念例词）。' +
+      '</div></div>' +
+      '<div class="mx-card"><div class="mx-card-t">📅 2026-09-19 ~ 09-20</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>拼音弹窗大改版</b>：双栏布局（图标+拼音 / 字卡+例词）、点四声小卡拼读联动、<b>三段拼读</b>（声母名→带调韵母→整音节）、例词注音；<br>' +
+      '· <b>拼音呼读音矫正</b>：f / d / t 等按教学规范读一声，更标准。' +
+      '</div></div>' +
+      '<div class="mx-card"><div class="mx-card-t">📅 体验与权益优化</div>' +
+      '<div style="font-size:13px;line-height:1.9;color:#456">' +
+      '· <b>锁站体验</b>：购正式卡＝永久本地使用权不锁站；体验卡到期锁站后可「🔑 直接登录」解锁；<br>' +
+      '· <b>VIP 到期横幅</b>：新增「去续费」按钮，一键续费；<br>' +
+      '· <b>学习任务套组</b>：支持「不关联（手动）」完全自定义个性化任务；每周排期可<b>任选周几</b>（不规则组合也行）；<br>' +
+      '· <b>拼音 21 天闯关 / 分类练习 / 音节组合</b>等多种练习方式上线。' +
+      '</div></div>' +
+      '</div>';  // [WLIB529-D2] 更新内容结束
     s.innerHTML = h;
   }
 
