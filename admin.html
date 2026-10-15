@@ -314,9 +314,9 @@
   <div id="pane-pub" hidden>
     <div class="card">
       <h3 style="margin:0 0 4px">🚀 一键发布（GitHub Pages 直推）</h3>
-      <div class="sub">把本地文件经 <b>GitHub Contents API</b> 直接提交到 <code>StarAi3690/mengxing-baby@main</code>，Pages 约 1~3 分钟后自动更新。
+      <div class="sub">把本地文件经 <b>GitHub Git Data API</b>（支持大文件、原子提交多文件）直接提交到 <code>StarAi3690/mengxing-baby@main</code>，Pages 约 1~3 分钟后自动更新。
         Token 只保存在<b>本机浏览器</b> localStorage、不经过任何服务器；建议使用仅授权该仓库 <code>Contents: Read and write</code> 的 fine-grained PAT，可随时吊销。
-        <b>单文件上限 60MB</b> —— 更大的 assets 资源请用部署仓根目录的 <code>发布_一键推送.bat</code> 走 git。</div>
+        <b>单文件上限 ~95MB</b>（blob 接口；超大 assets 仍建议用部署仓根目录的 <code>发布_一键推送.bat</code> 走 git）。</div>
       <div class="row">
         <div style="flex:1"><label>GitHub Token（PAT）</label><input id="pubToken" type="password" placeholder="ghp_… / github_pat_…" oninput="pubSaveToken()"></div>
         <div style="flex:1"><label>提交说明（commit message）</label><input id="pubMsg2" type="text" value="publish via admin one-click"></div>
@@ -334,6 +334,15 @@
         <input type="file" id="pubFolder" webkitdirectory directory multiple style="display:none" onchange="pubAddFolder(this)">
         <button class="btn ghost sm" onclick="document.getElementById('pubFolder').click()">📁 选定文件夹上传</button>
         <button class="btn ghost sm" onclick="PUB_ROWS=[];pubRender()">↺ 清空</button>
+      </div>
+      <div id="pubDrop" tabindex="0" title="点击选择文件夹，或把文件夹/文件拖进来"
+           style="margin-top:10px;border:2px dashed #c7d2fe;border-radius:12px;padding:16px 12px;text-align:center;color:#475569;background:#fafbff;cursor:pointer;transition:.15s"
+           onclick="document.getElementById('pubFolder').click()"
+           ondragover="event.preventDefault();this.style.borderColor='#6366f1';this.style.background='#eef2ff'"
+           ondragleave="this.style.borderColor='#c7d2fe';this.style.background='#fafbff'"
+           ondrop="event.preventDefault();this.style.borderColor='#c7d2fe';this.style.background='#fafbff';pubDropFiles(event)">
+        📂 把 <b>_mx_pages_deploy</b> 文件夹<b>拖到这里</b>，或点此选择<br>
+        <span style="font-size:12px;color:#94a3b8">自动排除 Backups/、temp/、netlify/ 与 *.bak 备份；保留网站真正需要的 index.html / admin.html / assets/ / sprite_crops/ 等</span>
       </div>
       <div class="row" style="margin-top:12px">
         <button class="btn" onclick="pubPublish()">🚀 一键发布全部已选文件</button>
@@ -1271,7 +1280,7 @@ async function saveGoods(){
 }
 /* ===== [#449] 一键发布：GitHub Contents API 直推 Pages ===== */
 const PUB_REPO = 'StarAi3690/mengxing-baby', PUB_BRANCH = 'main';
-const PUB_MAX = 60 * 1024 * 1024; /* 单文件 60MB 硬拦（base64 后 ~80MB，超过建议走 git） */
+const PUB_MAX = 95 * 1024 * 1024; /* Git Data API 单文件 ~95MB 上限（blob 接口；更大走 git） */
 let PUB_ROWS = [];
 function pubLoadToken(){
   const el = $('pubToken');
@@ -1298,30 +1307,53 @@ function pubRender(){
 function pubPick(i, inp){
   const f = inp.files && inp.files[0]; if (!f) return;
   PUB_ROWS[i].file = f; PUB_ROWS[i].size = f.size;
-  PUB_ROWS[i].status = f.size > PUB_MAX ? '❌ 超过 60MB，请走 git' : '✅ 已选择';
+  PUB_ROWS[i].status = f.size > PUB_MAX ? '❌ 超过 95MB，建议分卷/走 git' : '✅ 已选择';
   pubRender();
 }
-/* [#PUBDIR] 选定文件夹上传：webkitdirectory 递归列出文件，按相对路径入库行，逐文件直推 */
+/* [#PUBDIR] 选定文件夹上传：webkitdirectory 递归列出文件，按相对路径入库行，逐文件直推；自动排除备份/temp/netlify */
+function pubIsJunk(rel){
+  const low = rel.toLowerCase();
+  if (low.startsWith('backups/') || low.startsWith('temp/') || low.startsWith('netlify/')) return true;
+  if (low.endsWith('.bak') || /\.bak[._]/i.test(low) || /(^|\/)index\.html\.bak/i.test(low)) return true;
+  return false;
+}
 function pubAddFolder(inp){
   const files = Array.from((inp && inp.files) || []);
   if (!files.length) return;
   let strip = false;
   const rel0 = String((files[0] && files[0].webkitRelativePath) || files[0].name || '');
   if (rel0.indexOf('/') >= 0)
-    strip = confirm('是否去掉顶层文件夹名、只保留其下的相对路径？\n\n【确定】选的是与仓库根对应的文件夹（推荐）\n【取消】选的是 assets 等子目录，保留完整相对路径');
-  let added = 0, skipped = 0;
+    strip = confirm('是否去掉顶层文件夹名、只保留其下的相对路径？\n\n【确定】选的是与仓库根对应的文件夹（推荐，例如选了 _mx_pages_deploy）\n【取消】选的是 assets 等子目录，保留完整相对路径');
+  let added = 0, skipped = 0, junk = 0;
   files.forEach(function(f){
     let rel = String(f.webkitRelativePath || f.name || '');
     if (strip && rel.indexOf('/') >= 0) rel = rel.split('/').slice(1).join('/');
     if (!rel) { skipped++; return; }
+    if (pubIsJunk(rel)) { junk++; return; }
     if (PUB_ROWS.some(function(r){ return r.path === rel; })) { skipped++; return; }
-    PUB_ROWS.push({ path: rel, file: f, size: f.size, status: f.size > PUB_MAX ? '❌ 超过 60MB，请走 git' : '✅ 已选择（文件夹）' });
+    PUB_ROWS.push({ path: rel, file: f, size: f.size, status: f.size > PUB_MAX ? '❌ 超过 95MB，建议分卷/走 git' : '✅ 已选择（文件夹）' });
     added++;
   });
   pubRender();
-  setMsg('pubMsg', '📁 已加入 ' + added + ' 个文件' + (skipped ? '（跳过 ' + skipped + ' 个：重复/空路径）' : '')
+  setMsg('pubMsg', '📁 已加入 ' + added + ' 个文件' + (junk ? '（自动排除备份/temp ' + junk + ' 个）' : '') + (skipped ? '；跳过重复 ' + skipped + ' 个' : '')
     + '；请核对「仓库路径」列后点「🚀 一键发布全部已选文件」', added ? 'ok' : 'warn');
   inp.value = '';
+}
+/* 拖拽上传：浏览器拖文件夹会丢失目录结构，故逐文件按文件名/相对路径入库；整站发布请点上方「📁 选定文件夹上传」 */
+function pubDropFiles(e){
+  const dt = e && e.dataTransfer; if (!dt) return;
+  const files = Array.from(dt.files || []);
+  if (!files.length) return;
+  let added = 0, junk = 0;
+  files.forEach(function(f){
+    let rel = String((f.webkitRelativePath && f.webkitRelativePath.indexOf('/') >= 0) ? f.webkitRelativePath : (f.name || ''));
+    if (pubIsJunk(rel)) { junk++; return; }
+    if (PUB_ROWS.some(function(r){ return r.path === rel; })) return;
+    PUB_ROWS.push({ path: rel, file: f, size: f.size, status: f.size > PUB_MAX ? '❌ 超过 95MB' : '✅ 已选择（拖拽）' });
+    added++;
+  });
+  pubRender();
+  setMsg('pubMsg', '📂 拖入 ' + added + ' 个文件' + (junk ? ('（排除备份/temp ' + junk + ' 个）') : '') + '；注意：拖拽文件夹可能丢失子目录结构，整站发布请用「📁 选定文件夹上传」', added ? 'ok' : 'warn');
 }
 function pubB64(file){
   return new Promise(function(res, rej){
@@ -1331,42 +1363,53 @@ function pubB64(file){
     fr.readAsDataURL(file);
   });
 }
-function pubApi(path, opt){
+function ghReq(path, opt){
   const tok = String(($('pubToken')||{}).value || '').trim();
-  return fetch('https://api.github.com/repos/' + PUB_REPO + '/contents/'
-      + path.split('/').map(encodeURIComponent).join('/') + '?ref=' + PUB_BRANCH,
+  return fetch('https://api.github.com/repos/' + PUB_REPO + '/' + path,
     Object.assign({ headers: { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' } }, opt || {}))
     .then(function(r){ return r.json().then(function(j){ return { http: r.status, j: j }; }); });
 }
+/* [C2] Git Data API：blob→tree→commit→ref，支持 >1MB 大文件与多文件原子提交（绕开 Contents API 1MB 限制） */
 async function pubPublish(){
   const rows = PUB_ROWS.filter(function(r){ return r.path && r.file; });
   if (!rows.length) return setMsg('pubMsg','❌ 没有可发布的行（每行需同时填路径并选择文件）','bad');
   if (!String(($('pubToken')||{}).value || '').trim()) return setMsg('pubMsg','❌ 请先填 GitHub Token','bad');
   const msg = String(($('pubMsg2')||{}).value || 'publish via admin').trim();
-  for (const r of rows){
-    if (r.size > PUB_MAX){ r.status = '❌ 超过 60MB，跳过（走 git）'; pubRender(); continue; }
-    r.status = '⏳ 读取文件…'; pubRender();
+  const blobs = [];
+  for (let i=0;i<rows.length;i++){
+    const r = rows[i];
+    if (r.size > PUB_MAX){ r.status = '❌ 超过 95MB，跳过（走 git）'; pubRender(); continue; }
+    r.status = '⏳ 上传 blob ('+(i+1)+'/'+rows.length+')…'; pubRender();
     try {
       const b64 = await pubB64(r.file);
-      r.status = '⏳ 获取远端 sha…'; pubRender();
-      const cur = await pubApi(r.path);
-      let sha;
-      if (cur.http === 200 && cur.j && cur.j.sha) sha = cur.j.sha;
-      else if (cur.http === 404) sha = undefined;
-      else throw new Error('读取远端失败 HTTP ' + cur.http + ' ' + ((cur.j && cur.j.message) || ''));
-      r.status = '⏳ 提交中…'; pubRender();
-      const put = await pubApi(r.path, { method: 'PUT', body: JSON.stringify({
-        message: msg + ' [' + r.path + ']', content: b64, sha: sha, branch: PUB_BRANCH }) });
-      if (put.http >= 200 && put.http < 300)
-        r.status = '✅ 已提交 ' + String(((put.j && put.j.commit && put.j.commit.sha) || '')).slice(0, 7);
-      else
-        r.status = '❌ HTTP ' + put.http + ' ' + ((put.j && put.j.message) || '');
-    } catch(e){ r.status = '❌ ' + String(e.message || e); }
+      const res = await ghReq('git/blobs', { method:'POST', body: JSON.stringify({ content: b64, encoding:'base64' }) });
+      if (!(res.http>=200 && res.http<300) || !res.j.sha) throw new Error('blob 失败 HTTP '+res.http+' '+((res.j&&res.j.message)||''));
+      blobs.push({ path: r.path, sha: res.j.sha });
+      r.status = '✅ blob '+String(res.j.sha).slice(0,7);
+    } catch(e){ r.status = '❌ ' + String(e.message||e); blobs.push(null); }
     pubRender();
   }
-  const ok = PUB_ROWS.filter(function(r){ return /^✅/.test(r.status || ''); }).length;
-  setMsg('pubMsg', ok ? ('✅ 已提交 ' + ok + '/' + rows.length + ' 个文件；Pages 约 1~3 分钟后生效')
-                      : '❌ 没有成功的提交', ok ? 'ok' : 'bad');
+  const okBlobs = blobs.filter(Boolean);
+  if (!okBlobs.length) return setMsg('pubMsg','❌ 没有成功的 blob，未提交','bad');
+  try {
+    setMsg('pubMsg','⏳ 组装并提交 commit…','sub');
+    const ref = await ghReq('git/refs/heads/'+PUB_BRANCH);
+    if (!(ref.http===200 && ref.j && ref.j.object && ref.j.object.sha)) throw new Error('读取分支失败 HTTP '+ref.http+' '+((ref.j&&ref.j.message)||''));
+    const baseSha = ref.j.object.sha;
+    const cm = await ghReq('git/commits/'+baseSha);
+    if (!(cm.http===200 && cm.j && cm.j.tree && cm.j.tree.sha)) throw new Error('读取 commit 失败 HTTP '+cm.http);
+    const baseTree = cm.j.tree.sha;
+    const tree = okBlobs.map(function(b){ return { path: b.path, mode:'100644', type:'blob', sha: b.sha }; });
+    const tr = await ghReq('git/trees', { method:'POST', body: JSON.stringify({ base_tree: baseTree, tree: tree }) });
+    if (!(tr.http>=200 && tr.http<300 && tr.j.sha)) throw new Error('建 tree 失败 HTTP '+tr.http+' '+((tr.j&&tr.j.message)||''));
+    const ct = await ghReq('git/commits', { method:'POST', body: JSON.stringify({ message: msg, tree: tr.j.sha, parents: [baseSha] }) });
+    if (!(ct.http>=200 && ct.http<300 && ct.j.sha)) throw new Error('建 commit 失败 HTTP '+ct.http+' '+((ct.j&&ct.j.message)||''));
+    const up = await ghReq('git/refs/heads/'+PUB_BRANCH, { method:'PATCH', body: JSON.stringify({ sha: ct.j.sha }) });
+    if (!(up.http>=200 && up.http<300)) throw new Error('更新分支失败 HTTP '+up.http+' '+((up.j&&up.j.message)||''));
+    okBlobs.forEach(function(b){ const r = rows.find(function(x){ return x.path===b.path; }); if(r) r.status='✅ 已发布 '+String(ct.j.sha).slice(0,7); });
+    pubRender();
+    setMsg('pubMsg','✅ 已原子提交 '+okBlobs.length+' 个文件（commit '+String(ct.j.sha).slice(0,7)+'）；Pages 约 1~3 分钟后生效','ok');
+  } catch(e){ setMsg('pubMsg','❌ 提交失败：'+String(e.message||e),'bad'); }
 }
 async function pubVerifyAll(){
   const paths = PUB_ROWS.filter(function(r){ return r.path; }).map(function(r){ return r.path; });

@@ -16707,7 +16707,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       if (!list || !list.length) return;
       var meta = MX_PLAN_CATS[c] || { label: c, color: '#888', pts: 5, sub: '' };
       var d = list.filter(function (x) { return x.done; }).length;
-      var catPts = list.reduce(function (s, x) { return s + (x.done ? meta.pts : 0); }, 0);
+      var catPts = list.reduce(function (s, x) { return s + (x.done ? (x.pts != null ? x.pts : meta.pts) : 0); }, 0);
       html += '<div class="cal-cat-head" style="--cc:' + meta.color + '">' +
         '<span class="cal-cat-dot"></span>' +
         '<b>' + meta.label + '</b>' +
@@ -16717,7 +16717,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       '<div class="cal-list">' + list.slice().sort(function (a, b) { return (a.seq || 0) - (b.seq || 0); }).map(function (it) {
         var d1 = it.done;
         return '<label class="cal-task' + (d1 ? ' cal-task-done' : '') + '">' +
-          '<input type="checkbox" class="cal-check" data-seq="' + it.seq + '" data-cat="' + (it.category || 'base') + '"' + (d1 ? ' checked' : '') + '>' +
+          '<input type="checkbox" class="cal-check" data-pts="' + (it.pts != null ? it.pts : "") + '" data-seq="' + it.seq + '" data-cat="' + (it.category || 'base') + '"' + (d1 ? ' checked' : '') + '>' +
           '<span class="cal-checkbox"></span>' +
           '<span class="cal-task-main">' +
             '<span class="cal-task-time">' + esc(it.time || '') + ' · ' + (Number(it.duration) || 0) + '分</span>' +
@@ -16754,7 +16754,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       var modeTxt = it.mode === 'ebbinghaus' ? '🔁 艾宾浩斯曲线' : '▶ 顺序播放';
       var end = mxEndTime(it.time, it.duration);
       return '<label class="cal-task' + (it.done ? ' cal-task-done' : '') + '">' +
-        '<input type="checkbox" class="cal-check ls-check" data-seq="' + it.seq + '" data-cat="listen"' + (it.done ? ' checked' : '') + '>' +
+        '<input type="checkbox" class="cal-check ls-check" data-pts="' + (it.pts != null ? it.pts : "") + '" data-seq="' + it.seq + '" data-cat="listen"' + (it.done ? ' checked' : '') + '>' +
         '<span class="cal-checkbox"></span>' +
         '<span class="cal-listen-type" style="--c:' + tinfo.color + '">' + esc(tinfo.label) + '</span>' +
         '<span class="cal-task-main">' +
@@ -16869,7 +16869,8 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
             try { awardedToday = localStorage.getItem(awardKey) === '1'; } catch (e) {}
             if (_selDate === todayStr && !awardedToday) {
               var meta = MX_PLAN_CATS[pCat] || { pts: 10 };
-              var pts = meta.pts || 10;
+              var cbPts = cb.getAttribute('data-pts');
+              var pts = (cbPts && cbPts !== '') ? Number(cbPts) : (meta.pts || 10);
               await DB.addPoints(cid, pts, '今日任务完成');
               try { localStorage.setItem(awardKey, '1'); } catch (e) {}
               if (window.showToast) window.showToast('✅ 任务完成 +' + pts + ' 积分');
@@ -30560,16 +30561,9 @@ function downloadResourceFromCloud(resId) {
     document.head.appendChild(st);
   }
 
-  /* ================= 8) 挂载 ================= */
+  /* ============ 8) 挂载（已移交 V2 · mx-tasksets-v2：本块仅保留兼容 API，boot 置空避免旧 UI/CSS 重复注入） ============ */
   function boot() {
-    injectCSS();
-    try {
-      document.addEventListener('navigation', function (e) {
-        var p = e.detail && e.detail.page;
-        if (p === 'page-tasksets') setTimeout(render, 60);
-      });
-    } catch (e) {}
-    if (document.getElementById('page-tasksets') && document.getElementById('page-tasksets').classList.contains('active')) render();
+    /* V2 接管渲染与样式；此处不再注入旧 mx-ts-css，也不注册旧 navigation 监听 */
   }
 
   window.MX_TASKSETS = {
@@ -30577,6 +30571,803 @@ function downloadResourceFromCloud(resId) {
     generate: generate, apply: apply, clearToday: clearToday,
     getCursor: getCursor, setCursor: setCursor, render: render,
     effQty: effQty, setQty: setQty, getPin: getPin, setPin: setPin
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+</script>
+<script id="mx-tasksets-v2">
+/* ==========================================================
+   萌星宝宝 · 学习任务套组 V2（page-tasksets / 家长工作台·套组）
+   兼容旧 API：保留 SETS/SLOT/generate/apply（首页看板首跑 apply('set_all',7) 依赖）
+   新增：推荐模板(PRESETS) + 自定义套组(本地2/VIP6槽) + 月度4模式轮换
+        + 日历编排(点天编辑写回套组) + 单项积分(pts) + 家长工作台体能模块
+   落库：settings 表 key = mx_ts_cfg:<cid>（异步、零 schema 变更）
+   ========================================================== */
+(function () {
+  'use strict';
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function toast(m) { if (window.showToast) window.showToast(m); else console.log('[mx-tasksets]', m); }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function dkey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function todayKey() { return dkey(new Date()); }
+  function childId() {
+    try { if (window.DB && DB.getActiveChildId) return DB.getActiveChildId().then(function (x) { return x || 'default'; }).catch(function () { return 'default'; }); } catch (e) {}
+    return Promise.resolve('default');
+  }
+
+  var WEEK = ['一', '二', '三', '四', '五', '六', '日'];
+  var TIME_SLOTS = ['08:00', '09:30', '10:30', '15:30', '16:30', '19:30', '20:30'];
+
+  /* ============ 模块分组（含日常表现 + 熏听下一级） ============ */
+  var MODULE_GROUPS = [
+    { g: '学科', items: { poem: '古诗', pinyin: '拼音', literacy: '识字', maththink: '数学思维', algo: '算法启蒙', phonics: '自然拼读', words: '英文单词' } },
+    { g: '熏听', items: { listen_guo: '国学熏听', listen_en: '英语熏听', listen_story: '故事熏听', listen_kepu: '科普熏听' } },
+    { g: '习惯·表现', items: { daily: '日常表现', sport: '体能运动', manual: '不关联(手动)' } }
+  ];
+  function modName(k) { for (var i = 0; i < MODULE_GROUPS.length; i++) { if (MODULE_GROUPS[i].items[k]) return MODULE_GROUPS[i].items[k]; } return k || ''; }
+  function modOptions(sel) {
+    return '<option value="">— 不关联 —</option>' + MODULE_GROUPS.map(function (g) {
+      return '<optgroup label="' + g.g + '">' + Object.keys(g.items).map(function (k) {
+        return '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + g.items[k] + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+  }
+  function modCat(k) {
+    if (!k) return 'custom';
+    if (k.indexOf('listen_') === 0) return 'listen';
+    if (k === 'daily' || k === 'manual' || k === 'sport') return 'custom';
+    return 'base';
+  }
+  function modPage(k) {
+    var m = { poem: 'page-poem', pinyin: 'page-pinyin', literacy: 'page-literacy', maththink: 'page-maththink', algo: 'page-algo', phonics: 'page-phonics', words: 'page-words', listen_guo: 'page-listen', listen_en: 'page-listen', listen_story: 'page-listen', listen_kepu: 'page-listen', daily: '', sport: 'page-sport', manual: '' };
+    return m[k] || '';
+  }
+  function modSubject(k) {
+    if (k === 'poem' || k === 'pinyin' || k === 'literacy') return '语文';
+    if (k === 'maththink' || k === 'algo') return '数学';
+    if (k === 'phonics' || k === 'words') return '英语';
+    if (k && k.indexOf('listen_') === 0) return '熏听';
+    if (k === 'sport') return '体能';
+    if (k === 'daily') return '日常表现';
+    return '习惯';
+  }
+  function modIcon(k) {
+    var m = { poem: '📜', pinyin: '🔤', literacy: '✍️', maththink: '🧠', algo: '➕', phonics: '🗣️', words: '🔡', listen_guo: '📿', listen_en: '🔤', listen_story: '📚', listen_kepu: '🔬', daily: '⭐', sport: '🏃', manual: '📌' };
+    return m[k] || '📌';
+  }
+
+  /* ============ ① 内置 6 套组（智能生成，保留·首页首跑依赖） ============ */
+  function LIB() {
+    var S = window.MX_SEED || {};
+    var math = S.math || {};
+    var sportLib = (window.MX_SPORT && window.MX_SPORT.LIB) || null;
+    var st = window.MX_STORY_DATA || {};
+    var themes = (window.MX_GAME && window.MX_GAME.THEMES) || null;
+    return {
+      poem: S.poems || [], word: S.words || [], letter: S.letters || [],
+      cvc: S.cvc || [], method: (math.methods) || [], sense: (math.sense) || [],
+      pinyin: window.MX_PINYIN_DATA || [], story: st.story || [], estory: st.estory || [],
+      sport: sportLib ? Object.keys(sportLib).map(function (k) { var c = sportLib[k] || {}; return { key: k, name: c.name || k, items: c.items || [] }; }) : [],
+      game: themes ? Object.keys(themes).map(function (k) { return { key: k, name: (GAME_NAMES[k] || k) }; }) : []
+    };
+  }
+  var GAME_NAMES = { pvz: '植物大战僵尸·护苗塔防', pony: '小马宝莉·魔法三消', frozen: '冰雪奇缘·冰晶堆叠', paw: '汪汪队·拼图修路', shanhai: 'AI山海经·翻牌连连看', beat: '节奏大师·音符敲击' };
+  var SLOT = {
+    poem: { lib: 'poem', n: 1, subject: '语文', module: 'poem', page: 'page-poem', icon: '📜', dur: 15, pts: 10, label: function (v) { var p = v[0]; return '晨读古诗《' + p.title + '》· ' + (p.dynasty || '') + (p.author || ''); } },
+    word: { lib: 'word', n: 5, subject: '语文', module: 'literacy', page: 'page-literacy', icon: '✍️', dur: 15, pts: 10, label: function (v) { return '识字 ' + v.length + ' 个：' + v.map(function (w) { return w.word; }).join(' ') + '（跟读+组词）'; } },
+    pinyin: { lib: 'pinyin', n: 2, subject: '语文', module: 'pinyin', page: 'page-pinyin', icon: '🔤', dur: 10, pts: 10, label: function (v) { return '拼音认读：' + v.map(function (x) { return x.main + '（' + x.ext + '）'; }).join('、'); } },
+    story: { lib: 'story', n: 1, subject: '语文', module: 'story', page: 'page-story', icon: '📚', dur: 20, pts: 10, label: function (v) { return '中文绘本《' + v[0].title + '》共 ' + (v[0].pages || []).length + ' 页（亲子共读）'; } },
+    estory: { lib: 'estory', n: 1, subject: '英语', module: 'estory', page: 'page-estory', icon: '📖', dur: 15, pts: 10, label: function (v) { return '英文绘本《' + v[0].title + '》共 ' + (v[0].pages || []).length + ' 页（点读跟读）'; } },
+    letter: { lib: 'letter', n: 3, subject: '英语', module: 'abc', page: 'page-abc', icon: '🔠', dur: 15, pts: 10, label: function (v) { return '字母认读：' + v.map(function (l) { return l.letter + l.lower + ' ' + l.word; }).join(' / '); } },
+    cvc: { lib: 'cvc', n: 3, subject: '英语', module: 'phonics', page: 'page-phonics', icon: '🗣️', dur: 15, pts: 10, label: function (v) { return '自然拼读：' + v.map(function (c) { return c.word + '(' + c.letters + ')'; }).join(' / '); } },
+    method: { lib: 'method', n: 1, subject: '数学', module: 'algo', page: 'page-algo', icon: '➕', dur: 20, pts: 10, label: function (v) { var m = v[0]; return (m.emoji || '') + m.name + '：' + m.gist + '｜口诀「' + m.koujue + '」'; } },
+    sense: { lib: 'sense', n: 2, subject: '数学', module: 'maththink', page: 'page-maththink', icon: '🧠', dur: 15, pts: 10, distinct: function (s) { return s.title; }, label: function (v) { return '数感练习：' + v.map(function (s) { return s.title; }).join(' / '); } },
+    sport: { lib: 'sport', n: 1, subject: '体能', module: 'sport', page: 'page-sport', icon: '🏃', dur: 15, pts: 10, label: function (v) { var c = v[0]; return '体能·' + c.name + '：' + c.items.map(function (i) { return i.n; }).join('、'); } },
+    game: { lib: 'game', n: 1, subject: '游戏', module: 'games', page: 'page-games', icon: '🎮', dur: 15, pts: 5, label: function (v) { return '游戏闯关：' + v[0].name; } },
+    clock: { lib: null, n: 0, subject: '数学', module: 'clock', page: 'page-clock', icon: '🕐', dur: 10, pts: 5, label: function () { return '认识时钟：整点/半点认读一组'; } },
+    sudoku: { lib: null, n: 0, subject: '数学', module: 'sudoku', page: 'page-sudoku', icon: '🧩', dur: 10, pts: 5, label: function () { return '数独：入门一局（全对 +5⭐）'; } },
+    toolmath: { lib: null, n: 0, subject: '数学', module: 'toolmath', page: 'page-tool-math', icon: '🖩', dur: 10, pts: 5, label: function () { return '口算练习：随机生成一组（20 以内）'; } },
+    tomato: { lib: null, n: 0, subject: '专注', module: 'tomato', page: 'page-tool-tomato', icon: '🍅', dur: 25, pts: 5, label: function () { return '番茄钟：专注 25 分钟不分心'; } }
+  };
+  var SLOT_KEYS = Object.keys(SLOT);
+  var SLOT_NAME = { poem: '古诗晨读', word: '识字跟读', pinyin: '拼音认读', story: '中文绘本', estory: '英文绘本', letter: '字母认读', cvc: '自然拼读', method: '算法口诀', sense: '数感练习', sport: '体能运动', game: '游戏闯关', clock: '认识时钟', sudoku: '数独', toolmath: '口算练习', tomato: '番茄钟' };
+  function qtyKey(cid) { return 'mx_ts_qty_' + cid; }
+  function qtyMap(cid) { try { return JSON.parse(localStorage.getItem(qtyKey(cid)) || '{}') || {}; } catch (e) { return {}; } }
+  function setQty(cid, k, n) { var m = qtyMap(cid); m[k] = n; try { localStorage.setItem(qtyKey(cid), JSON.stringify(m)); } catch (e) {} }
+  function effQty(cid, k) { var s = SLOT[k]; if (!s) return 0; if (s.n === 0) return 1; var m = qtyMap(cid); return (m[k] != null) ? m[k] : s.n; }
+  function getPin() { try { return localStorage.getItem('mx_parent_pin') || '0000'; } catch (e) { return '0000'; } }
+  function setPin(p) { try { localStorage.setItem('mx_parent_pin', String(p || '0000')); } catch (e) {} }
+
+  var SETS = [
+    { id: 'set_chinese', icon: '🌅', name: '语文晨读', color: '#ff7043', desc: '古诗 + 拼音 + 识字，打牢语文启蒙底子', plan: [['poem', 'pinyin', 'word'], ['poem', 'word', 'story']] },
+    { id: 'set_math', icon: '🔢', name: '数学思维', color: '#42a5f5', desc: '数感 + 四大算法 + 口算/时钟/数独', plan: [['sense', 'method', 'toolmath'], ['sense', 'method', 'clock'], ['sense', 'method', 'sudoku']] },
+    { id: 'set_english', icon: '🔤', name: '英语启蒙', color: '#66bb6a', desc: '26 字母 + 自然拼读 + 英文绘本', plan: [['letter', 'cvc'], ['letter', 'cvc', 'estory']] },
+    { id: 'set_all', icon: '🌈', name: '全科均衡', color: '#ab47bc', desc: '语数英体全覆盖 + 游戏奖励，每天约 1 小时', plan: [['poem', 'word', 'sense', 'letter', 'sport', 'game']] },
+    { id: 'set_light', icon: '⏱️', name: '轻松半小时', color: '#ffa726', desc: '忙碌日也能坚持：3 项 · 约 30 分钟', plan: [['poem', 'sense', 'sport'], ['word', 'cvc', 'sport']] },
+    { id: 'set_sport', icon: '💪', name: '运动专注', color: '#26a69a', desc: '体能 + 番茄钟 + 数独/时钟，动静结合', plan: [['sport', 'tomato', 'sudoku'], ['sport', 'tomato', 'clock']] }
+  ];
+  SETS.forEach(function (s) { if (s.id === 'set_all' || s.id === 'set_light') s.fav = true; });
+
+  function curKey(cid) { return 'mx_ts_cursor_' + cid; }
+  function getCursor(cid) { try { return JSON.parse(localStorage.getItem(curKey(cid)) || '{}') || {}; } catch (e) { return {}; } }
+  function setCursor(cid, c) { try { localStorage.setItem(curKey(cid), JSON.stringify(c)); } catch (e) {} }
+  function take(lib, cur, key, n, keyFn) {
+    var arr = lib[key] || []; if (!arr.length) return null;
+    var start = (cur[key] | 0) % arr.length, out = [], seen = {}, i = 0, consumed = 0;
+    while (out.length < n && i < arr.length) {
+      var idx = (start + i) % arr.length, it = arr[idx], kk = keyFn ? String(keyFn(it)) : ('#' + idx);
+      i++; consumed = i; if (seen[kk]) continue; seen[kk] = 1; out.push(it);
+    }
+    cur[key] = (start + consumed) % arr.length; return { items: out, review: (start + consumed) > arr.length };
+  }
+  function slotAvailable(k) { var s = SLOT[k]; if (!s) return false; if (!s.lib) return true; return (LIB()[s.lib] || []).length > 0; }
+  function generate(setId, days, cid, dry) {
+    var set = SETS.filter(function (s) { return s.id === setId; })[0]; if (!set) return [];
+    var lib = LIB(), cur = dry ? JSON.parse(JSON.stringify(getCursor(cid))) : getCursor(cid), out = [], base = new Date();
+    for (var d = 0; d < days; d++) {
+      var day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + d), recipe = set.plan[d % set.plan.length], items = [], seq = 0;
+      recipe.forEach(function (k) {
+        if (!slotAvailable(k)) return; var s = SLOT[k], title;
+        if (s.n === 0) { title = s.label(); }
+        else {
+          var en = effQty(cid, k); if (en <= 0) return;
+          var got = take(lib, cur, s.lib, en, s.distinct); if (!got) return;
+          title = (got.review ? '复习·' : '') + s.label(got.items);
+        }
+        items.push({ seq: seq, time: TIME_SLOTS[seq % TIME_SLOTS.length], duration: s.dur, subject: s.subject, module: s.module, task: title, title: title, icon: s.icon, pts: s.pts, page: s.page, setId: setId, done: false, doneAt: null }); seq++;
+      });
+      out.push({ date: dkey(day), weekday: '周' + '日一二三四五六'.charAt(day.getDay()), items: items });
+    }
+    if (!dry) setCursor(cid, cur); return out;
+  }
+  /* 旧 API（首页看板首跑依赖）：写 dailySchedule，保留已完成，setId+genVer:2 */
+  function apply(setId, days) {
+    return childId().then(function (cid) {
+      var plan = generate(setId, days, cid, false), chain = Promise.resolve();
+      plan.forEach(function (d) {
+        chain = chain.then(function () {
+          return DB.getDailySchedule(cid, d.date).catch(function () { return null; }).then(function (old) {
+            var _doneOld = ((old && old.items) || []).filter(function (t) { return t && t.done; });
+            var items = d.items.map(function (t, i) {
+              var nt = Object.assign({}, t, { seq: i });
+              for (var _j = 0; _j < _doneOld.length; _j++) { var _o = _doneOld[_j]; if (_o && _o.module === nt.module && (_o.task === nt.task || _o.title === nt.title)) { nt.done = true; nt.doneAt = _o.doneAt || null; break; } }
+              return nt;
+            });
+            return DB.putDailySchedule(cid, d.date, { id: cid + ':' + d.date, childId: cid, date: d.date, items: items, setId: setId, genVer: 2, updatedAt: Date.now() });
+          });
+        });
+      });
+      return chain.then(function () { return plan; });
+    });
+  }
+  function clearToday() {
+    return childId().then(function (cid) { var k = todayKey(); return DB.putDailySchedule(cid, k, { id: cid + ':' + k, childId: cid, date: k, items: [], updatedAt: Date.now() }); });
+  }
+
+  /* ============ ② 推荐模板（6 个，固定任务列表·可复制为自定义套组） ============ */
+  var PRESETS = [
+    { id: 'p_chinese', name: '语文晨读', icon: '📖', color: '#4f8cff', fav: false, tasks: [
+      { title: '古诗晨读', module: 'poem', days: [1, 2, 3, 4, 5, 6, 7], perDay: 1, dur: 15, pts: 10 },
+      { title: '识字启蒙', module: 'literacy', days: [1, 3, 5], perDay: 1, dur: 20, pts: 10 },
+      { title: '拼音认读', module: 'pinyin', days: [2, 4, 6], perDay: 1, dur: 20, pts: 10 }
+    ] },
+    { id: 'p_math', name: '数学思维', icon: '🔢', color: '#42a5f5', fav: false, tasks: [
+      { title: '数学思维', module: 'maththink', days: [1, 3, 5], perDay: 1, dur: 20, pts: 12 },
+      { title: '算法启蒙', module: 'algo', days: [2, 4], perDay: 1, dur: 20, pts: 12 },
+      { title: '数感游戏', module: 'manual', days: [6, 7], perDay: 1, dur: 15, pts: 6 }
+    ] },
+    { id: 'p_english', name: '英语启蒙', icon: '🔤', color: '#66bb6a', fav: false, tasks: [
+      { title: '自然拼读', module: 'phonics', days: [1, 3, 6], perDay: 1, dur: 20, pts: 10 },
+      { title: '英文单词', module: 'words', days: [2, 4, 7], perDay: 1, dur: 15, pts: 10 },
+      { title: '英语熏听', module: 'listen_en', days: [1, 2, 3, 4, 5, 6, 7], perDay: 1, dur: 15, pts: 6 }
+    ] },
+    { id: 'p_all', name: '全科均衡', icon: '⚖️', color: '#2bb673', fav: true, tasks: [
+      { title: '古诗晨读', module: 'poem', days: [1, 3, 5], perDay: 1, dur: 15, pts: 10 },
+      { title: '数学思维', module: 'maththink', days: [2, 4], perDay: 1, dur: 20, pts: 12 },
+      { title: '英文单词', module: 'words', days: [6], perDay: 1, dur: 15, pts: 10 },
+      { title: '体能运动', module: 'sport', days: [7], perDay: 1, dur: 20, pts: 8 },
+      { title: '识字启蒙', module: 'literacy', days: [1, 3, 5], perDay: 1, dur: 15, pts: 10 }
+    ] },
+    { id: 'p_light', name: '轻松半小时', icon: '☕', color: '#ffa726', fav: true, tasks: [
+      { title: '绘本共读', module: 'manual', days: [6, 7], perDay: 1, dur: 20, pts: 5 },
+      { title: '国学熏听', module: 'listen_guo', days: [1, 2, 3, 4, 5, 6, 7], perDay: 1, dur: 10, pts: 6 },
+      { title: '运动放松', module: 'sport', days: [1, 2, 3, 4, 5], perDay: 1, dur: 10, pts: 5 }
+    ] },
+    { id: 'p_sport', name: '运动专注', icon: '🏃', color: '#26a69a', fav: false, tasks: [
+      { title: '体能训练', module: 'sport', days: [1, 2, 3, 4, 5, 6, 7], perDay: 1, dur: 15, pts: 8 },
+      { title: '户外探索', module: 'manual', days: [6, 7], perDay: 1, dur: 40, pts: 5 },
+      { title: '节奏盒子', module: 'manual', days: [2, 4], perDay: 1, dur: 15, pts: 5 }
+    ] }
+  ];
+
+  /* ============ ③ 自定义套组 / 轮换 / 体能 —— 配置与持久化 ============ */
+  function capacity() { try { return (window.isVip && window.isVip()) ? 6 : 2; } catch (e) { return 2; } }
+  function defaultRot() { return { mode: 'month', windows: { month: null, halfDay: [null, null], halfWeek: [null, null], week: [null, null, null, null] } }; }
+  function defaultSports() { return [
+    { id: 'sp1', name: '跳绳', icon: '🤾', essence: '双手握柄，前脚掌轻着地，保持匀速节奏', dur: 10 },
+    { id: 'sp2', name: '开合跳', icon: '⭐', essence: '双脚打开与肩同宽，双手头顶击掌，核心收紧', dur: 8 },
+    { id: 'sp3', name: '平板支撑', icon: '💪', essence: '身体成一条直线，不塌腰不撅臀，自然呼吸', dur: 5 }
+  ]; }
+  function cfgKey(cid) { return 'mx_ts_cfg:' + cid; }
+  function loadCfg(cid) {
+    return DB.getSetting(cfgKey(cid), null).then(function (raw) {
+      var cfg = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+      if (!cfg || !cfg.suites) cfg = { suites: [], rot: defaultRot(), sports: defaultSports() };
+      if (!cfg.rot) cfg.rot = defaultRot();
+      if (!cfg.sports || !cfg.sports.length) cfg.sports = defaultSports();
+      return cfg;
+    }).catch(function () { return { suites: [], rot: defaultRot(), sports: defaultSports() }; });
+  }
+  function saveCfg(cid, cfg) { return DB.setSetting(cfgKey(cid), cfg); }
+  function nonEmptySuites(cfg) { return (cfg.suites || []).filter(function (s) { return s && !s.empty; }); }
+  function suiteById(cfg, id) { return (cfg.suites || []).filter(function (s) { return s.id === id; })[0] || null; }
+
+  /* 轮换：给定日期 → 该日生效套组 id */
+  function suiteOfDate(key, rot, suites) {
+    var d = new Date(key + 'T00:00:00'), day = d.getDate();
+    if (rot.mode === 'halfDay') return day <= 15 ? rot.windows.halfDay[0] : rot.windows.halfDay[1];
+    if (rot.mode === 'halfWeek') { var w = Math.ceil(day / 7); return w <= 2 ? rot.windows.halfWeek[0] : rot.windows.halfWeek[1]; }
+    if (rot.mode === 'week') { var w2 = Math.ceil(day / 7); return rot.windows.week[(w2 - 1) % rot.windows.week.length]; }
+    return rot.windows.month;
+  }
+  function tasksOn(key, rot, suites) {
+    var sid = suiteOfDate(key, rot, suites), s = sid ? suiteById(suites, sid) : null; if (!s) return [];
+    var wd = (new Date(key + 'T00:00:00').getDay() + 6) % 7 + 1;
+    return s.tasks.filter(function (t) { return t.days && t.days.indexOf(wd) >= 0; });
+  }
+
+  /* 将自定义套组(按轮换)生成进 dailySchedule —— V2 主生成路径 */
+  function applySuites(days, fromDate) {
+    return childId().then(function (cid) {
+      return loadCfg(cid).then(function (cfg) {
+        var rot = cfg.rot || defaultRot(), suites = cfg.suites || [], base = fromDate ? new Date(fromDate + 'T00:00:00') : new Date(), chain = Promise.resolve();
+        for (var d = 0; d < days; d++) {
+          var day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + d), key = dkey(day);
+          var sid = suiteOfDate(key, rot, suites), s = sid ? suiteById(suites, sid) : null, suiteId = s ? s.id : 'custom';
+          var items = [], seq = 0, wd = (day.getDay() + 6) % 7 + 1;
+          if (s) {
+            s.tasks.forEach(function (t) {
+              if (!t.days || t.days.indexOf(wd) < 0) return;
+              var per = Math.max(1, t.perDay || 1);
+              for (var pp = 0; pp < per; pp++) {
+                items.push({ seq: seq, time: TIME_SLOTS[seq % TIME_SLOTS.length], duration: t.dur, subject: modSubject(t.module), module: t.module, task: t.title, title: t.title, icon: modIcon(t.module), pts: t.pts, category: modCat(t.module), page: modPage(t.module), setId: suiteId, done: false, doneAt: null }); seq++;
+              }
+            });
+          }
+          (function (k, its, sid0) {
+            chain = chain.then(function () {
+              return DB.getDailySchedule(cid, k).catch(function () { return null; }).then(function (old) {
+                var doneOld = ((old && old.items) || []).filter(function (x) { return x && x.done; });
+                var merged = its.map(function (it, i) {
+                  var nt = Object.assign({}, it, { seq: i });
+                  for (var j = 0; j < doneOld.length; j++) { var o = doneOld[j]; if (o && o.module === nt.module && (o.task === nt.task || o.title === nt.title)) { nt.done = true; nt.doneAt = o.doneAt || null; break; } }
+                  return nt;
+                });
+                return DB.putDailySchedule(cid, k, { id: cid + ':' + k, childId: cid, date: k, items: merged, setId: sid0, genVer: 2, updatedAt: Date.now() });
+              });
+            });
+          })(key, items, suiteId);
+        }
+        return chain;
+      });
+    });
+  }
+  /* 单个套组直接生成（套组卡片「本周/本月」按钮使用，忽略轮换） */
+  function applySuiteDays(sid, days, fromDate) {
+    return childId().then(function (cid) {
+      return loadCfg(cid).then(function (cfg) {
+        var s = suiteById(cfg, sid); if (!s) return;
+        var base = fromDate ? new Date(fromDate + 'T00:00:00') : new Date(), chain = Promise.resolve();
+        for (var d = 0; d < days; d++) {
+          var day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + d), key = dkey(day), wd = (day.getDay() + 6) % 7 + 1, items = [], seq = 0;
+          s.tasks.forEach(function (t) {
+            if (!t.days || t.days.indexOf(wd) < 0) return;
+            var per = Math.max(1, t.perDay || 1);
+            for (var pp = 0; pp < per; pp++) { items.push({ seq: seq, time: TIME_SLOTS[seq % TIME_SLOTS.length], duration: t.dur, subject: modSubject(t.module), module: t.module, task: t.title, title: t.title, icon: modIcon(t.module), pts: t.pts, category: modCat(t.module), page: modPage(t.module), setId: s.id, done: false, doneAt: null }); seq++; }
+          });
+          (function (k, its) {
+            chain = chain.then(function () {
+              return DB.getDailySchedule(cid, k).catch(function () { return null; }).then(function (old) {
+                var doneOld = ((old && old.items) || []).filter(function (x) { return x && x.done; });
+                var merged = its.map(function (it, i) { var nt = Object.assign({}, it, { seq: i }); for (var j = 0; j < doneOld.length; j++) { var o = doneOld[j]; if (o && o.module === nt.module && (o.task === nt.task || o.title === nt.title)) { nt.done = true; nt.doneAt = o.doneAt || null; break; } } return nt; });
+                return DB.putDailySchedule(cid, k, { id: cid + ':' + k, childId: cid, date: k, items: merged, setId: s.id, genVer: 2, updatedAt: Date.now() });
+              });
+            });
+          })(key, items);
+        }
+        return chain;
+      });
+    });
+  }
+
+  /* 把体能配置同步给「体能」模块（孩子端按此打卡） */
+  function syncSportLib(cfg) {
+    try {
+      window.MX_SPORT = window.MX_SPORT || {};
+      var lib = {}; (cfg.sports || []).forEach(function (s) { lib[s.id] = { name: s.name, items: [{ n: s.name, essence: s.essence }] }; });
+      window.MX_SPORT.LIB = lib;
+    } catch (e) {}
+  }
+
+  /* ============ UI 状态 ============ */
+  var _preview = {}, _selCalDate = null, parentUnlocked = false;
+
+  function invHTML() {
+    var L = LIB();
+    var rows = [['📜 古诗', L.poem.length], ['✍️ 识字', L.word.length], ['🔤 拼音', L.pinyin.length], ['📚 中文绘本', L.story.length], ['🔠 英语字母', L.letter.length], ['🗣️ 自然拼读', L.cvc.length], ['📖 英文绘本', L.estory.length], ['➕ 算法口诀', L.method.length], ['🧠 数感题', L.sense.length], ['🏃 体能动作组', L.sport.length], ['🎮 游戏主题', L.game.length]];
+    return '<div class="ts-inv">' + rows.map(function (r) { return '<span class="ts-inv-i' + (r[1] ? '' : ' off') + '">' + esc(r[0]) + ' <b>' + r[1] + '</b></span>'; }).join('') + '</div>';
+  }
+  function progressHTML(cid) {
+    var L = LIB(), c = getCursor(cid);
+    var rows = [['古诗', 'poem'], ['识字', 'word'], ['字母', 'letter'], ['拼读', 'cvc'], ['算法', 'method'], ['数感', 'sense']];
+    return '<div class="ts-prog">' + rows.map(function (r) {
+      var tot = (L[r[1]] || []).length, done = tot ? ((c[r[1]] | 0) % tot) : 0, pct = tot ? Math.round(done / tot * 100) : 0;
+      return '<div class="ts-prog-i"><div class="ts-prog-t">' + esc(r[0]) + ' ' + done + '/' + tot + '</div><div class="ts-prog-bar"><i style="width:' + pct + '%"></i></div></div>';
+    }).join('') + '</div>';
+  }
+
+  /* ---- ① 套组管理：自定义套组卡片 ---- */
+  function suiteCardHTML(s, cid) {
+    var tasks = (s.tasks || []).map(function (t) {
+      return '<div class="ts-task"><span class="ts-ti">' + esc(t.title || '未命名') + '</span>' +
+        '<span class="ts-mod">' + esc(modName(t.module) || '不关联') + '</span>' +
+        '<span class="ts-pts">+' + (t.pts || 0) + '分</span></div>';
+    }).join('');
+    var prev = WEEK.map(function (w, i) { var d = i + 1; var has = (s.tasks || []).some(function (t) { return t.days && t.days.indexOf(d) >= 0; }); return '<span class="ts-prev-d' + (has ? ' on' : '') + '">周' + w + '</span>'; }).join('');
+    return '<div class="ts-suite">' +
+      '<div class="ts-suite-hd"><span class="ts-dot" style="background:' + (s.color || '#ccc') + '"></span><span class="ts-suite-nm">' + esc(s.name || '未命名套组') + '</span>' +
+      (s.fromPreset ? '<span class="ts-tag">来自模板</span>' : '') + '</div>' +
+      '<div class="ts-suite-meta">' + (s.tasks || []).length + ' 个任务 · 每周排期</div>' +
+      '<div class="ts-prev">' + prev + '</div>' +
+      (tasks ? '<div class="ts-task-list">' + tasks + '</div>' : '<div class="ts-tip">暂无任务，点「编辑任务/积分」添加</div>') +
+      '<div class="ts-btns">' +
+        '<button type="button" class="ts-b sm" data-act="editSuite" data-s="' + s.id + '">⚙ 编辑套组</button>' +
+        '<button type="button" class="ts-b sm ghost" data-act="editTasks" data-s="' + s.id + '">✎ 任务/积分</button>' +
+        '<button type="button" class="ts-b sm" data-act="applyWeek" data-s="' + s.id + '">📆 本周</button>' +
+        '<button type="button" class="ts-b sm main" data-act="applyMonth" data-s="' + s.id + '">🗓️ 本月</button>' +
+      '</div></div>';
+  }
+  function presetCardHTML(p, cid) {
+    var tasks = p.tasks.map(function (t) { return '<div class="ts-task"><span class="ts-ti">' + esc(t.title) + '</span><span class="ts-pts">+' + t.pts + '分</span></div>'; }).join('');
+    var prev = WEEK.map(function (w, i) { var d = i + 1; var has = p.tasks.some(function (t) { return t.days.indexOf(d) >= 0; }); return '<span class="ts-prev-d' + (has ? ' on' : '') + '">周' + w + '</span>'; }).join('');
+    return '<div class="ts-suite preset">' + (p.fav ? '<div class="ts-fav">❤ 你喜欢的</div>' : '') +
+      '<div class="ts-suite-hd"><span class="ts-dot" style="background:' + p.color + '"></span><span class="ts-suite-nm">' + esc(p.name) + '</span></div>' +
+      '<div class="ts-suite-meta">推荐模板 · ' + p.tasks.length + ' 个任务</div>' +
+      '<div class="ts-prev">' + prev + '</div>' +
+      '<div class="ts-task-list">' + tasks + '</div>' +
+      '<div class="ts-btns">' +
+        '<button type="button" class="ts-b sm primary" data-act="copyPreset" data-p="' + p.id + '">📋 复制为我的套组</button>' +
+        '<button type="button" class="ts-b sm" data-act="applyPreset" data-p="' + p.id + '">📆 本周</button>' +
+      '</div></div>';
+  }
+
+  /* ---- ③ 日历编排 ---- */
+  function renderCal(cfg, cid) {
+    var y = _calY, m = _calM;
+    var head = WEEK.map(function (w) { return '<div class="ts-cal-wh">周' + w + '</div>'; }).join('');
+    var lead = (new Date(y, m - 1, 1).getDay() + 6) % 7, dim = new Date(y, m, 0).getDate();
+    var cells = '';
+    for (var i = 0; i < lead; i++) cells += '<div class="ts-cal-d void"></div>';
+    var rotName = { month: '整月同套组', halfDay: '半月(自然日)', halfWeek: '半月(自然周)', week: '按周轮换' }[cfg.rot.mode];
+    var activeSid = suiteOfDate(y + '-' + pad(m) + '-01', cfg.rot, cfg.suites);
+    var activeS = suiteById(cfg.suites, activeSid);
+    for (var d = 1; d <= dim; d++) {
+      var key = y + '-' + pad(m) + '-' + pad(d), sid = suiteOfDate(key, cfg.rot, cfg.suites), s = sid ? suiteById(cfg.suites, sid) : null;
+      var ts = tasksOn(key, cfg.rot, cfg.suites), mini = ts.slice(0, 3).map(function (t) { return '·' + esc(t.title) + ' <b>+' + t.pts + '</b>'; }).join('<br>');
+      if (ts.length > 3) mini += '<br>…+' + (ts.length - 3);
+      cells += '<div class="ts-cal-d' + (_selCalDate === key ? ' sel' : '') + '" data-act="calDay" data-date="' + key + '">' +
+        '<div class="ts-cal-num">' + d + '</div>' +
+        (s ? '<span class="ts-cal-tag" style="background:' + (s.color || '#4f8cff') + '">' + esc((s.name || '').slice(0, 4)) + '</span>' : '') +
+        '<div class="ts-cal-mini">' + mini + '</div></div>';
+    }
+    return '<div class="ts-rotbadge">本月计划：<b>' + rotName + '</b> · ' + (activeS ? esc(activeS.name) : '未选套组') + ' <button type="button" class="ts-b sm ghost" data-act="gotoRot">调整月度计划 ›</button></div>' +
+      '<div class="ts-cal-head">' + head + '</div><div class="ts-cal-grid">' + cells + '</div>' +
+      '<div class="ts-cal-nav"><button type="button" class="ts-b sm ghost" data-act="calPrev">‹ 上月</button><span>' + y + '年' + m + '月</span><button type="button" class="ts-b sm ghost" data-act="calNext">下月 ›</button></div>' +
+      '<div class="ts-tip">点任意日期 → 编辑当天任务（自动写回所属套组）。轮换只影响之后生成，历史打卡不回滚。</div>';
+  }
+
+  /* ---- ③ 月度计划 ---- */
+  function suiteOpts(cfg, sel) {
+    var ne = nonEmptySuites(cfg);
+    if (!ne.length) return '<option value="">（请先创建自定义套组）</option>';
+    return ne.map(function (s) { return '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('');
+  }
+  function renderRot(cfg, cid) {
+    var w = '', rot = cfg.rot;
+    if (rot.mode === 'month') {
+      w = '<div class="ts-rot"><div class="ts-rot-wh">📅 整月使用套组</div><select class="ts-pick" data-win="month">' + suiteOpts(cfg, rot.windows.month) + '</select></div>';
+    } else if (rot.mode === 'halfDay') {
+      w = '<div class="ts-rot"><div class="ts-rot-wh">🌓 本月 1–15 日（自然日）</div><select class="ts-pick" data-win="halfDay0">' + suiteOpts(cfg, rot.windows.halfDay[0]) + '</select></div>' +
+        '<div class="ts-rot"><div class="ts-rot-wh">🌗 本月 16–月末（自然日）</div><select class="ts-pick" data-win="halfDay1">' + suiteOpts(cfg, rot.windows.halfDay[1]) + '</select></div>';
+    } else if (rot.mode === 'halfWeek') {
+      w = '<div class="ts-rot"><div class="ts-rot-wh">🌓 第1-2周（自然周）</div><select class="ts-pick" data-win="halfWeek0">' + suiteOpts(cfg, rot.windows.halfWeek[0]) + '</select></div>' +
+        '<div class="ts-rot"><div class="ts-rot-wh">🌗 第3-4周（自然周）</div><select class="ts-pick" data-win="halfWeek1">' + suiteOpts(cfg, rot.windows.halfWeek[1]) + '</select></div>';
+    } else {
+      ['第1周', '第2周', '第3周', '第4周'].forEach(function (l, i) { w += '<div class="ts-rot"><div class="ts-rot-wh">🗓️ ' + l + '</div><select class="ts-pick" data-win="week' + i + '">' + suiteOpts(cfg, rot.windows.week[i]) + '</select></div>'; });
+    }
+    var rows = '';
+    for (var d = 1; d <= 14; d++) { var key = _calY + '-' + pad(_calM) + '-' + pad(d), ts = tasksOn(key, rot, cfg.suites), s = suiteById(cfg.suites, suiteOfDate(key, rot, cfg.suites));
+      rows += '<tr><td>' + d + '日(周' + WEEK[(new Date(key + 'T00:00:00').getDay() + 6) % 7] + ')</td><td>' + (s ? esc(s.name) : '—') + '</td><td>' + (ts.map(function (t) { return esc(t.title) + '(+' + t.pts + ')'; }).join('、') || '—') + '</td></tr>';
+    }
+    var modes = [['month', '整月同套组'], ['halfDay', '半月(自然日 1-15/16-月末)'], ['halfWeek', '半月(自然周 1-2/3-4周)'], ['week', '按周轮换(1-4周)']];
+    return '<div class="ts-seg">' + modes.map(function (mm) { return '<button type="button" class="ts-seg-b' + (rot.mode === mm[0] ? ' on' : '') + '" data-rot="' + mm[0] + '">' + mm[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="ts-rot-wrap">' + w + '</div>' +
+      '<div class="ts-sec-t" style="margin-top:12px">📊 本模式排期总览（前 14 天）</div>' +
+      '<table class="ts-tbl"><tr><th>日期</th><th>套组</th><th>当日任务（含单项积分）</th></tr>' + rows + '</table>' +
+      '<div class="ts-btns" style="margin-top:10px"><button type="button" class="ts-b main" data-act="applyRotMonth">🗓️ 按当前月度计划生成本月排期</button></div>';
+  }
+
+  /* ---- ④ 体能模块（家长工作台结构化编辑） ---- */
+  function renderSports(cfg, cid) {
+    var grid = (cfg.sports || []).map(function (s) {
+      return '<div class="ts-suite">' +
+        '<div class="ts-suite-hd"><span class="ts-dot" style="background:#2bb673"></span><span class="ts-suite-nm">' + esc(s.name) + ' ' + (s.icon || '🏃') + '</span></div>' +
+        '<div class="ts-suite-meta">初始时长 ' + (s.dur || 10) + ' 分钟</div>' +
+        '<div class="ts-task"><span class="ts-ti">要领：' + esc(s.essence || '') + '</span></div>' +
+        '<div class="ts-btns"><button type="button" class="ts-b sm" data-act="editSport" data-sp="' + s.id + '">✎ 编辑</button>' +
+        '<button type="button" class="ts-b sm danger" data-act="delSport" data-sp="' + s.id + '">🗑 删除</button></div></div>';
+    }).join('');
+    var add = '<div class="ts-suite preset"><div class="ts-suite-hd"><span class="ts-dot" style="background:#ccc"></span><span class="ts-suite-nm">➕ 新增体能项目</span></div>' +
+      '<div class="ts-suite-meta">名称·图标·要领·初始时长</div><div class="ts-btns"><button type="button" class="ts-b sm primary" data-act="addSport">＋ 新建</button></div></div>';
+    return grid + add;
+  }
+
+  /* ============ 主渲染 ============ */
+  var _calY = 0, _calM = 0;
+  function render() {
+    var page = window.__parentTaskMount || $('page-tasksets');
+    if (!page) { var main = $('main-content'); if (!main) return; page = document.createElement('section'); page.className = 'content-page'; page.id = 'page-tasksets'; main.appendChild(page); }
+    if (!_calY) { var nw = new Date(); _calY = nw.getFullYear(); _calM = nw.getMonth() + 1; }
+    childId().then(function (cid) {
+      return loadCfg(cid).then(function (cfg) {
+        syncSportLib(cfg);
+        var cap = capacity(), ne = nonEmptySuites(cfg);
+        var suiteCards = ne.map(function (s) { return suiteCardHTML(s, cid); }).join('');
+        if (ne.length < cap) suiteCards += '<div class="ts-suite preset"><div class="ts-suite-hd"><span class="ts-dot" style="background:#ccc"></span><span class="ts-suite-nm">➕ 新建自定义套组</span></div><div class="ts-suite-meta">' + (ne.length) + '/' + cap + ' 已用 · 本地卡 2 / VIP 6 个槽位</div><div class="ts-btns"><button type="button" class="ts-b sm primary" data-act="newSuite">＋ 空白新建</button></div></div>';
+        page.innerHTML =
+          '<div class="mxvt">' +
+          '<div class="content-section-title">🗂️ 学习任务·套组 V2 <span class="sub">自定义套组 + 日历编排 + 月度轮换 + 单项积分 + 体能模块</span></div>' +
+          /* ① 套组管理 */
+          '<div class="ts-zone"><div class="ts-sec-t">📦 我的自定义套组 <span class="ts-sub">本地卡 2 个 / VIP 6 个槽位（会员权益）</span></div>' +
+          '<div class="ts-tip">自定义套组可改名/换色/删；点「✎ 任务/积分」增删改任务（名称·关联模块·每周排期·每天次数·时长·单项积分）。</div>' +
+          '<div class="ts-suite-grid">' + suiteCards + '</div>' +
+          '<div class="ts-sec-t" style="margin-top:16px">🌟 内置推荐模板（6 个·保留·点击「复制为我的套组」即落到上方空槽）</div>' +
+          '<div class="ts-suite-grid">' + PRESETS.map(function (p) { return presetCardHTML(p, cid); }).join('') + '</div>' +
+          '<div class="ts-box"><div class="ts-box-t">📦 当前内容库存（智能套组生成任务的唯一来源，绝不出现没有的内容）</div>' + invHTML() + '</div>' +
+          '<div class="ts-box"><div class="ts-box-t">📈 智能套组已排到的学习进度（自动顺延）</div>' + progressHTML(cid) + '</div>' +
+          '</div>' +
+          /* ② 日历编排 */
+          '<div class="ts-zone"><div class="ts-sec-t">📅 日历编排（点某天 → 编辑当天任务，写回套组）</div>' +
+          '<div id="ts-cal">' + renderCal(cfg, cid) + '</div></div>' +
+          /* ③ 月度计划 */
+          '<div class="ts-zone"><div class="ts-sec-t">🔁 月度轮换计划（四种模式都保留）</div>' +
+          '<div id="ts-rot">' + renderRot(cfg, cid) + '</div></div>' +
+          /* ④ 体能模块 */
+          '<div class="ts-zone"><div class="ts-sec-t">🏃 家长工作台 · 体能模块（结构化指引，孩子端按此打卡）</div>' +
+          '<div class="ts-tip">每项含 名称·图标·要领内容·初始持续时长，可增删改。</div>' +
+          '<div class="ts-suite-grid" id="ts-sports">' + renderSports(cfg, cid) + '</div></div>' +
+          /* 今日日程 + 底部 */
+          '<div class="ts-box"><div class="ts-box-t">📅 今日个人历程日程（与首页看板同源）</div><div id="ts-today">加载中…</div></div>' +
+          '<div class="ts-foot"><button type="button" class="ts-b ghost" data-act="clear">🧹 清空今日排期</button><button type="button" class="ts-b ghost" data-act="reset">🔄 智能套组进度归零</button></div>' +
+          '</div>';
+        bind(page, cid, cfg);
+        renderTodaySchedule(cid, page);
+      });
+    }).catch(function (e) { try { page.innerHTML = '<div class="ts-tip">学习任务套组加载失败：' + esc((e && e.message) || e) + '。</div>'; } catch (_) {} });
+  }
+  window.__mxRenderTasksets = render;
+
+  function renderTodaySchedule(cid, page) {
+    var box = $('ts-today'); if (!box) return;
+    if (!(window.DB && DB.getDailySchedule)) { box.innerHTML = '<span class="ts-tip">日程数据暂不可用</span>'; return; }
+    DB.getDailySchedule(cid, todayKey()).then(function (s) {
+      var items = (s && s.items) || [];
+      if (!items.length) { box.innerHTML = '<span class="ts-tip">今天还没有排期，去点上面的「本周/本月」生成吧～</span>'; return; }
+      box.innerHTML = '<div class="ts-today-list">' + items.map(function (t) {
+        return '<div class="ts-today-t' + (t.done ? ' done' : '') + '"><span class="ts-today-ic">' + (t.icon || '📌') + '</span><span class="ts-today-tx">' + esc(t.title) + '</span><span class="ts-today-st">' + (t.done ? '✅ 已完成' : '⏳ ' + (t.duration || '?') + '′') + '</span></div>';
+      }).join('') + '</div>';
+    }).catch(function (e) { box.innerHTML = '<span class="ts-tip">读取失败：' + esc(e && e.message || e) + '</span>'; });
+  }
+
+  /* ============ 编辑弹层 ============ */
+  function openSheet(html) { var mask = $('ts-mask'), sheet = $('ts-sheet'); if (!mask || !sheet) return; sheet.innerHTML = html; mask.className = 'ts-mask on'; try { mask.onclick = function (e) { if (e.target === mask) closeSheet(); }; } catch (e) {} }
+  function closeSheet() { var mask = $('ts-mask'); if (mask) mask.className = 'ts-mask'; }
+  function editTaskForm(cid, cfg, dateKey, sid, idx) {
+    var s = suiteById(cfg, sid); if (!s) return; var t = s.tasks[idx];
+    var body = '<h3>✎ 编辑任务（套组：' + esc(s.name) + '）</h3>' +
+      '<div class="fld"><label>任务名称</label><input id="et_title" value="' + esc(t.title) + '"></div>' +
+      '<div class="fld"><label>关联学习模块（含「日常表现」与「熏听」下一级）</label><select id="et_mod">' + modOptions(t.module) + '</select></div>' +
+      '<div class="fld"><label>每周排期（勾选星期几＝每周几次；点「每天」即全选）</label>' +
+      '<div class="wd" id="et_days">' + WEEK.map(function (w, i) { var d = i + 1; return '<button type="button" class="' + (t.days.indexOf(d) >= 0 ? 'on' : '') + '" data-d="' + d + '">周' + w + '</button>'; }).join('') + '</div>' +
+      '<div class="row"><button type="button" class="ts-b sm ghost" data-setdays="7">每天</button><button type="button" class="ts-b sm ghost" data-setdays="wd">工作日</button><button type="button" class="ts-b sm ghost" data-setdays="we">周末</button><button type="button" class="ts-b sm ghost" data-setdays="0">清空</button></div></div>' +
+      '<div class="fld"><label>每天次数（同一天做几遍）</label><input id="et_per" type="number" min="1" value="' + t.perDay + '"></div>' +
+      '<div class="fld"><label>单次时长（分钟）</label><input id="et_dur" type="number" min="1" value="' + t.dur + '"></div>' +
+      '<div class="fld"><label>单项积分（完成该任务奖励积分）</label><input id="et_pts" type="number" min="0" value="' + t.pts + '"></div>' +
+      '<div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="ts-b ghost" data-act="backTasks" data-s="' + sid + '">返回</button><button type="button" class="ts-b primary" data-act="saveTask" data-s="' + sid + '" data-i="' + idx + '" data-dk="' + (dateKey || '') + '">💾 保存</button></div>';
+    openSheet(body);
+    sheetBinds();
+  }
+  function openEditSuite(cid, cfg, id) {
+    var s = suiteById(cfg, id); if (!s) return;
+    var body = '<h3>⚙ 编辑套组</h3>' +
+      '<div class="fld"><label>套组名称</label><input id="su_name" value="' + esc(s.name) + '"></div>' +
+      '<div class="fld"><label>主题色</label><select id="su_color">' + ['#4f8cff', '#42a5f5', '#66bb6a', '#ab47bc', '#ffa726', '#26a69a', '#ff7043', '#2bb673'].map(function (c) { return '<option value="' + c + '"' + (c === s.color ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div>' +
+      '<div class="fld"><label>一句话说明</label><input id="su_desc" value="' + esc(s.desc || '') + '"></div>' +
+      '<div class="row" style="margin-top:12px;justify-content:space-between"><button type="button" class="ts-b sm danger" data-act="delSuite" data-s="' + id + '">🗑 删除套组</button>' +
+      '<span><button type="button" class="ts-b ghost" data-act="close">关闭</button><button type="button" class="ts-b primary" data-act="saveSuite" data-s="' + id + '">💾 保存</button></span></div>';
+    openSheet(body); sheetBinds();
+  }
+  function openEditSport(cid, cfg, id) {
+    var s = id ? (cfg.sports || []).filter(function (x) { return x.id === id; })[0] : null, isNew = !s; s = s || { name: '', icon: '🏃', essence: '', dur: 10 };
+    var body = '<h3>' + (isNew ? '＋ 新建体能项目' : '✎ 编辑体能项目') + '</h3>' +
+      '<div class="fld"><label>项目名称</label><input id="sp_name" value="' + esc(s.name) + '"></div>' +
+      '<div class="fld"><label>图标（emoji）</label><input id="sp_icon" value="' + esc(s.icon) + '"></div>' +
+      '<div class="fld"><label>要领内容（动作要点 / 注意事项）</label><textarea id="sp_ess" rows="3">' + esc(s.essence) + '</textarea></div>' +
+      '<div class="fld"><label>初始持续时长（分钟）</label><input id="sp_dur" type="number" min="1" value="' + s.dur + '"></div>' +
+      '<div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="ts-b ghost" data-act="close">关闭</button><button type="button" class="ts-b primary" data-act="saveSport" data-id="' + (id || '') + '">💾 保存</button></div>';
+    openSheet(body); sheetBinds();
+  }
+  function openTasksSheet(cid, cfg, dateKey, sid) {
+    var s = suiteById(cfg, sid); if (!s) { toast('请先新建/复制一个套组'); return; }
+    var title = dateKey ? ('📅 ' + dateKey + ' 当日任务（套组：' + s.name + '）') : ('✎ 编辑套组「' + s.name + '」的任务与积分');
+    var body = '<h3>' + title + '</h3><div class="ts-tip">以下任务属于套组「' + esc(s.name) + '」，修改后日历与套组页同步。</div>';
+    (s.tasks || []).forEach(function (t, idx) {
+      body += '<div class="ts-ed-task"><div class="ts-ed-h"><b>' + esc(t.title || '未命名') + '</b><span class="ts-pts">+' + t.pts + '分</span></div>' +
+        '<div class="row"><span class="ts-mod">模块：' + esc(modName(t.module) || '不关联') + '</span><span class="ts-mod">每周 ' + t.days.length + ' 天</span><span class="ts-mod">每天 ' + t.perDay + ' 次</span><span class="ts-mod">' + t.dur + '分</span></div>' +
+        '<div class="row" style="margin-top:6px"><button type="button" class="ts-b sm ghost" data-act="editOne" data-s="' + sid + '" data-i="' + idx + '" data-dk="' + (dateKey || '') + '">✎ 改名称/模块/排期/积分</button>' +
+        '<button type="button" class="ts-b sm danger" data-act="delOne" data-s="' + sid + '" data-i="' + idx + '">🗑 删除</button></div></div>';
+    });
+    body += '<div class="ts-add-task" data-act="addOne" data-s="' + sid + '">＋ 添加任务（自定义名称·关联模块·排期·单项积分）</div>';
+    body += '<div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="ts-b ghost" data-act="close">关闭</button></div>';
+    openSheet(body); sheetBinds();
+  }
+  function sheetBinds() {
+    var sheet = $('ts-sheet'); if (!sheet) return;
+    sheet.onclick = function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act],[data-setdays]') : null; if (!b) return;
+      var act = b.getAttribute('data-act'), sd = b.getAttribute('data-setdays');
+      if (sd != null) { sheet.querySelectorAll('#et_days button').forEach(function (x) { var d = Number(x.getAttribute('data-d')); var on = sd === '7' ? true : sd === 'wd' ? (d <= 5) : sd === 'we' ? (d >= 6) : false; x.classList.toggle('on', on); }); return; }
+      if (act === 'close') { closeSheet(); }
+      else if (act === 'backTasks') { var bs = b.getAttribute('data-s'); rerenderTasks(bs); }
+      else if (act === 'saveTask') { saveTask(b.getAttribute('data-s'), parseInt(b.getAttribute('data-i'), 10), b.getAttribute('data-dk')); }
+      else if (act === 'editOne') { var cid = _curCid, cfg = _curCfg; editTaskForm(cid, cfg, b.getAttribute('data-dk'), b.getAttribute('data-s'), parseInt(b.getAttribute('data-i'), 10)); }
+      else if (act === 'delOne') { delOne(b.getAttribute('data-s'), parseInt(b.getAttribute('data-i'), 10)); }
+      else if (act === 'addOne') { addOne(b.getAttribute('data-s')); }
+      else if (act === 'saveSuite') { saveSuite(b.getAttribute('data-s')); }
+      else if (act === 'delSuite') { delSuite(b.getAttribute('data-s')); }
+      else if (act === 'saveSport') { saveSport(b.getAttribute('data-id')); }
+    };
+  }
+  var _curCid = 'default', _curCfg = null;
+  function rerenderTasks(sid) { render(); setTimeout(function () { openTasksSheet(_curCid, _curCfg, null, sid); }, 30); }
+
+  function saveTask(sid, idx, dateKey) {
+    var t = suiteById(_curCfg, sid).tasks[idx];
+    t.title = ($('et_title').value || '').trim() || '未命名任务';
+    t.module = $('et_mod').value;
+    var ds = []; $('ts-sheet').querySelectorAll('#et_days button.on').forEach(function (x) { ds.push(Number(x.getAttribute('data-d'))); }); t.days = ds;
+    t.perDay = Math.max(1, Number($('et_per').value) || 1);
+    t.dur = Math.max(1, Number($('et_dur').value) || 15);
+    t.pts = Math.max(0, Number($('et_pts').value) || 0);
+    saveCfg(_curCid, _curCfg).then(function () { closeSheet(); render(); toast('✅ 已保存任务「' + t.title + '」'); });
+  }
+  function addOne(sid) { var s = suiteById(_curCfg, sid); s.tasks.push({ title: '新任务' + (s.tasks.length + 1), module: 'manual', days: [1, 2, 3, 4, 5], perDay: 1, dur: 15, pts: 5 }); saveCfg(_curCid, _curCfg).then(function () { render(); openTasksSheet(_curCid, _curCfg, null, sid); }); }
+  function delOne(sid, idx) { var s = suiteById(_curCfg, sid); s.tasks.splice(idx, 1); saveCfg(_curCid, _curCfg).then(function () { render(); openTasksSheet(_curCid, _curCfg, null, sid); }); }
+  function saveSuite(id) { var s = suiteById(_curCfg, id); if (!s) return; s.name = ($('su_name').value || '').trim() || '我的套组'; s.color = $('su_color').value; s.desc = ($('su_desc').value || '').trim(); saveCfg(_curCid, _curCfg).then(function () { closeSheet(); render(); toast('套组已更新'); }); }
+  function delSuite(id) { if (!window.confirm('确定删除该套组？删除后空槽可再建。')) return; var s = suiteById(_curCfg, id); if (s) { s.empty = true; s.name = ''; s.icon = '➕'; s.color = '#ccc'; s.tasks = []; s.fromPreset = false; s.desc = ''; } saveCfg(_curCid, _curCfg).then(function () { closeSheet(); render(); toast('套组已删除'); }); }
+  function saveSport(id) {
+    var name = ($('sp_name').value || '').trim(); if (!name) { toast('请填写项目名称'); return; }
+    var icon = ($('sp_icon').value || '').trim() || '🏃', essence = ($('sp_ess').value || '').trim(), dur = Math.max(1, Number($('sp_dur').value) || 10);
+    if (!_curCfg.sports) _curCfg.sports = [];
+    if (id) { var s = _curCfg.sports.filter(function (x) { return x.id === id; })[0]; if (s) { s.name = name; s.icon = icon; s.essence = essence; s.dur = dur; } }
+    else { _curCfg.sports.push({ id: 'sp' + Date.now(), name: name, icon: icon, essence: essence, dur: dur }); }
+    saveCfg(_curCid, _curCfg).then(function () { syncSportLib(_curCfg); closeSheet(); render(); toast('体能项目已保存'); });
+  }
+  function delSport(id) { if (!window.confirm('删除该体能项目？')) return; _curCfg.sports = (_curCfg.sports || []).filter(function (x) { return x.id !== id; }); saveCfg(_curCid, _curCfg).then(function () { render(); toast('已删除'); }); }
+
+  function newSuite() {
+    var cap = capacity(), ne = nonEmptySuites(_curCfg);
+    if (ne.length >= cap) { toast('自定义槽位已满（本地卡 2 / VIP 6）。升级 VIP 可扩到 6 个。'); return; }
+    var s = { id: 'c' + (ne.length + 1) + '_' + Date.now(), name: '我的套组' + (ne.length + 1), icon: '🎯', color: '#7c5cff', empty: false, fromPreset: false, tasks: [], desc: '' };
+    _curCfg.suites.push(s); saveCfg(_curCid, _curCfg).then(function () { render(); openTasksSheet(_curCid, _curCfg, null, s.id); });
+  }
+  function copyPreset(pid) {
+    var p = PRESETS.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
+    var cap = capacity(), ne = nonEmptySuites(_curCfg);
+    if (ne.length >= cap) { toast('自定义槽位已满（本地卡 2 / VIP 6）。升级 VIP 可扩到 6 个。'); return; }
+    var s = { id: 'c' + (ne.length + 1) + '_' + Date.now(), name: p.name + '（我的）', icon: p.icon, color: p.color, empty: false, fromPreset: true, desc: p.name + ' 模板', tasks: JSON.parse(JSON.stringify(p.tasks)) };
+    _curCfg.suites.push(s); saveCfg(_curCid, _curCfg).then(function () { render(); toast('已复制「' + p.name + '」到自定义套组'); });
+  }
+  function applyPreset(pid) {
+    var p = PRESETS.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
+    if (!window.confirm('将把【' + p.name + '】按固定任务列表写入未来 7 天排期（当天已完成保留），继续吗？')) return;
+    childId().then(function (cid) {
+      var base = new Date(), chain = Promise.resolve();
+      for (var d = 0; d < 7; d++) {
+        var day = new Date(base.getFullYear(), base.getMonth(), base.getDate() + d), key = dkey(day), wd = (day.getDay() + 6) % 7 + 1, items = [], seq = 0;
+        p.tasks.forEach(function (t) { if (t.days.indexOf(wd) < 0) return; var per = Math.max(1, t.perDay || 1); for (var pp = 0; pp < per; pp++) { items.push({ seq: seq, time: TIME_SLOTS[seq % TIME_SLOTS.length], duration: t.dur, subject: modSubject(t.module), module: t.module, task: t.title, title: t.title, icon: modIcon(t.module), pts: t.pts, category: modCat(t.module), page: modPage(t.module), setId: 'preset:' + p.id, done: false, doneAt: null }); seq++; } });
+        (function (k, its) { chain = chain.then(function () { return DB.getDailySchedule(cid, k).catch(function () { return null; }).then(function (old) { var doneOld = ((old && old.items) || []).filter(function (x) { return x && x.done; }); var merged = its.map(function (it, i) { var nt = Object.assign({}, it, { seq: i }); for (var j = 0; j < doneOld.length; j++) { var o = doneOld[j]; if (o && o.module === nt.module && (o.task === nt.task || o.title === nt.title)) { nt.done = true; nt.doneAt = o.doneAt || null; break; } } return nt; }); return DB.putDailySchedule(cid, k, { id: cid + ':' + k, childId: cid, date: k, items: merged, setId: 'preset:' + p.id, genVer: 2, updatedAt: Date.now() }); }); }); })(key, items);
+      }
+      chain.then(function () { toast('✅ 已生成 7 天排期：' + p.name); render(); try { document.dispatchEvent(new CustomEvent('mx-schedule-changed')); } catch (e) {} if (window.__renderDashboard) window.__renderDashboard(); });
+    });
+  }
+
+  /* ============ 事件绑定 ============ */
+  function bind(page, cid, cfg) {
+    _curCid = cid; _curCfg = cfg;
+    page.onclick = function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
+      var act = b.getAttribute('data-act'), sid = b.getAttribute('data-s'), pid = b.getAttribute('data-p');
+      if (act === 'newSuite') { newSuite(); }
+      else if (act === 'copyPreset') { copyPreset(pid); }
+      else if (act === 'applyPreset') { applyPreset(pid); }
+      else if (act === 'editSuite') { openEditSuite(cid, cfg, sid); }
+      else if (act === 'editTasks') { openTasksSheet(cid, cfg, null, sid); }
+      else if (act === 'applyWeek') { applyAndToast(sid, 7); }
+      else if (act === 'applyMonth') { applyAndToast(sid, daysLeftThisMonth()); }
+      else if (act === 'applyRotMonth') { applyRotMonth(cid, cfg); }
+      else if (act === 'gotoRot') { var z = page.querySelector('#ts-rot'); if (z) z.scrollIntoView({ behavior: 'smooth' }); }
+      else if (act === 'calPrev') { _calM--; if (_calM < 1) { _calM = 12; _calY--; } rerenderCal(cid, cfg); }
+      else if (act === 'calNext') { _calM++; if (_calM > 12) { _calM = 1; _calY++; } rerenderCal(cid, cfg); }
+      else if (act === 'addSport') { openEditSport(cid, cfg, null); }
+      else if (act === 'editSport') { openEditSport(cid, cfg, b.getAttribute('data-sp')); }
+      else if (act === 'delSport') { delSport(b.getAttribute('data-sp')); }
+      else if (act === 'clear') { if (window.confirm('确定清空今天的全部排期任务？')) clearToday().then(function () { toast('🧹 今日排期已清空'); render(); }); }
+      else if (act === 'reset') { if (window.confirm('智能套组进度归零后下次生成从第 1 首古诗重新开始，确定吗？')) { setCursor(cid, {}); toast('🔄 进度已归零'); render(); } }
+      else if (act === 'calDay') { var k = b.getAttribute('data-date'); _selCalDate = k; render(); setTimeout(function () { openTasksSheet(cid, cfg, k, suiteOfDate(k, cfg.rot, cfg.suites)); }, 30); }
+    };
+    page.querySelectorAll('.ts-pick').forEach(function (sel) {
+      sel.onchange = function () { var k = sel.getAttribute('data-win'); setRotWin(cfg, k, sel.value); saveCfg(cid, cfg).then(function () { rerenderRot(cid, cfg); }); };
+    });
+    page.querySelectorAll('[data-rot]').forEach(function (btn) {
+      btn.onclick = function () { cfg.rot.mode = btn.getAttribute('data-rot'); saveCfg(cid, cfg).then(function () { rerenderRot(cid, cfg); }); };
+    });
+  }
+  function daysLeftThisMonth() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate() - n.getDate() + 1; }
+  function applyAndToast(sid, days) {
+    var s = suiteById(_curCfg, sid); if (!s) return;
+    if (!window.confirm('将把【' + s.name + '】写入未来 ' + days + ' 天排期（当天已完成保留），继续吗？')) return;
+    applySuiteDays(sid, days, null).then(function () { toast('✅ 已生成 ' + days + ' 天排期：' + s.name); render(); try { document.dispatchEvent(new CustomEvent('mx-schedule-changed')); } catch (e) {} if (window.__renderDashboard) window.__renderDashboard(); }).catch(function (err) { console.warn(err); toast('❌ 生成失败：' + err); });
+  }
+  function applyRotMonth(cid, cfg) {
+    if (!window.confirm('按当前月度计划（' + ({ month: '整月', halfDay: '半月自然日', halfWeek: '半月自然周', week: '按周' }[cfg.rot.mode]) + '）生成本月全部排期？当天已完成保留。')) return;
+    applySuites(daysLeftThisMonth(), null).then(function () { toast('✅ 已按月度计划生成本月排期'); render(); try { document.dispatchEvent(new CustomEvent('mx-schedule-changed')); } catch (e) {} if (window.__renderDashboard) window.__renderDashboard(); }).catch(function (err) { toast('❌ 生成失败：' + err); });
+  }
+  function setRotWin(cfg, k, val) {
+    if (k === 'month') cfg.rot.windows.month = val;
+    else if (k === 'halfDay0') cfg.rot.windows.halfDay[0] = val;
+    else if (k === 'halfDay1') cfg.rot.windows.halfDay[1] = val;
+    else if (k === 'halfWeek0') cfg.rot.windows.halfWeek[0] = val;
+    else if (k === 'halfWeek1') cfg.rot.windows.halfWeek[1] = val;
+    else if (k.indexOf('week') === 0) cfg.rot.windows.week[Number(k.slice(4))] = val;
+  }
+  function rerenderCal(cid, cfg) { var el = $('ts-cal'); if (el) el.innerHTML = renderCal(cfg, cid); bind(page0(), cid, cfg); }
+  function rerenderRot(cid, cfg) { var el = $('ts-rot'); if (el) el.innerHTML = renderRot(cfg, cid); bind(page0(), cid, cfg); }
+  function page0() { return window.__parentTaskMount || $('page-tasksets'); }
+
+  /* ============ 样式 ============ */
+  function injectCSS() {
+    if ($('mx-ts-v2-css')) return;
+    var st = document.createElement('style'); st.id = 'mx-ts-v2-css';
+    st.textContent = [
+      '.mxvt{--ts-accent:var(--accent-primary,#4f8cff);--ts-card:var(--card-bg,#fff);--ts-line:var(--border-color,#e3e9f2);--ts-ink:var(--text-primary,#27324a);--ts-sub:var(--text-secondary,#7b8aa0);--ts-soft:var(--bg-tertiary,#eef4ff)}',
+      '.mxvt .ts-zone{background:var(--ts-card);border:1px solid var(--ts-line);border-radius:16px;padding:14px;margin:14px 0}',
+      '.mxvt .ts-sec-t{font-size:15px;font-weight:800;margin:2px 0 10px;display:flex;align-items:center;gap:8px;color:var(--ts-ink)}',
+      '.mxvt .ts-sub{font-size:12px;font-weight:600;color:var(--ts-sub)}',
+      '.mxvt .ts-tip{color:var(--ts-sub);font-size:12.5px;line-height:1.6;background:var(--ts-soft);border:1px dashed var(--ts-accent);border-radius:10px;padding:10px 12px;margin:8px 0}',
+      '.mxvt .ts-suite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}',
+      '.mxvt .ts-suite{border:1px solid var(--ts-line);border-radius:14px;padding:12px;background:var(--ts-card);position:relative}',
+      '.mxvt .ts-suite.preset{background:var(--ts-soft);border-style:dashed}',
+      '.mxvt .ts-suite-hd{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;color:var(--ts-ink)}',
+      '.mxvt .ts-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto}',
+      '.mxvt .ts-suite-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.mxvt .ts-fav{position:absolute;top:10px;right:12px;font-size:12px;color:#e5484d;font-weight:800}',
+      '.mxvt .ts-tag{font-size:11px;background:#e8f0ff;color:var(--ts-accent);border-radius:999px;padding:1px 8px;font-weight:700}',
+      '.mxvt .ts-suite-meta{color:var(--ts-sub);font-size:12px;margin:4px 0 8px}',
+      '.mxvt .ts-task{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:9px;background:var(--ts-soft);margin:5px 0;font-size:13px}',
+      '.mxvt .ts-ti{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ts-ink)}',
+      '.mxvt .ts-mod{font-size:11px;color:var(--ts-sub)}',
+      '.mxvt .ts-pts{background:#fff4e0;color:#b9791b;font-weight:800;border-radius:999px;padding:2px 9px;font-size:12px;border:1px solid #ffe0a8}',
+      '.mxvt .ts-task-list{display:flex;flex-direction:column}',
+      '.mxvt .ts-prev{display:flex;gap:3px;margin:6px 0}',
+      '.mxvt .ts-prev-d{flex:1;text-align:center;font-size:10px;padding:3px 0;border-radius:6px;background:#f0f3f8;color:#bcc6d4}',
+      '.mxvt .ts-prev-d.on{background:var(--ts-accent);color:#fff}',
+      '.mxvt .ts-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}',
+      '.mxvt .ts-b{border:1px solid var(--ts-line);background:var(--ts-card);border-radius:9px;padding:6px 10px;font-size:12.5px;cursor:pointer;font-weight:700;color:var(--ts-ink)}',
+      '.mxvt .ts-b:hover{background:var(--ts-soft)}',
+      '.mxvt .ts-b.main{background:var(--ts-accent);border-color:transparent;color:#fff}',
+      '.mxvt .ts-b.ghost{color:var(--ts-sub)}',
+      '.mxvt .ts-b.sm{padding:5px 10px;font-size:12px}',
+      '.mxvt .ts-b.danger{border-color:#e5484d;color:#e5484d;background:var(--ts-card)}',
+      '.mxvt .ts-box{background:var(--ts-card);border:1px solid var(--ts-line);border-radius:14px;padding:12px 14px;margin:10px 0}',
+      '.mxvt .ts-box-t{font-weight:800;font-size:14px;margin-bottom:8px;color:var(--ts-ink)}',
+      '.mxvt .ts-inv{display:flex;flex-wrap:wrap;gap:8px}',
+      '.mxvt .ts-inv-i{background:var(--ts-soft);border:1px solid var(--ts-accent);color:var(--ts-accent);border-radius:999px;padding:4px 10px;font-size:12.5px}',
+      '.mxvt .ts-inv-i b{font-size:13.5px}',
+      '.mxvt .ts-inv-i.off{background:#f6f6f6;border-color:#e5e5e5;color:#aaa;text-decoration:line-through}',
+      '.mxvt .ts-prog{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}',
+      '.mxvt .ts-prog-t{font-size:12.5px;color:var(--ts-sub);margin-bottom:4px}',
+      '.mxvt .ts-prog-bar{height:7px;border-radius:5px;background:#eef1f6;overflow:hidden}',
+      '.mxvt .ts-prog-bar>i{display:block;height:100%;background:linear-gradient(90deg,#7ec850,#4caf50)}',
+      /* 日历 */
+      '.mxvt .ts-rotbadge{font-size:13px;margin-bottom:8px;color:var(--ts-ink)}',
+      '.mxvt .ts-rotbadge b{color:var(--ts-accent)}',
+      '.mxvt .ts-cal-head,.mxvt .ts-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}',
+      '.mxvt .ts-cal-wh{text-align:center;font-weight:800;color:var(--ts-sub);font-size:12px;padding:4px 0}',
+      '.mxvt .ts-cal-d{border:1px solid var(--ts-line);border-radius:10px;min-height:84px;padding:6px;background:var(--ts-card);cursor:pointer;transition:.12s;position:relative}',
+      '.mxvt .ts-cal-d:hover{border-color:var(--ts-accent);box-shadow:0 2px 8px rgba(79,140,255,.15)}',
+      '.mxvt .ts-cal-d.sel{border-color:var(--ts-accent);background:var(--ts-soft)}',
+      '.mxvt .ts-cal-d.void{visibility:hidden}',
+      '.mxvt .ts-cal-num{font-weight:800;font-size:13px;color:var(--ts-ink)}',
+      '.mxvt .ts-cal-tag{position:absolute;top:6px;right:6px;font-size:10px;padding:1px 6px;border-radius:999px;color:#fff}',
+      '.mxvt .ts-cal-mini{font-size:10.5px;color:var(--ts-sub);margin-top:3px;line-height:1.35}',
+      '.mxvt .ts-cal-nav{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:8px;font-size:13px;color:var(--ts-sub)}',
+      /* 月度计划 */
+      '.mxvt .ts-seg{display:flex;border:1px solid var(--ts-line);border-radius:9px;overflow:hidden;flex-wrap:wrap}',
+      '.mxvt .ts-seg-b{flex:1;min-width:120px;border:none;background:var(--ts-card);padding:8px;font-weight:700;color:var(--ts-sub);cursor:pointer;font-size:12.5px}',
+      '.mxvt .ts-seg-b.on{background:var(--ts-accent);color:#fff}',
+      '.mxvt .ts-rot-wrap{margin:10px 0}',
+      '.mxvt .ts-rot{border:1px solid var(--ts-line);border-radius:12px;padding:12px;margin:8px 0;background:var(--ts-soft)}',
+      '.mxvt .ts-rot-wh{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:6px;color:var(--ts-ink)}',
+      '.mxvt .ts-pick{width:100%;padding:8px;border:1px solid var(--ts-line);border-radius:8px;font-size:13px;background:var(--ts-card);color:var(--ts-ink)}',
+      '.mxvt .ts-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}',
+      '.mxvt .ts-tbl th,.mxvt .ts-tbl td{border:1px solid var(--ts-line);padding:6px 8px;text-align:left;color:var(--ts-ink)}',
+      '.mxvt .ts-tbl th{background:var(--ts-soft);color:var(--ts-accent)}',
+      /* 弹层（全局，不依赖 .mxvt 容器） */
+      '.ts-mask{position:fixed;inset:0;background:rgba(20,30,50,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}',
+      '.ts-mask.on{display:flex}',
+      '.ts-sheet{background:var(--ts-card);border-radius:16px;width:min(520px,100%);max-height:88vh;overflow:auto;padding:16px}',
+      '.ts-sheet h3{margin:0 0 10px;font-size:15px;color:var(--ts-ink)}',
+      '.fld{margin:8px 0}',
+      '.fld label{display:block;font-size:12px;color:var(--ts-sub);margin-bottom:4px;font-weight:700}',
+      '.fld input,.fld select,.fld textarea{width:100%;padding:8px 10px;border:1px solid var(--ts-line);border-radius:9px;font-size:13px;font-family:inherit;background:var(--ts-card);color:var(--ts-ink)}',
+      '.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}',
+      '.wd{display:flex;gap:4px}',
+      '.wd button{flex:1;padding:7px 0;border:1px solid var(--ts-line);background:var(--ts-card);border-radius:8px;font-size:12px;font-weight:700;color:var(--ts-sub);cursor:pointer}',
+      '.wd button.on{background:var(--ts-accent);color:#fff;border-color:var(--ts-accent)}',
+      '.ts-ed-task{border:1px solid var(--ts-line);border-radius:10px;padding:8px;margin:6px 0;background:var(--ts-soft)}',
+      '.ts-ed-h{display:flex;justify-content:space-between;align-items:center;gap:8px}',
+      '.ts-add-task{border:1px dashed var(--ts-accent);color:var(--ts-accent);background:var(--ts-card);border-radius:10px;padding:8px;text-align:center;font-weight:800;cursor:pointer;margin-top:6px}',
+      '.ts-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px}',
+      '.ts-today-list{display:flex;flex-direction:column;gap:6px;margin-top:4px}',
+      '.ts-today-t{display:flex;align-items:center;gap:8px;background:var(--ts-soft);border:1px solid var(--ts-line);border-radius:9px;padding:7px 10px}',
+      '.ts-today-t.done{background:#eafaef;border-color:#bfe6c9}',
+      '.ts-today-ic{font-size:16px}',
+      '.ts-today-tx{flex:1;font-size:13px;color:var(--ts-ink);line-height:1.5}',
+      '.ts-today-st{flex:0 0 auto;font-size:12px;font-weight:700;color:#f08c00}',
+      '.ts-today-t.done .ts-today-st{color:#2e9e54}',
+      '@media (max-width:640px){.mxvt .ts-suite-grid{grid-template-columns:1fr}}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  /* 全局弹层容器（mask/sheet 挂载到 body，确保 openSheet 始终可用） */
+  function ensureShell() {
+    if ($('ts-mask')) return;
+    var mask = document.createElement('div'); mask.id = 'ts-mask'; mask.className = 'ts-mask';
+    var sheet = document.createElement('div'); sheet.id = 'ts-sheet'; sheet.className = 'ts-sheet';
+    mask.appendChild(sheet); document.body.appendChild(mask);
+  }
+
+  /* ============ 挂载 ============ */
+  function boot() {
+    injectCSS();
+    ensureShell();
+    try { document.addEventListener('navigation', function (e) { var p = e.detail && e.detail.page; if (p === 'page-tasksets') setTimeout(render, 60); }); } catch (e) {}
+    if ($('page-tasksets') && $('page-tasksets').classList.contains('active')) render();
+  }
+
+  window.MX_TASKSETS = {
+    SETS: SETS, SLOT: SLOT, LIB: LIB, PRESETS: PRESETS,
+    generate: generate, apply: apply, applySuites: applySuites, clearToday: clearToday,
+    getCursor: getCursor, setCursor: setCursor, render: render,
+    effQty: effQty, setQty: setQty, getPin: getPin, setPin: setPin,
+    loadCfg: loadCfg, suiteOfDate: suiteOfDate
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
