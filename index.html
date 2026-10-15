@@ -11327,9 +11327,9 @@ window.DB = {
   function navigateTo(pageId, navId) {
 
     // 家长工作台进入需手势/密码验证（儿童/家长模式分区）
-    if (pageId === 'page-parent' && !window.__parentUnlocked) {
+    if ((pageId === 'page-parent' || pageId === 'page-tool-wlib') && !window.__parentUnlocked) {
       if (window.mxParentUnlock) { window.mxParentUnlock(function () { navigateTo(pageId, navId); }); return; }
-    } else if (pageId !== 'page-parent') {
+    } else if (pageId !== 'page-parent' && pageId !== 'page-tool-wlib') {
       window.__parentUnlocked = false;
       var mb = document.getElementById('mode-badge'); if (mb) mb.textContent = '🧒 儿童模式';
       try { if (window.mxSyncModeBox) window.mxSyncModeBox(); } catch (eM) {}
@@ -15440,7 +15440,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       });
     }
     var wchLibBtn = document.getElementById('wch-libbtn');
-    if (wchLibBtn) wchLibBtn.onclick = function () { if (window.navigateTo) window.navigateTo('page-tool-wlib'); };
+    if (wchLibBtn) wchLibBtn.onclick = function () { if (window.mxOpenWLib) { window.mxOpenWLib(); return; } if (window.navigateTo) window.navigateTo('page-tool-wlib'); };
     if (!blocked) {
       var selId = null;
       sec.querySelectorAll('.wch-role').forEach(function (el) {
@@ -15674,7 +15674,14 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
       '</div></div>';
     var importLocked = (!isV && cur.uploadUsed);
     h += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05);margin-bottom:12px">' +
-      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:8px">📥 批量导入（Excel / CSV / 粘贴）</div>' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:8px">📥 批量导入（文件 / Excel / CSV / 粘贴）</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
+      '<label id="wlib-filelbl" style="border:none;border-radius:10px;background:linear-gradient(90deg,#7c5cff,#5a3fe0);color:#fff;font-weight:800;padding:9px 18px;cursor:pointer;display:inline-block' + (importLocked ? ';opacity:.5;pointer-events:none' : '') + '">📂 选择文件导入（可多选）' +
+      '<input type="file" id="wlib-file" accept=".csv,.txt,.xlsx,.xls,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></label>' +
+      '<span style="font-size:12.5px;color:#8a93a6">支持 <b>.csv / .txt / .xlsx</b> · 手机 / 平板 / 鸿蒙 / 电脑 都可选本机文件</span>' +
+      '</div>' +
+      '<div style="font-size:12.5px;color:#8a93a6;margin-bottom:8px">表格格式：第 1 列 = 单词，后面依次 释义 / 音标 / 例句；表头自动跳过。老版 <b>.xls</b> 请先另存为 <b>.xlsx</b> 或 <b>.csv</b>。</div>' +
+      '<div id="wlib-filelist" style="font-size:12.5px;color:#455a64;margin-bottom:6px"></div>' +
       (importLocked ? '<div style="font-size:12.5px;color:#ef6c00;margin-bottom:8px">⚠️ 普通用户批量导入仅可 1 次，已用完。如需更多词库请升级 VIP，或继续用上方「添加单词」手动补充。</div>' : '') +
       '<textarea id="wlib-txt" class="wlib-in" style="width:100%;min-height:90px;font-size:13.5px" placeholder="每行一个单词，支持 4 列：单词,释义,音标,例句&#10;例：elephant,大象,/ˈelɪfənt/,The elephant is big.&#10;也可从 Excel/WPS 复制多行粘贴；表头自动跳过"></textarea>' +
       '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
@@ -15732,18 +15739,32 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     cur.words.push({ w: w, zh: zh, ph: ph, ex: ex }); cur.updatedAt = Date.now();
     await saveSets(); renderWLib();
   };
-  var impBtn = sec.querySelector('#wlib-imp');
-  if (impBtn && cur && !importLocked) impBtn.onclick = async function () {
-    var txt = (sec.querySelector('#wlib-txt').value || '').trim();
-    if (!txt) { toast('请先粘贴内容'); return; }
-    var rows = txt.split(/\r?\n/), add = 0, upd = 0, skip = 0;
+  /* [WLIB530] 单行拆列：兼容 Excel 导出的带引号 CSV（字段内可含逗号） */
+  function wlibSplitLine(ln) {
+    if (ln.indexOf('"') < 0) return ln.split(/\t|,|，|;|；/).map(function (s) { return s.trim(); });
+    var out = [], cell = '', q = false;
+    for (var i = 0; i < ln.length; i++) {
+      var ch = ln.charAt(i);
+      if (q) {
+        if (ch === '"') { if (ln.charAt(i + 1) === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') { q = true; }
+      else if (ch === '\t' || ch === ',' || ch === '，' || ch === ';' || ch === '；') { out.push(cell.trim()); cell = ''; }
+      else cell += ch;
+    }
+    out.push(cell.trim());
+    return out;
+  }
+  /* [WLIB530] 导入核心：粘贴 与 文件导入 共用 */
+  async function wlibIngest(txt, note) {
+    var rows = String(txt || '').split(/\r?\n/), add = 0, upd = 0, skip = 0;
     rows.forEach(function (ln) {
       ln = ln.trim(); if (!ln) return;
-      var cols = ln.split(/\t|,|，|;|；/).map(function (s) { return s.trim(); });
+      var cols = wlibSplitLine(ln);
       if (!cols[0]) return;
       if (/^(单词|word|英文|释义|meaning|音标|phonetic|例句|example)$/i.test(cols[0])) return;
-      var wd = cols[0];
-      if (!/^[A-Za-z][A-Za-z ]{0,40}$/.test(wd)) { skip++; return; }
+      var wd = String(cols[0]).replace(/^["']+|["']+$/g, '').trim();
+      if (!/^[A-Za-z][A-Za-z .'\-]{0,40}$/.test(wd)) { skip++; return; }
       var hit = cur.words.filter(function (x) { return x.w.toLowerCase() === wd.toLowerCase(); })[0];
       if (hit) { hit.zh = cols[1] || hit.zh; hit.ph = cols[2] || hit.ph; hit.ex = cols[3] || hit.ex; upd++; }
       else { cur.words.push({ w: wd, zh: cols[1] || '', ph: cols[2] || '', ex: cols[3] || '' }); add++; }
@@ -15751,8 +15772,122 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     cur.uploadUsed = true; cur.updatedAt = Date.now();
     await saveSets(); await renderWLib();
     var m2 = sec.querySelector('#wlib-msg');
-    if (m2) m2.textContent = '✅ 导入完成：新增 ' + add + ' / 更新 ' + upd + ' / 跳过 ' + skip + (!isV ? '（普通用户批量导入已用完，可继续手动添加）' : '');
+    if (m2) m2.textContent = '✅ 导入完成：新增 ' + add + ' / 更新 ' + upd + ' / 跳过 ' + skip + (!isV ? '（普通用户批量导入已用完，可继续手动添加）' : '') + (note || '');
     if (window.showToast) window.showToast('✅ 导入完成：新增 ' + add + '，更新 ' + upd);
+  }
+  /* [WLIB530] 读文本文件：UTF-8 优先，解码失败或出现乱码自动回退 GBK（Excel 导出的 CSV 常见） */
+  function wlibReadText(f) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error('文件读取失败')); };
+      fr.onload = function () {
+        var ab = fr.result, txt = null;
+        try { txt = new TextDecoder('utf-8', { fatal: true }).decode(ab); } catch (e0) { txt = null; }
+        if (txt === null || txt.indexOf('\uFFFD') >= 0) {
+          try { txt = new TextDecoder('gbk').decode(ab); }
+          catch (e1) { try { txt = new TextDecoder('utf-8').decode(ab); } catch (e2) { txt = ''; } }
+        }
+        resolve(txt || '');
+      };
+      fr.readAsArrayBuffer(f);
+    });
+  }
+  /* [WLIB530] .xlsx → 制表符文本：手写 ZIP 目录解析 + DecompressionStream('deflate-raw')，
+     零外部库，PC/平板/鸿蒙/手机通用；浏览器不支持解压时给出降级提示。 */
+  function wlibXlsxToText(f) {
+    return f.arrayBuffer().then(function (ab) {
+      var u8 = new Uint8Array(ab), dv = new DataView(ab), i;
+      var eocd = -1, lim = Math.max(0, u8.length - 66000);
+      for (i = u8.length - 22; i >= lim; i--) { if (u8[i] === 0x50 && u8[i + 1] === 0x4b && u8[i + 2] === 0x05 && u8[i + 3] === 0x06) { eocd = i; break; } }
+      if (eocd < 0) throw new Error('不是有效的 .xlsx 文件');
+      var cnt = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), ent = {}, k;
+      for (k = 0; k < cnt && p + 46 <= u8.length; k++) {
+        if (dv.getUint32(p, true) !== 0x02014b50) break;
+        var method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+        var nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+        var lho = dv.getUint32(p + 42, true);
+        var nm = new TextDecoder('utf-8').decode(u8.subarray(p + 46, p + 46 + nl));
+        var lnl = dv.getUint16(lho + 26, true), lel = dv.getUint16(lho + 28, true);
+        ent[nm] = { m: method, s: csize, o: lho + 30 + lnl + lel };
+        p += 46 + nl + el + cl;
+      }
+      function raw(name) {
+        var e = ent[name]; if (!e) return Promise.resolve('');
+        var bytes = u8.subarray(e.o, e.o + e.s);
+        if (e.m === 0) return Promise.resolve(new TextDecoder('utf-8').decode(bytes));
+        if (typeof DecompressionStream !== 'function') return Promise.reject(new Error('当前浏览器不支持解压 xlsx，请把表格另存为 .csv 后再导入'));
+        return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+      }
+      var sh = ent['xl/worksheets/sheet1.xml'] ? 'xl/worksheets/sheet1.xml'
+        : (Object.keys(ent).filter(function (n) { return /^xl\/worksheets\/sheet\d+\.xml$/.test(n); }).sort()[0] || '');
+      return Promise.all([raw('xl/sharedStrings.xml'), raw(sh)]).then(function (r) {
+        function unesc(s) {
+          return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+            .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 10)); })
+            .replace(/&#x([0-9a-fA-F]+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 16)); })
+            .replace(/&amp;/g, '&');
+        }
+        var shared = [], m, ssRe = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+        while ((m = ssRe.exec(r[0] || ''))) {
+          var inner = m[1], tm, tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/g, acc = '';
+          while ((tm = tRe.exec(inner))) acc += unesc(tm[1]);
+          shared.push(acc);
+        }
+        function colIdx(letters) { var n = 0; for (var q = 0; q < letters.length; q++) { n = n * 26 + (letters.charCodeAt(q) - 64); } return n - 1; }
+        var out = [], rm, rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g;
+        while ((rm = rowRe.exec(r[1] || ''))) {
+          var cells = [], cm, cRe = /<c\b([^>]*?)\/>|<c\b([^>]*?)>([\s\S]*?)<\/c>/g;
+          while ((cm = cRe.exec(rm[1]))) {
+            var at = cm[1] || cm[2] || '', bd = cm[3] || '';
+            var tf = /t="([^"]+)"/.exec(at), tt = tf ? tf[1] : '';
+            var rf = /r="([A-Z]+)\d+"/.exec(at), ci = rf ? colIdx(rf[1]) : cells.length;
+            var val = '';
+            if (tt === 's') { var v1 = /<v[^>]*>([\s\S]*?)<\/v>/.exec(bd); val = v1 ? (shared[parseInt(v1[1], 10)] || '') : ''; }
+            else if (tt === 'inlineStr' || tt === 'str') {
+              var tm2, tRe2 = /<t\b[^>]*>([\s\S]*?)<\/t>/g, a2 = '';
+              while ((tm2 = tRe2.exec(bd))) a2 += unesc(tm2[1]);
+              val = a2;
+            } else { var v2 = /<v[^>]*>([\s\S]*?)<\/v>/.exec(bd); val = v2 ? unesc(v2[1]) : ''; }
+            cells[ci] = val;
+          }
+          var last = -1;
+          for (var q2 = 0; q2 < cells.length; q2++) { if (cells[q2] !== undefined && String(cells[q2]).trim() !== '') last = q2; }
+          if (last < 0) continue;
+          var arr = [];
+          for (var q3 = 0; q3 <= last; q3++) arr.push(String(cells[q3] === undefined ? '' : cells[q3]).replace(/[\t\r\n]+/g, ' ').trim());
+          out.push(arr.join('\t'));
+        }
+        var txt = out.join('\n');
+        if (txt.trim() === '') throw new Error('表格里没读到内容（请确认第一个工作表里有数据）');
+        return txt;
+      });
+    });
+  }
+  var impBtn = sec.querySelector('#wlib-imp');
+  if (impBtn && cur && !importLocked) impBtn.onclick = async function () {
+    var txt = (sec.querySelector('#wlib-txt').value || '').trim();
+    if (!txt) { toast('请先粘贴内容，或点「📂 选择文件导入」选文件'); return; }
+    await wlibIngest(txt);
+  };
+  var fileInput = sec.querySelector('#wlib-file');
+  if (fileInput && cur && !importLocked) fileInput.onchange = async function () {
+    var files = Array.prototype.slice.call(fileInput.files || []);
+    if (!files.length) return;
+    var fl = sec.querySelector('#wlib-filelist');
+    function say(t, c) { if (fl) { fl.style.color = c || '#455a64'; fl.textContent = t; } }
+    say('⏳ 正在读取 ' + files.length + ' 个文件…');
+    var buf = [], errs = [], i;
+    for (i = 0; i < files.length; i++) {
+      var f2 = files[i], nm2 = String(f2.name || ''), low = nm2.toLowerCase();
+      try {
+        if (/\.xlsx$/.test(low)) buf.push(await wlibXlsxToText(f2));
+        else if (/\.xls$/.test(low)) throw new Error('老版 .xls 请在 Excel/WPS 里另存为 .xlsx 或 .csv');
+        else buf.push(await wlibReadText(f2));
+      } catch (e3) { errs.push(nm2 + '：' + ((e3 && e3.message) || e3)); }
+    }
+    var all = buf.join('\n').trim();
+    if (!all) { say('❌ 没读到可用内容' + (errs.length ? '：' + errs.join('；') : ''), '#c62828'); return; }
+    await wlibIngest(all, errs.length ? '；' + errs.length + ' 个文件读取失败：' + errs.join('；') : '');
   };
   var expBtn = sec.querySelector('#wlib-exp');
   if (expBtn && cur) expBtn.onclick = function () {
@@ -22908,6 +23043,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<input type="number" class="mx-input" id="pt-wch-limit" min="1" max="20" value="' + (await sget('wch:dailyLimit:' + c, String(window.WCH_DAILY_DEFAULT || 5))) + '" style="width:70px">';
     h += '<span class="mx-note-inline">次/天（默认5）。今日已闯关 <b>' + (await sget('wch:plays:' + c + ':' + __wchToday, '0')) + '</b> 次。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-wch-save" style="margin-top:8px">💾 保存单词闯关设置</button>';
+    h += '<button class="mx-btn" id="pt-wch-lib" style="margin-top:8px;margin-left:8px">📚 英语词库管理 / 批量导入</button>';
     h += '</div>';
 
     /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 / 自主导入 ---- */
@@ -23075,6 +23211,12 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       var inp = $('pt-wch-limit');
       if (inp) { var v = parseInt(inp.value, 10); if (isNaN(v) || v < 1) v = window.WCH_DAILY_DEFAULT || 5; await window.DB.setSetting('wch:dailyLimit:' + c, String(v)); }
       toast('💾 单词闯关设置已保存！');
+    };
+    /* [WLIB530] 家长工作台内的词库管理入口（批量导入 / 自建词库） */
+    var wchLibBtn2 = $('pt-wch-lib');
+    if (wchLibBtn2) wchLibBtn2.onclick = function () {
+      if (window.mxOpenWLib) window.mxOpenWLib();
+      else if (window.navigateTo) window.navigateTo('page-tool-wlib');
     };
 
     /* 页签切换：主页/日历/套组 在同一页内切换，不触发 navigateTo，因此不重复弹密码 */
@@ -23571,12 +23713,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
     h += '<div class="mx-card"><div class="mx-card-t">📚 学习模块一览</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
-      '· <b>拼音</b>：拼音拼读器（字母呼读音 · 四声大卡 · 三段拼读 · 点调四声联动）、音节组合、21天闯关；<br>' +
-      '· <b>识字/生字</b>：点喇叭发音（真人拼音音节音频，苹果手机同样可用），生字卡可一键进错题集；<br>' +
-      '· <b>古诗</b>：内置157首（小学必备 / 拓展 / 初中 三个标签 + 年级筛选 + 搜索），点击整个卡片自动朗读，大字一行一句、逐字拼音；<br>' +
-      '· <b>英语</b>：26字母（念字母+念单词）、单词闯关（进入前右上角可选<b>初级2~4岁 / 中级4~6岁 / 高级6~10岁</b>三档词库）；<br>' +
-      '· <b>数学</b>：数学思维闯关、数独、口算题卡 A4 打印；<br>' +
-      '· <b>学习闪卡</b>：自动生成识字/拼音/单词/古诗复习卡，支持打印。</div></div>';
+      '· <b>拼音</b>：拼音拼读器（字母呼读音 · 四声大卡 · 三段拼读 · 点调四声联动）、音节组合、21天闯关 <b style="color:#c62828">🔧</b>；<br>' +
+      '· <b>识字/生字</b>：点喇叭发音（真人拼音音节音频，苹果手机同样可用），生字卡可一键进错题集 <b style="color:#c62828">🔧</b>；<br>' +
+      '· <b>古诗</b>：内置157首（小学必备 / 拓展 / 初中 三个标签 + 年级筛选 + 搜索），点击整个卡片自动朗读，大字一行一句、逐字拼音 <b style="color:#c62828">🔧</b>；<br>' +
+      '· <b>英语</b>：26字母（念字母+念单词）、单词闯关（进入前右上角可选<b>初级2~4岁 / 中级4~6岁 / 高级6~10岁</b>三档词库）<b style="color:#c62828">🔧支持自定义导入</b>；<br>' +
+      '· <b>数学</b>：数学思维闯关、数独、口算题卡 A4 打印 <b style="color:#c62828">🔧</b>；<br>' +
+      '· <b>学习闪卡</b>：自动生成识字/拼音/单词/古诗复习卡，支持打印。<br>' +
+      '· <b style="color:#c62828">🔧</b> 支持自定义导入：英语·单词闯关可<b>批量导入自建词库</b>（选文件或粘贴 Excel/CSV）；其余带 <b style="color:#c62828">🔧</b> 模块可在 家长工作台 → 📥 资源中心 导入自己的音频/图片素材并自动归类。</div></div>';
 
     h += '<div class="mx-card"><div class="mx-card-t">🎮 积分 · 游戏 · 宠物</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
@@ -23641,9 +23784,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<div class="mx-card"><div class="mx-card-t">📚 英语·单词闯关 自定义词库（家长导入）</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '家长可<b>自建单词套组</b>作为闯关题库，比内置词库更贴合自家孩子：' +
-      '<br><b>① 入口</b>：英语 → 单词闯关，点顶部「📚 自定义词库（去管理 →）」；或 智能工具 → 📚 英语词库管理；' +
+      '<br><b>① 入口</b>：英语 → 单词闯关，点顶部「📚 自定义词库」（<b>需先输入家长密码/手势</b>）；也可在 家长工作台 → 🏃 英语单词闯关 点「📚 英语词库管理 / 批量导入」；' +
       '<br><b>② 建套组</b>：点「➕ 新建套组」命名（如「初级 / 2026年 / 旅行词汇」），相当于一套难度词库；' +
-      '<br><b>③ 批量导入</b>：在套组里点「📥 批量导入」，粘贴 Excel/WPS 复制的多行（<b>单词,释义,音标,例句</b>），一键导入；也可手动「➕ 添加单词」；' +
+      '<br><b>③ 批量导入</b>：点「📂 选择文件导入」<b>直接从手机/平板/鸿蒙/电脑里选文件</b>（.csv / .txt / .xlsx，可多选），或粘贴表格多行；列顺序 <b>单词,释义,音标,例句</b>，表头自动跳过；也可手动「➕ 添加单词」；' +
       '<br><b>④ 接入闯关</b>：自建套组会自动出现在单词闯关的「🎚️ 难度」选择里，选它即按你的词库出题；' +
       '<br><b>⑤ 每日上限</b>：同一看板可设「⏱️ 每日闯关上限（家长管控）」，与「家长工作台 → 英语单词闯关」同一设置、互相同步；' +
       '<br><b>名额</b>：普通用户 <b>1</b> 个套组（批量导入仅 1 次，之后可手动加词），VIP <b>5</b> 个套组、导入与修改不限。' +
@@ -27290,6 +27433,15 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     if (window.navigateTo) window.navigateTo('page-parent'); else { location.hash = '#parent'; }
     setTimeout(_tryClick, 120);
+  };
+
+  /* [WLIB530] 打开「英语词库管理」统一入口：家长工作台 与 单词闯关都走这里。
+     流程 = 先弹家长验证（手势/数字密码），验证通过后才进入词库管理页。 */
+  window.mxOpenWLib = function () {
+    function go() { if (window.navigateTo) window.navigateTo('page-tool-wlib'); }
+    if (window.__parentUnlocked) { go(); return; }
+    if (window.mxParentUnlock) { window.mxParentUnlock(go); return; }
+    go();
   };
 })();
 </script>
