@@ -23473,6 +23473,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '入口：右上角「👨‍👩‍👧 家长」按钮（需密码验证）。可做：<b>多孩管理</b>（本地卡 2 个 / VIP 5 个）、<b>真实学习时长</b>统计（进入模块自动计时，闲置3分钟不计时）、<b>错题集</b>、<b>学习任务套组</b>（自定义每日任务数量）、<b>打印周报</b>、资源管理。</div></div>';
 
+    h += '<div class="mx-card"><div class="mx-card-t">🗂️ 智能套组（自定义学习任务）</div>' +
+      '<div style="font-size:13px;line-height:1.95;color:#456">' +
+      '「智能套组」让家长<b>自己编排孩子的每日打卡任务</b>：练什么、每周几次、每次多久、完成奖多少分，全由你定。' +
+      '<br><b>① 新建</b>：家长工作台 → 🗂️ 智能套组，点右下角 <b>➕ 新建自定义套组 → ＋ 空白新建</b>，自动进入任务编辑弹窗；' +
+      '<br><b>② 加任务</b>：点「＋ 添加任务」，填 <b>任务名称</b>（如「背5个单词」）、<b>关联模块</b>（拼音 / 识字 / 古诗 / 英语 / 数学 / 日常表现 / 熏听…）、<b>每周排期</b>（勾选星期几＝每周几次，可一键选「每天 / 工作日 / 周末」）、<b>每天次数</b>、<b>单次时长(分钟)</b>、<b>单项积分</b>；' +
+      '<br><b>③ 套模板</b>：嫌麻烦？预设套组（如「幼小衔接·日课」）点「复制」，一键变成你的套组；' +
+      '<br><b>④ 下发作期</b>：套组卡片点 <b>应用到本周 / 应用到本月</b>，任务自动写入首页日历；也可在日历上<b>点某一天单独编排</b>当天任务；' +
+      '<br><b>⑤ 月度计划</b>：选「整月 / 半月 / 按周」节奏，系统按模式自动轮换排期，不用天天手动；' +
+      '<br><b>名额</b>：本地卡可建 <b>2</b> 个、VIP 可建 <b>6</b> 个自定义套组（不够用升级 VIP）。</div>' +
+      '<div style="font-size:12.5px;color:#789;margin-top:6px">💡 套组里的「单项积分」会直接计入孩子总积分，可在积分商城兑换奖励。</div></div>';
+
     h += '<div class="mx-card"><div class="mx-card-t">💬 建议反馈 · 我们的承诺</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
       '· <b>提建议</b>：左侧菜单「💌 建议与反馈」直接留言，每一条我们都会认真看；<br>' +
@@ -31174,7 +31185,9 @@ function downloadResourceFromCloud(resId) {
     var cap = capacity(), ne = nonEmptySuites(_curCfg);
     if (ne.length >= cap) { toast('自定义槽位已满（本地卡 2 / VIP 6）。升级 VIP 可扩到 6 个。'); return; }
     var s = { id: 'c' + (ne.length + 1) + '_' + Date.now(), name: '我的套组' + (ne.length + 1), icon: '🎯', color: '#7c5cff', empty: false, fromPreset: false, tasks: [], desc: '' };
-    _curCfg.suites.push(s); saveCfg(_curCid, _curCfg).then(function () { render(); openTasksSheet(_curCid, _curCfg, null, s.id); });
+    _curCfg.suites.push(s);
+    openTasksSheet(_curCid, _curCfg, null, s.id);
+    saveCfg(_curCid, _curCfg).then(function () { render(); }).catch(function (e) { console.error('saveSuite failed', e); toast('⚠️ 保存失败，请重试'); });
   }
   function copyPreset(pid) {
     var p = PRESETS.filter(function (x) { return x.id === pid; })[0]; if (!p) return;
@@ -31319,7 +31332,7 @@ function downloadResourceFromCloud(resId) {
       '.mxvt .ts-tbl th,.mxvt .ts-tbl td{border:1px solid var(--ts-line);padding:6px 8px;text-align:left;color:var(--ts-ink)}',
       '.mxvt .ts-tbl th{background:var(--ts-soft);color:var(--ts-accent)}',
       /* 弹层（全局，不依赖 .mxvt 容器） */
-      '.ts-mask{position:fixed;inset:0;background:rgba(20,30,50,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}',
+      '.ts-mask{--ts-accent:var(--accent-primary,#4f8cff);--ts-card:var(--card-bg,#fff);--ts-line:var(--border-color,#e3e9f2);--ts-ink:var(--text-primary,#27324a);--ts-sub:var(--text-secondary,#7b8aa0);--ts-soft:var(--bg-tertiary,#eef4ff);position:fixed;inset:0;background:rgba(20,30,50,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}',
       '.ts-mask.on{display:flex}',
       '.ts-sheet{background:var(--ts-card);border-radius:16px;width:min(520px,100%);max-height:88vh;overflow:auto;padding:16px}',
       '.ts-sheet h3{margin:0 0 10px;font-size:15px;color:var(--ts-ink)}',
