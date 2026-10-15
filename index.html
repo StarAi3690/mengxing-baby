@@ -23691,7 +23691,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
     h += '<div class="mx-card"><div class="mx-card-t">🚀 三步快速上手</div>' +
       '<div style="font-size:13.5px;line-height:2;color:#456">' +
-      '① <b>激活</b>：打开平台输入购物获取的<b>卡密</b>完成激活（体验卡1天 / 月卡30天 / 本地买断长期）；<br>' +
+      '① <b>激活</b>：打开平台输入购物获取的<b>卡密</b>完成激活（体验卡1天 / 月卡30天 / 永久本地版）；<br>' +
       '② <b>建档</b>：按提示创建宝宝档案（名字+头像），家长工作台可添加多个孩子；<br>' +
       '③ <b>开学</b>：首页「今日打卡」已自动排好每天任务，点一条即开始，完成得积分。</div>' +
       '<div style="font-size:12.5px;color:#789;margin-top:6px">网址：https://StarAi3690.github.io/mengxing-baby/</div></div>';
@@ -23735,7 +23735,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>多孩管理</b></td><td style="border-top:1px solid #eee">最多 2 个孩子</td><td style="border-top:1px solid #eee">最多 5 个孩子</td></tr>' +
       '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>数据保存</b></td><td style="border-top:1px solid #eee">仅本机（可手动备份导出）</td><td style="border-top:1px solid #eee"><b>多端云同步</b>，换设备登录即恢复</td></tr>' +
       '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>资源中心</b></td><td style="border-top:1px solid #eee">仅存本机（20MB 配额）</td><td style="border-top:1px solid #eee">云端存储 + 多端同步</td></tr>' +
-      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>到期后</b></td><td style="border-top:1px solid #eee" colspan="2">正式卡（月卡/买断）到期后<b>本地使用权永久保留</b>不锁站；体验卡到期锁站，可登录账号恢复权限</td></tr>' +
+      '<tr><td style="padding:7px 6px;border-top:1px solid #eee"><b>到期后</b></td><td style="border-top:1px solid #eee" colspan="2">正式卡（月卡 / 永久本地版）到期后<b>本地使用权永久保留</b>不锁站；<b>体验卡（本地体验版 / VIP 体验版）到期即锁站</b>，需<b>续费</b>（永久本地版 或 VIP 各版本）才能继续使用。已在其他设备买过正式卡的，可在锁页登录账号自助恢复</td></tr>' +
       '</table>' +
       '<div style="margin-top:10px;padding:11px 12px;border-radius:12px;background:linear-gradient(90deg,#fff8e6,#fffbf0);border:1px solid #f0dfae;font-size:13.5px;color:#8a6d00">⬆️ <b>升级 VIP 点此链接</b>：<a href="https://m.tb.cn/h.8rn9HPM" target="_blank" style="color:#e8890c;font-weight:700">https://m.tb.cn/h.8rn9HPM</a>（VIP 月卡 · 积分商城「萌星好物」里也有）</div>' +
       '<div style="font-size:12.5px;color:#789;margin-top:8px">卡密规则：一张卡绑定一个账号（最多 5 台设备）；VIP 到期会显示续费横幅（点 ✕ 可静默 24 小时）。</div></div>';
@@ -23817,7 +23817,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '</div></div>' +
       '<div class="mx-card"><div class="mx-card-t">📅 体验与权益优化</div>' +
       '<div style="font-size:13px;line-height:1.9;color:#456">' +
-      '· <b>锁站体验</b>：购正式卡＝永久本地使用权不锁站；体验卡到期锁站后可「🔑 直接登录」解锁；<br>' +
+      '· <b>锁站与续费</b>：购正式卡＝永久本地使用权不锁站；<b>体验卡（本地 / VIP 体验版）到期即锁站</b>，需<b>续费</b>（永久本地版 或 VIP 各版本）才能继续使用；跨设备买过正式卡的可登录账号自助恢复；<br>' +
       '· <b>VIP 到期横幅</b>：新增「去续费」按钮，一键续费；<br>' +
       '· <b>学习任务套组</b>：支持「不关联（手动）」完全自定义个性化任务；每周排期可<b>任选周几</b>（不规则组合也行）；<br>' +
       '· <b>拼音 21 天闯关 / 分类练习 / 音节组合</b>等多种练习方式上线。' +
@@ -28015,15 +28015,20 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function mxCardKind() { var k = ''; try { k = lsGet('mengxing_card_kind') || ''; } catch (e) {} return k; }
   function mxSetCardKind(vd) { try { lsSet('mengxing_card_kind', Number(vd) === 1 ? 'trial' : 'formal'); } catch (e) {} }
   function mxGateShouldLock() { return mxGateExpired() && mxCardKind() !== 'formal'; }
+  /* [WLIB531] 续费入口：后台商品名含「买断 / 永久 / 本地」即取该商品链接；
+     后台未配置时退回通用购买链接（是占位符则返回空，避免死链）——
+     保证体验卡到期后「永久本地版」续费入口始终可达。 */
   function mxGateBuyoutUrl() {
     try {
       var list = (typeof MX_MALL_PRODUCTS === 'function') ? MX_MALL_PRODUCTS() : (window.MX_GOODS_MALL || []);
       for (var i = 0; i < (list || []).length; i++) {
         var p = list[i];
-        if (p && p.url && /买断/.test(String(p.name || ''))) return p.url;
+        if (p && p.url && /(买断|永久|本地)/.test(String(p.name || ''))) return p.url;
       }
     } catch (e) {}
-    return '';
+    var fb = '';
+    try { fb = PURCHASE_URL || ''; } catch (e2) {}
+    return /\.example\.com/.test(fb) ? '' : fb;
   }
   function mxGateRecheck() {
     var lock = document.getElementById('mx-lock');
@@ -28080,6 +28085,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var buyUrl = mxGateBuyoutUrl();
     var vipUrl = '';
     try { vipUrl = mxVipRenewUrl() || ''; } catch (e) {}
+    if (/\.example\.com/.test(vipUrl)) vipUrl = ''; /* [WLIB531] 占位符不显示按钮，避免死链 */
     var g = document.createElement('div');
     g.id = 'mx-lock';
     g.style.cssText = 'position:fixed;inset:0;z-index:100000;background:linear-gradient(160deg,#fdf6ec,#fdeef0);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;';
@@ -28087,23 +28093,24 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(157,63,63,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
         '<div style="font-size:52px">🔒</div>' +
         '<div style="font-size:21px;font-weight:800;color:#5f2b2b;margin:10px 0 6px">' + (frozenMode ? '⛔ 该卡密已被冻结' : '您的有效期已结束') + '</div>' +
-        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">' + (frozenMode ? '您的卡密已被管理员冻结，如有疑问请联系客服（vx:daquan88666）<br>如有新卡密可直接输入激活，孩子的学习数据已安全保留' : '卡密到期后需<b>续费或换卡</b>才能继续使用萌星宝宝<br>孩子的学习数据已安全保留在本机，激活新卡后立即可用') + '</div>' +
+        '<div style="font-size:13.5px;color:#8a6d6d;line-height:1.8;margin-bottom:20px">' + (frozenMode ? '您的卡密已被管理员冻结，如有疑问请联系客服（vx:daquan88666）<br>如有新卡密可直接输入激活，孩子的学习数据已安全保留' : '卡密到期后<b>需续费</b>才能继续使用萌星宝宝<br>可续：<b>永久本地版</b>（一次购买·永久本地使用）或 <b>VIP 各版本</b>（全功能 + 多端同步）<br>孩子的学习数据已安全保留在本机，续费后立即可用') + '</div>' +
         '<input id="mx-lock-code" maxlength="32" placeholder="输入新卡密立即续期" style="width:100%;box-sizing:border-box;padding:14px 16px;font-size:17px;letter-spacing:2px;text-align:center;border:2px solid #f3d9c2;border-radius:12px;outline:none"/>' +
         '<div id="mx-lock-msg" style="font-size:13px;color:#c62828;min-height:20px;margin:10px 0 4px"></div>' +
         '<button id="mx-lock-renew" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#ff9800,#f4633a);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(244,99,58,.35)">立即续期</button>' +
-        '<button id="mx-lock-login-toggle" style="width:100%;margin-top:12px;padding:12px;border:1.5px solid #c5d6f2;background:#f4f8ff;border-radius:12px;color:#2b5cb8;font-size:14.5px;font-weight:700;cursor:pointer">🔑 已有账号？直接登录（免输卡密恢复）</button>' +
+        '<button id="mx-lock-login-toggle" style="width:100%;margin-top:12px;padding:12px;border:1.5px solid #c5d6f2;background:#f4f8ff;border-radius:12px;color:#2b5cb8;font-size:14.5px;font-weight:700;cursor:pointer">🔑 已在其他设备买过正式卡？登录账号自助恢复</button>' +
         '<div id="mx-lock-login" style="display:none;margin-top:12px;text-align:left">' +
           '<input id="mx-lock-acc" maxlength="64" placeholder="邮箱或用户名" style="width:100%;box-sizing:border-box;padding:13px 15px;font-size:15.5px;border:2px solid #d5e3f7;border-radius:12px;outline:none;margin-bottom:9px"/>' +
           '<input id="mx-lock-pass" type="password" maxlength="64" placeholder="密码" style="width:100%;box-sizing:border-box;padding:13px 15px;font-size:15.5px;border:2px solid #d5e3f7;border-radius:12px;outline:none"/>' +
           '<div id="mx-lock-lmsg" style="font-size:13px;color:#c62828;min-height:18px;margin:8px 0 2px"></div>' +
           '<button id="mx-lock-login-btn" style="width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(90deg,#3f8ef5,#2b5cb8);color:#fff;font-size:15px;font-weight:700;cursor:pointer">登录并恢复</button>' +
-          '<div style="font-size:12px;color:#9aa9bd;margin-top:8px;text-align:center">账号名下有正式卡（月卡/买断/VIP）即可直接恢复使用，无需重新输卡密</div>' +
+          '<div style="font-size:12px;color:#9aa9bd;margin-top:8px;text-align:center">仅用于「已买过正式卡（月卡 / 永久本地版 / VIP）」的账号跨设备自助恢复；<b>体验卡到期不能靠登录解锁，需续费</b></div>' +
         '</div>' +
         '<div style="display:flex;gap:10px;margin-top:14px">' +
-          (buyUrl ? '<button id="mx-lock-buyout" style="flex:1;padding:12px;border:1.5px solid #ffb74d;background:#fff8ef;border-radius:12px;color:#b26a00;font-size:14px;font-weight:700;cursor:pointer">📀 本地买断版</button>' : '') +
-          (vipUrl ? '<button id="mx-lock-vip" style="flex:1;padding:12px;border:1.5px solid #ffd9b3;background:#fffaf5;border-radius:12px;color:#c77800;font-size:14px;font-weight:700;cursor:pointer">👑 购买 VIP</button>' : '') +
+          '<button id="mx-lock-buyout" style="flex:1;padding:12px;border:1.5px solid #ffb74d;background:#fff8ef;border-radius:12px;color:#b26a00;font-size:14px;font-weight:700;cursor:pointer">📀 续费永久本地版</button>' +
+          '<button id="mx-lock-vip" style="flex:1;padding:12px;border:1.5px solid #ffd9b3;background:#fffaf5;border-radius:12px;color:#c77800;font-size:14px;font-weight:700;cursor:pointer">👑 续费 VIP</button>' +
         '</div>' +
-        '<div style="font-size:12px;color:#b9a7a7;margin-top:16px">买断版=一次购买长期使用本地功能 · VIP=全功能+多端同步<br>客服微信：vx:daquan88666</div>' +
+        '<div id="mx-lock-renote" style="font-size:12px;color:#b9a7a7;margin-top:8px">' + ((buyUrl || vipUrl) ? '点上方按钮直达购买页' : '📮 未配置购买链接，请加客服微信 vx:daquan88666 获取') + '</div>' +
+        '<div style="font-size:12px;color:#b9a7a7;margin-top:16px">永久本地版＝一次购买·永久本地使用 · VIP＝全功能+多端同步<br>客服微信：vx:daquan88666</div>' +
       '</div>';
     document.body.appendChild(g);
     var inp = g.querySelector('#mx-lock-code');
@@ -28182,10 +28189,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     }
     if (lockLoginBtn) lockLoginBtn.addEventListener('click', doLockLogin);
     if (lockPass) lockPass.addEventListener('keydown', function (e) { if (e.key === 'Enter') doLockLogin(); });
+    /* [WLIB531B] 续费入口：有配置链接直达；未配置时提示联系客服，绝不跳死链 */
+    function mxGoBuyBridge(u, name) {
+      if (u) { try { window.open(u, '_blank'); return; } catch (e) {} }
+      var mm = '请添加客服微信 vx:daquan88666 获取「' + name + '」续费链接';
+      try { if (window.showToast) window.showToast(mm); else alert(mm); } catch (e2) { try { alert(mm); } catch (e3) {} }
+    }
     var bo = g.querySelector('#mx-lock-buyout');
-    if (bo) bo.onclick = function () { try { window.open(buyUrl, '_blank'); } catch (e) {} };
+    if (bo) bo.onclick = function () { mxGoBuyBridge(buyUrl, '永久本地版'); };
     var vv = g.querySelector('#mx-lock-vip');
-    if (vv) vv.onclick = function () { try { window.open(vipUrl, '_blank'); } catch (e) {} };
+    if (vv) vv.onclick = function () { mxGoBuyBridge(vipUrl, 'VIP'); };
     /* 异步云端复核：本地值滞后但实际已续期 → checkVipExpiry 刷新后回调 mxGateRecheck 解锁 */
     try { checkVipExpiry(); } catch (e) {}
   }
