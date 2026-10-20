@@ -41,10 +41,15 @@
   .hint{font-size:12px;color:var(--sub);margin-top:6px}
   /* 商品配置表格化编辑器（#433） */
   .gt{min-width:700px}
-  .gt#gtMall{min-width:900px}
+  .gt#gtMall{min-width:1620px}
+  /* WLIB532-fix：表格变宽后，操作列吸右固定，横向滑动时始终可点 */
+  .gt#gtMall th:last-child,.gt#gtMall td:last-child{position:sticky;right:0;background:#fff;z-index:2;box-shadow:-7px 0 9px -7px rgba(40,70,140,.28)}
   .gt th,.gt td{padding:5px 5px;vertical-align:middle}
   .gt th{font-size:12px}
   .gt input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;width:100%}
+  .gt textarea{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;width:100%;resize:vertical;line-height:1.5;min-height:36px;box-sizing:border-box}
+  .gt textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,124,255,.13)}
+  .gt .c-id textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px}
   .gt input:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,124,255,.13)}
   .gt .c-emo input{text-align:center}
   .gt .c-num input{text-align:right}
@@ -287,7 +292,8 @@
         </span>
       </div>
       <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>价格</b>写成 <code>¥199</code> 这样；<b>VIP价</b>、<b>链接</b>留空即不展示。<br>
-        <b>分类</b>：孩子端「萌星好物」顶部按此筛选（下拉可选 7 个预设分类，也可自定义；与前端筛选标签一致）。<b>复制按钮文案 / 可复制内容</b>：填了「可复制内容」的孩子端商品卡会出现一个复制按钮（文案取「复制按钮文案」，留空默认「复制」），点一下即复制该内容（如购买链接）。<b>留空 = 不可复制</b>（默认保持防盗）。</div>
+        <b>分类</b>：孩子端「萌星好物」顶部按此筛选（下拉可选 7 个预设分类，也可自定义；与前端筛选标签一致）。<b>复制按钮文案 / 可复制内容</b>：填了「可复制内容」的孩子端商品卡会出现一个复制按钮（文案取「复制按钮文案」，留空默认「复制」），点一下即复制该内容（如购买链接）。<b>留空 = 不可复制</b>（默认保持防盗）。<br>
+        <span style="color:#c26a00">👉 表格较宽，可<b>左右滑动</b>查看后面的「链接 / 复制按钮文案 / 可复制内容」列；最右侧「操作」列已固定，滑动时照样能点。</span></div>
       <div class="scroll"><table class="gt" id="gtMall"><thead id="gtMallHead"></thead><tbody id="gtMallBody"></tbody></table></div>
       <datalist id="mallCatList">
         <option value="双十一特惠"></option>
@@ -1065,10 +1071,10 @@ const GOODS_FIELDS = {
     {k:'vipPrice',t:'VIP价', cls:'c-num', w:'78px',  ph:'¥169'},
     {k:'tag',     t:'标签',  cls:'',      w:'72px',  ph:'硬件'},
     {k:'cat',     t:'分类',  cls:'',      w:'128px', ph:'绘本教具类', list:'mallCatList'},
-    {k:'desc',    t:'说明',  cls:'',      w:'',      ph:'描述'},
+    {k:'desc',    t:'说明',  cls:'',      w:'260px', ph:'描述', ta:2},
     {k:'url',     t:'链接',  cls:'c-id',  w:'150px', ph:'https://...'},
     {k:'copyLabel',t:'复制按钮文案', cls:'', w:'110px', ph:'复制购买链接'},
-    {k:'copy',    t:'可复制内容', cls:'c-id', w:'220px', ph:'留空=不可复制'}
+    {k:'copy',    t:'可复制内容', cls:'c-id', w:'240px', ph:'留空=不可复制', ta:2}
   ]
 };
 /* [#442] 权益类型白名单（与孩子端 index.html GRANT_KINDS 对齐；此处仅用于发布前提示） */
@@ -1104,10 +1110,16 @@ function goodsRender(which){
       return '<tr'+((o.on===false)?' style="opacity:.55"':'')+'><td style="color:#9aa">'+(i+1)+'</td>'
         + fields.map(function(f){
             const v = (o[f.k]==null) ? '' : String(o[f.k]);
+            const onin = 'oninput="goodsSet(\''+which+'\','+i+',\''+f.k+'\',this.value)"';
+            if (f.ta) {
+              return '<td class="'+f.cls+'"><textarea rows="'+f.ta+'" placeholder="'+goodsEsc(f.ph||'')+'" '
+                + onin + '>' + goodsEsc(v) + '</textarea></td>';
+            }
             return '<td class="'+f.cls+'"><input '+(f.num?'type="number" min="1" step="1" ':'type="text" ')
               + (f.list?'list="'+f.list+'" ':'')
               + 'value="'+goodsEsc(v)+'" placeholder="'+goodsEsc(f.ph||'')+'" '
-              + 'oninput="goodsSet(\''+which+'\','+i+',\''+f.k+'\',this.value)"></td>';
+              + (v?'title="'+goodsEsc(v)+'" ':'')
+              + onin + '></td>';
           }).join('')
         + '<td style="white-space:nowrap">'
         + '<button class="ico" title="'+((o.on!==false)?'点击下架（孩子端不再展示）':'点击上架')+'" '
