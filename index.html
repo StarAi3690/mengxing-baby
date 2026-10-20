@@ -5387,6 +5387,14 @@ html, body {
 .mx-mall-desc{font-size:11px;color:var(--text-secondary,#888);min-height:28px;margin:4px 0;}
 .mx-mall-price{color:#c62828;font-weight:800;font-size:15px;margin-bottom:8px;}
 .mx-mall-buy{width:100%;background:#ff7043;color:#fff;border:none;border-radius:20px;padding:7px 0;font-size:13px;cursor:pointer;}
+.mx-mall-toolbar{margin:10px 0 4px;}
+.mx-mall-search{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border-color,rgba(0,0,0,.15));border-radius:20px;font-size:14px;outline:none;background:#fff;}
+.mx-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.mx-chip{background:#f1f3f5;border:none;border-radius:16px;padding:6px 14px;font-size:13px;cursor:pointer;color:#444;transition:all .15s;}
+.mx-chip.on{background:#ff7043;color:#fff;font-weight:700;}
+.mx-mall-empty{background:#fff;border-radius:14px;padding:24px;text-align:center;border:1px solid var(--border-color,rgba(0,0,0,.08));grid-column:1/-1;}
+.mx-mall-copy{width:100%;background:#e3f2fd;color:#1565c0;border:none;border-radius:20px;padding:6px 0;font-size:13px;cursor:pointer;margin-top:6px;}
+.mx-mall-wish{background:#ff7043;color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:14px;cursor:pointer;}
 .mx-order-list{margin-top:6px;background:#fff;border:1px solid var(--border-color,rgba(0,0,0,.1));border-radius:14px;padding:12px;}
 .mx-order-row{border-top:1px solid #f0f0f0;padding:8px 2px;font-size:13px;}
 .mx-order-row .sub{color:var(--text-secondary,#999);font-size:11px;float:right;}
@@ -24930,13 +24938,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* ---------- 数据：外部电商商城 ---------- */
   var MALL_PRODUCTS=[
-    {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'硬件', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
-    {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'礼盒', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
-    {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'教具', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
-    {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
-    {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
-    {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
+    {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'硬件', cat:'明星爆款特惠', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
+    {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'礼盒', cat:'绘本教具类', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
+    {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'教具', cat:'绘本教具类', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
+    {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'会员', cat:'萌星会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
+    {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', cat:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
+    {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', cat:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
   ];
+  /* [WLIB532] 萌星好物分类（标签筛选，默认 7 类） */
+  var MALL_CATS=[
+    '双十一特惠','绘本等虚拟资源','食品用品类','绘本教具类','服饰配饰类','萌星会员','明星爆款特惠'
+  ];
+  /* [WLIB532] 萌星好物筛选状态（搜索关键词 + 分类） */
+  var _mallFilter = { kw:'', cat:'' };
 
   /* ---------- 图鉴卡册已知角色目录（进度与锁定槽用） ---------- */
   var ALBUM_THEMES=[
@@ -25104,37 +25118,143 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       DB.getAll('virtualOrders').then(function(all){
         var orders=(all||[]).filter(function(o){return o&&o.kind==='mall'&&o.cid===cid;});
         var isVip=!!(window.isVip && window.isVip());
-        var cards=MX_MALL_PRODUCTS().map(function(p){
-          var showVip=isVip && p.vipPrice;
-          var priceHtml=showVip
-            ? '<div class="mx-mall-price"><span style="text-decoration:line-through;color:#aaa;font-weight:400;margin-right:6px">'+esc(p.price)+'</span><span style="color:#e53935;font-weight:800">'+esc(p.vipPrice)+'</span> <span style="background:#ffe0b2;color:#e65100;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">👑VIP</span></div>'
-            : '<div class="mx-mall-price">'+esc(p.price)+'</div>';
-          return '<div class="mx-mall-card">'+
-            '<div class="mx-mall-emoji">'+p.emoji+'</div>'+
-            '<div class="mx-mall-tag">'+esc(p.tag)+'</div>'+
-            '<div class="mx-mall-name">'+esc(p.name)+'</div>'+
-            '<div class="mx-mall-desc">'+esc(p.desc)+'</div>'+
-            priceHtml+
-            '<button type="button" class="btn mx-mall-buy" data-id="'+p.id+'">'+(showVip?'VIP专享价购买':'去购买')+'</button>'+
-          '</div>';
-        }).join('');
-        if (!cards) cards = '<div class="empty-tip">🛠️ 好物正在整理中，敬请期待</div>';
-        page.innerHTML='<div class="content-section-title">🏪 萌星好物推荐 <span class="sub">精选启蒙好物 · '+(isVip?'VIP专享折扣已自动应用':'开通VIP享部分商品专属折扣')+'</span></div>'+
-          '<div class="mx-balance-bar">🛒 我的意向订单：<b>'+orders.length+'</b> 笔 &nbsp;<span class="sub">点击「去购买」将记录意向并跳转官方商城</span></div>'+
-          '<div class="mx-mall-grid">'+cards+'</div>'+
-          (orders.length?'<div class="mx-order-list"><div class="dash-block-title">📋 我的意向订单</div>'+orders.slice().reverse().map(function(o){return '<div class="mx-order-row">'+esc(o.goods||o.name)+' · '+esc(o.price||'')+' <span class="sub">'+new Date(o.at).toLocaleString()+'</span></div>';}).join('')+'</div>':'');
-        page.querySelectorAll('.mx-mall-buy').forEach(function(b){
-          b.onclick=function(){
-            var id=b.dataset.id; var p=MX_MALL_PRODUCTS().find(function(x){return x.id===id;}); if(!p) return;
-            var paid=(isVip && p.vipPrice)?p.vipPrice:p.price;
-            DB.put('virtualOrders',{id:Date.now(),cid:cid,goods:p.name,price:paid,kind:'mall',at:Date.now()}).catch(function(){});
-            T('🛒 已记录意向'+(paid!==p.price?('（VIP价 '+paid+'）'):'')+'，正在跳转…');
-            try{ window.open(p.url,'_blank'); }catch(e){}
-            renderMall();
-          };
+        var chips='<button type="button" class="mx-chip'+(_mallFilter.cat===''?' on':'')+'" data-cat="">全部</button>'
+          + MALL_CATS.map(function(c){ return '<button type="button" class="mx-chip'+(_mallFilter.cat===c?' on':'')+'" data-cat="'+esc(c)+'">'+esc(c)+'</button>'; }).join('');
+        page.innerHTML='<div class="content-section-title">🏪 萌星好物推荐 <span class="sub">精选启蒙好物 · '+(isVip?'VIP专享折扣已自动应用':'开通VIP享部分商品专属折扣')+'</span></div>'
+          + '<div class="mx-balance-bar">🛒 我的意向订单：<b>'+orders.length+'</b> 笔 &nbsp;<span class="sub">点击「去购买」将记录意向并跳转官方商城</span></div>'
+          + '<div class="mx-mall-toolbar">'
+          +   '<input id="mx-mall-search" class="mx-mall-search" type="text" placeholder="🔍 搜索已上架的商品名称…" value="'+esc(_mallFilter.kw)+'">'
+          +   '<div class="mx-chip-row">'+chips+'</div>'
+          + '</div>'
+          + '<div id="mx-mall-list" class="mx-mall-grid"></div>'
+          + (orders.length?'<div class="mx-order-list"><div class="dash-block-title">📋 我的意向订单</div>'+orders.slice().reverse().map(function(o){return '<div class="mx-order-row">'+esc(o.goods||o.name)+' · '+esc(o.price||'')+' <span class="sub">'+new Date(o.at).toLocaleString()+'</span></div>';}).join('')+'</div>':'');
+        var searchEl=page.querySelector('#mx-mall-search');
+        if(searchEl) searchEl.oninput=function(){ _mallFilter.kw=this.value.trim(); mxMallRenderList(cid,isVip); };
+        page.querySelectorAll('.mx-chip').forEach(function(b){
+          b.onclick=function(){ _mallFilter.cat=this.getAttribute('data-cat')||''; page.querySelectorAll('.mx-chip').forEach(function(x){x.classList.toggle('on', x===b);}); mxMallRenderList(cid,isVip); };
         });
+        mxMallRenderList(cid,isVip);
       }).catch(function(){ page.innerHTML='<div class="empty-tip">加载失败</div>'; });
     });
+  }
+
+  /* [WLIB532] 按 _mallFilter 渲染商品列表（只刷新列表区，保留搜索框焦点） */
+  function mxMallRenderList(cid,isVip){
+    var listEl=document.getElementById('mx-mall-list'); if(!listEl) return;
+    var kw=_mallFilter.kw.toLowerCase();
+    var list=MX_MALL_PRODUCTS().filter(function(p){
+      if(_mallFilter.cat && p.cat!==_mallFilter.cat) return false;
+      if(kw){ var hay=(p.name+' '+(p.desc||'')+' '+(p.tag||'')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
+      return true;
+    });
+    if(!list.length){
+      var html='<div class="mx-mall-empty">';
+      if(kw){
+        html+='<div style="font-size:15px;margin-bottom:6px">😢 没有找到「'+esc(_mallFilter.kw)+'」相关的好物</div>'
+          + '<div class="sub" style="margin-bottom:10px">没找到想要的好物？告诉我们，上架后第一时间通知你～</div>'
+          + '<button type="button" class="btn mx-mall-wish" data-kw="'+esc(_mallFilter.kw)+'">📝 没找到？一键提交需求</button>';
+      } else {
+        html+='<div style="font-size:15px;margin-bottom:6px">该分类暂时没有好物</div>'
+          + '<div class="sub">去其他分类看看吧～</div>';
+      }
+      html+='</div>';
+      listEl.innerHTML=html;
+      var wb=listEl.querySelector('.mx-mall-wish');
+      if(wb) wb.onclick=function(){ mxOpenWishModal(this.getAttribute('data-kw')||''); };
+      return;
+    }
+    listEl.innerHTML=list.map(function(p){
+      var showVip=isVip && p.vipPrice;
+      var priceHtml=showVip
+        ? '<div class="mx-mall-price"><span style="text-decoration:line-through;color:#aaa;font-weight:400;margin-right:6px">'+esc(p.price)+'</span><span style="color:#e53935;font-weight:800">'+esc(p.vipPrice)+'</span> <span style="background:#ffe0b2;color:#e65100;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700">👑VIP</span></div>'
+        : '<div class="mx-mall-price">'+esc(p.price)+'</div>';
+      var copyBtn = p.copy ? ('<button type="button" class="btn mx-mall-copy" data-copy="'+esc(p.copy)+'" data-label="'+esc(p.copyLabel||'复制')+'">📋 '+(p.copyLabel||'复制')+'</button>') : '';
+      return '<div class="mx-mall-card">'
+        + '<div class="mx-mall-emoji">'+p.emoji+'</div>'
+        + '<div class="mx-mall-tag">'+esc(p.tag)+'</div>'
+        + '<div class="mx-mall-name">'+esc(p.name)+'</div>'
+        + '<div class="mx-mall-desc">'+esc(p.desc)+'</div>'
+        + priceHtml
+        + '<button type="button" class="btn mx-mall-buy" data-id="'+p.id+'">'+(showVip?'VIP专享价购买':'去购买')+'</button>'
+        + copyBtn
+      + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.mx-mall-buy').forEach(function(b){
+      b.onclick=function(){
+        var id=b.dataset.id; var p=MX_MALL_PRODUCTS().find(function(x){return x.id===id;}); if(!p) return;
+        var paid=(isVip && p.vipPrice)?p.vipPrice:p.price;
+        DB.put('virtualOrders',{id:Date.now(),cid:cid,goods:p.name,price:paid,kind:'mall',at:Date.now()}).catch(function(){});
+        T('🛒 已记录意向'+(paid!==p.price?('（VIP价 '+paid+'）'):'')+'，正在跳转…');
+        try{ window.open(p.url,'_blank'); }catch(e){}
+      };
+    });
+    listEl.querySelectorAll('.mx-mall-copy').forEach(function(b){
+      b.onclick=function(){ mxCopyText(this.getAttribute('data-copy')||'', this.getAttribute('data-label')||'复制'); };
+    });
+  }
+
+  /* [WLIB532] 复制商品可复制内容（防盗仅拦截 F12/右键，不拦截主动复制按钮） */
+  function mxCopyText(text, label){
+    text=text||''; if(!text){ T('没有可复制的内容'); return; }
+    function done(){ T('✅ 已复制：'+(label||'内容')); }
+    function fallback(){
+      try{
+        var ta=document.createElement('textarea'); ta.value=text;
+        ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+        document.body.removeChild(ta);
+        if(ok) done(); else T('复制失败，请长按选择后复制');
+      }catch(e){ T('复制失败，请长按选择后复制'); }
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+  }
+
+  /* [WLIB532] 缺货登记弹框：一键提交到云端 mx_goods_wish（公开，无需登录） */
+  function mxOpenWishModal(prefillKw){
+    prefillKw=(prefillKw||'').toString();
+    var overlay=document.getElementById('mx-wish-overlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.id='mx-wish-overlay';
+      overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML='<div style="background:#fff;border-radius:16px;max-width:380px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+      + '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📝 没找到想要的好物？</div>'
+      + '<div class="sub" style="margin-bottom:12px">告诉我们你想买的好物，上架后第一时间通知你～</div>'
+      + '<label style="display:block;font-size:13px;margin-bottom:4px">想要的商品关键词</label>'
+      + '<input id="mx-wish-kw" type="text" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:10px;margin-bottom:10px" placeholder="例如：儿童书包" value="'+esc(prefillKw)+'">'
+      + '<label style="display:block;font-size:13px;margin-bottom:4px">还想说的（选填）</label>'
+      + '<textarea id="mx-wish-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:10px;margin-bottom:10px" placeholder="例如：希望有 XXX 品牌 / 价位在 XX 以内"></textarea>'
+      + '<label style="display:block;font-size:13px;margin-bottom:4px">联系方式（选填，方便通知）</label>'
+      + '<input id="mx-wish-contact" type="text" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:10px;margin-bottom:14px" placeholder="微信 / 手机号（选填）">'
+      + '<div style="display:flex;gap:10px;justify-content:flex-end">'
+      +   '<button type="button" id="mx-wish-cancel" class="btn ghost">取消</button>'
+      +   '<button type="button" id="mx-wish-submit" class="btn">提交需求</button>'
+      + '</div>'
+      + '<div id="mx-wish-msg" class="msg" style="margin-top:10px"></div>'
+      + '</div>';
+    overlay.style.display='flex';
+    function close(){ overlay.style.display='none'; overlay.innerHTML=''; }
+    overlay.querySelector('#mx-wish-cancel').onclick=close;
+    overlay.querySelector('#mx-wish-submit').onclick=function(){
+      var kw=(overlay.querySelector('#mx-wish-kw').value||'').trim();
+      var text=(overlay.querySelector('#mx-wish-text').value||'').trim();
+      var contact=(overlay.querySelector('#mx-wish-contact').value||'').trim();
+      var msgEl=overlay.querySelector('#mx-wish-msg');
+      if(!kw && !text){ msgEl.textContent='请至少填写关键词或说明'; msgEl.className='msg bad'; return; }
+      var btn=this; btn.disabled=true; btn.textContent='提交中…';
+      var payload={kw:kw,text:text,contact:contact,deviceId:(typeof window.deviceId==='function'?window.deviceId():''),uid:(window.__mx_uid__||''),ts:Date.now()};
+      mxApiProxy('mxAdmin',{action:'goodsWish',data:payload}).then(function(r){
+        btn.disabled=false; btn.textContent='提交需求';
+        if(r&&r.ok){ close(); T('✅ 已收到你的需求，上架后通知你'); }
+        else { msgEl.textContent=(r&&r.msg)||'提交失败，请稍后重试'; msgEl.className='msg bad'; }
+      }).catch(function(e){ btn.disabled=false; btn.textContent='提交需求'; msgEl.textContent='网络错误：'+(e&&e.message||e); msgEl.className='msg bad'; });
+    };
+    setTimeout(function(){ var k=overlay.querySelector('#mx-wish-kw'); if(k) k.focus(); }, 50);
   }
 
   /* ============ 渲染：免费资源库 ============ */
