@@ -357,6 +357,8 @@
         <h3 style="margin:0">🧾 用户意向单 <code>萌星好物 · 按用户ID</code></h3>
         <span style="display:flex;gap:8px">
           <button class="btn ghost sm" onclick="exportCSV('intentUserTable','用户意向单_按用户')">⬇ 导出汇总</button>
+          <!-- [INTENTCSV539] 明细导出：skipTail=1 去掉末列「操作」（删除按钮，导出无意义） -->
+          <button class="btn ghost sm" onclick="exportCSV('intentTable','用户意向单_明细',1)">⬇ 导出明细</button>
           <button class="btn ghost sm" onclick="loadIntent()">↺ 刷新</button>
         </span>
       </div>
@@ -1028,13 +1030,16 @@ function downloadCSV(csv, filename){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
 }
-function exportCSV(tableId, label){
+function exportCSV(tableId, label, skipTail){
+  /* [INTENTCSV539] skipTail：导出时忽略末尾 N 列（如意向单明细末列是「删除」按钮，导出无意义）。
+     缺省 0 = 全列导出，行为与旧版完全一致（现有 7 个调用点不受影响）。 */
   const table = $(tableId);
   if (!table) { alert('未找到表格：'+tableId); return; }
   const headCells = table.querySelectorAll('thead th');
   if (!headCells.length) { alert('该表格没有表头，无法导出'); return; }
-  const cols = headCells.length;
-  const lines = [Array.prototype.map.call(headCells, function(th){ return csvCell(th.textContent); }).join(',')];
+  const skip = (typeof skipTail === 'number' && skipTail > 0) ? Math.min(skipTail, headCells.length - 1) : 0;
+  const cols = headCells.length - skip;
+  const lines = [Array.prototype.slice.call(headCells, 0, cols).map(function(th){ return csvCell(th.textContent); }).join(',')];
   const bodyRows = table.querySelectorAll('tbody tr');
   let n = 0;
   for (let i=0;i<bodyRows.length;i++){
@@ -1048,7 +1053,7 @@ function exportCSV(tableId, label){
     lines.push(row.join(','));
     n++;
   }
-  if (!n) { alert('「'+label+'」当前没有可导出的数据（请先在「数据明细」点刷新加载）'); return; }
+  if (!n) { alert('「'+label+'」当前没有可导出的数据（请先打开对应页签，等数据加载完成后再导出）'); return; }
   downloadCSV(lines.join('\r\n'), '萌星宝宝_'+label+'_'+stamp()+'.csv');
 }
 
