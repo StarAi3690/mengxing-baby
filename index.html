@@ -25212,6 +25212,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         var id=b.dataset.id; var p=MX_MALL_PRODUCTS().find(function(x){return x.id===id;}); if(!p) return;
         var paid=(isVip && p.vipPrice)?p.vipPrice:p.price;
         DB.put('virtualOrders',{id:Date.now(),cid:cid,goods:p.name,price:paid,kind:'mall',at:Date.now()}).catch(function(){});
+        /* [INTENT539] 意向单上报云端：后台「用户意向单」按用户ID看谁点了啥（失败不影响跳转购买） */
+        try{
+          var _iu = window.__mx_uid__ || '';
+          var _dev = (typeof window.deviceId === 'function') ? window.deviceId() : '';
+          var _rep = function(nm){
+            try{
+              window.mxApiProxy('mxAdmin', { action:'intentAdd', data:{
+                uid:_iu, cid:cid, childName:nm||'', goodsId:p.id, goods:p.name,
+                price:paid, priceType:(paid!==p.price?'VIP价':'原价'), tag:p.tag||'',
+                deviceId:_dev, ts:Date.now()
+              } }).catch(function(){});
+            }catch(e3){}
+          };
+          if(cid && window.DB && DB.get){ DB.get('children',cid).then(function(c){ _rep(c&&c.name); }).catch(function(){ _rep(''); }); }
+          else _rep('');
+        }catch(e2){}
         T('🛒 已记录意向'+(paid!==p.price?('（VIP价 '+paid+'）'):'')+'，正在跳转…');
         try{ window.open(p.url,'_blank'); }catch(e){}
       };

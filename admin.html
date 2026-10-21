@@ -87,6 +87,7 @@
     <div class="tab" id="tab-sec" onclick="switchTab('sec')" data-page-node-id="J0dqbNKoDJq6GcIyTyOGFb">⚙️ 账号安全</div>
     <div class="tab" id="tab-goods" onclick="switchTab('goods')">🛍️ 商品配置</div>
     <div class="tab" id="tab-wish" onclick="switchTab('wish')">🛒 缺货登记</div>
+    <div class="tab" id="tab-intent" onclick="switchTab('intent')">🧾 用户意向单</div>
     <div class="tab" id="tab-pub" onclick="switchTab('pub')">🚀 一键发布</div>
     <div class="tab" id="tab-resops" onclick="switchTab('resops')">🩺 资源运维</div>
   </div>
@@ -162,6 +163,12 @@
       <div class="sub" data-page-node-id="KimQ7uks0CC5X5Ev3K56kc">疑似多设备共享卡密、近 30 天激活、安全日志数见上方核心指标。下为最近安全日志（服务端记录）。</div>
       <div id="secInfo" class="sub" data-page-node-id="FeDH0H6WPuYa62w0yR7Gyh"></div>
       <div id="acctAbuseBox"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 6px">👁️ PV / UV 明细（可追到具体用户ID）</h3>
+      <div class="sub">UV/PV 总数见上方核心指标。这里是「谁看了什么」的明细：有 UID 的按账号归并，<b>未登录访客没有 UID</b>，只能按浏览器指纹归并（这正是 <code>anon</code> 的来源）。页面列格式为「页面×次数」。</div>
+      <div class="row" style="margin-top:8px"><span class="hint" id="pvDetailCount" style="margin:0"></span></div>
+      <div class="scroll" style="margin-top:8px"><table id="pvDetailTable"><thead><tr><th>账号</th><th>UID</th><th>PV</th><th>设备数</th><th>页面分布</th><th>最近访问</th></tr></thead><tbody id="pvDetailBody"></tbody></table></div>
     </div>
   </div>
 
@@ -338,6 +345,25 @@
       <div class="sub">孩子端「萌星好物」搜索无结果会弹出一键提交，内容汇总在这里。可查看关键词 / 需求描述 / 联系方式 / 提交时间，并可删除无效条目。</div>
       <div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="loadWishList()">↻ 刷新</button><span class="hint" id="wishCount" style="margin:0"></span></div>
       <div class="scroll" style="margin-top:8px"><table class="gt" id="wishTable"><thead id="wishHead"></thead><tbody id="wishBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- [INTENT539] 用户意向单：萌星好物「去购买」记录，按用户ID归并 -->
+  <div id="pane-intent" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">🧾 用户意向单 <code>萌星好物 · 按用户ID</code></h3>
+        <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="exportCSV('intentUserTable','用户意向单_按用户')">⬇ 导出汇总</button>
+          <button class="btn ghost sm" onclick="loadIntent()">↺ 刷新</button>
+        </span>
+      </div>
+      <div class="sub">用户在「萌星好物」点「去购买」就记一条<b>意向单</b>（只代表想买，不等于已付款）。来源两条：① 新版本前端实时上报（集合 <code>mx_mall_intent</code>）；② 老版本只写本地/云快照，这里从 <code>user_data.snapshot.virtualOrders</code> 回灌补齐。</div>
+      <div class="row" style="margin-top:10px"><span class="hint" id="intentCount" style="margin:0"></span></div>
+      <h3 style="margin:14px 0 6px">按用户汇总</h3>
+      <div class="scroll"><table id="intentUserTable"><thead><tr><th>账号</th><th>UID</th><th>意向条数</th><th>合计金额</th><th>点过的商品</th><th>最近一次</th></tr></thead><tbody></tbody></table></div>
+      <h3 style="margin:16px 0 6px">逐条明细</h3>
+      <div class="scroll" style="max-height:520px"><table id="intentTable"><thead><tr><th>时间</th><th>账号</th><th>UID</th><th>孩子</th><th>商品</th><th>价格</th><th>标签</th><th>来源</th><th>操作</th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
 
@@ -518,7 +544,7 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','nav','mon','fb','data','sec','goods','wish','pub','resops'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec','goods','wish','intent','pub','resops'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
@@ -528,6 +554,7 @@ function switchTab(t){
   if (t==='nav') loadNavOrder();
   if (t==='goods') loadGoods();
   if (t==='wish') loadWishList();
+  if (t==='intent') loadIntent();
   if (t==='pub') pubRender();
   if (t==='resops') loadResOps();
 }
@@ -724,6 +751,34 @@ async function loadStats(){
     return '<tr><td>'+esc(L.n)+(L.raw ? ' <span class="hint" style="margin:0;font-family:ui-monospace,Consolas,monospace">'+esc(L.raw)+'</span>' : '')+'</td><td>'+esc(h.count)+'</td><td><span class="bar" style="width:'+w+'px"></span></td></tr>';
   }).join('') : '<tr><td colspan="3" class="sub">暂无点击数据（需用户访问后累计）</td></tr>';
   $('secInfo').textContent = '最近安全日志可在服务端 admin_security_logs 查看；当前共 '+esc(r.securityLogs)+' 条。';
+
+  /* [PVUV539] PV/UV 明细渲染：落到具体用户ID（未登录按设备指纹归并） */
+  try {
+    const pvRows = r.pvDetail || [], pvAnon = r.pvDetailAnon || [];
+    const pvBody = $('pvDetailBody'), pvCnt = $('pvDetailCount');
+    if (pvCnt) pvCnt.textContent = '登录用户 ' + pvRows.length + ' 人 · 未登录设备 ' + pvAnon.length + ' 台';
+    if (pvBody) {
+      let h = pvRows.map(function (d) {
+        return '<tr><td><b>' + esc(d.account || '（无账号名）') + '</b></td>'
+          + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + esc(d.uid || '') + '</td>'
+          + '<td>' + esc(d.pv) + '</td><td>' + esc(d.deviceCount) + '</td>'
+          + '<td style="white-space:normal;word-break:break-all;max-width:280px">' + esc(d.pages || '—') + '</td>'
+          + '<td style="white-space:nowrap">' + esc(d.lastAt || '—') + '</td></tr>';
+      }).join('');
+      if (!h) h = '<tr><td colspan="6" class="sub">暂无登录用户的 PV 埋点</td></tr>';
+      if (pvAnon.length) {
+        h += '<tr><td colspan="6" style="background:#f7f6f2;font-weight:700">未登录访客（无 UID，按浏览器指纹识别）</td></tr>';
+        h += pvAnon.map(function (d) {
+          return '<tr style="color:#888780"><td>（未登录）</td>'
+            + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + esc(String(d.deviceId || '').slice(0, 16)) + '…</td>'
+            + '<td>' + esc(d.pv) + '</td><td>—</td>'
+            + '<td style="white-space:normal;word-break:break-all;max-width:280px">' + esc(d.pages || '—') + '</td>'
+            + '<td style="white-space:nowrap">' + esc(d.lastAt || '—') + '</td></tr>';
+        }).join('');
+      }
+      pvBody.innerHTML = h;
+    }
+  } catch (e) {}
 
   /* [#446] 同账号多终端登录：同一 uid 在 ≥2 个**真实**浏览器指纹上出现过才列出。
      去噪口径（见 mxAdmin #446）：
@@ -1291,6 +1346,59 @@ async function wishDel(id){
     else setMsg('wishCount','❌ 删除失败：'+goodsEsc((r&&r.msg)||'未知错误'),'bad');
   } catch(e){ setMsg('wishCount','❌ 删除异常：'+goodsEsc(String(e&&e.message||e)),'bad'); }
 }
+/* [INTENT539] 用户意向单：按用户ID汇总 + 逐条明细 */
+async function loadIntent(){
+  const ub = document.querySelector('#intentUserTable tbody');
+  const ib = document.querySelector('#intentTable tbody');
+  const cnt = $('intentCount');
+  if (!ub || !ib) return;
+  ub.innerHTML = '<tr><td colspan="6" class="sub">读取中…</td></tr>';
+  ib.innerHTML = '<tr><td colspan="9" class="sub">读取中…</td></tr>';
+  try {
+    const r = await proxy('mxAdmin', { action:'intentList', adminKey: ADMIN_KEY });
+    if (!r || r.ok === false){
+      ub.innerHTML = '<tr><td colspan="6" style="color:#c33">读取失败：' + goodsEsc((r&&r.msg)||'未知错误') + '</td></tr>';
+      ib.innerHTML = '';
+      if (cnt) cnt.textContent = '读取失败';
+      return;
+    }
+    const users = r.users || [], items = r.items || [];
+    if (cnt) cnt.textContent = '共 ' + (r.count||0) + ' 条意向单 / ' + (r.userCount||0) + ' 个用户ID';
+    ub.innerHTML = users.length ? users.map(function(u){
+      return '<tr><td><b>' + goodsEsc(u.account || '（无账号名）') + '</b></td>'
+        + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + goodsEsc(u.uid || '（未登录）') + '</td>'
+        + '<td>' + goodsEsc(u.count) + '</td>'
+        + '<td>¥' + goodsEsc(u.amount) + '</td>'
+        + '<td style="white-space:normal;word-break:break-all">' + goodsEsc((u.goods||[]).join(' / ') || '—') + '</td>'
+        + '<td style="white-space:nowrap">' + goodsEsc(u.lastDate || '—') + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="sub">暂无意向单</td></tr>';
+    ib.innerHTML = items.length ? items.map(function(w){
+      return '<tr><td style="white-space:nowrap">' + goodsEsc(w.date || '—') + '</td>'
+        + '<td>' + goodsEsc(w.account || '（无账号名）') + '</td>'
+        + '<td style="font-family:ui-monospace,Consolas,monospace;font-size:11px">' + goodsEsc(w.uid || '（未登录）') + '</td>'
+        + '<td>' + goodsEsc(w.childName || '—') + '</td>'
+        + '<td><b>' + goodsEsc(w.goods || '—') + '</b></td>'
+        + '<td>' + goodsEsc(w.price || '—') + (w.priceType ? ' <span class="hint" style="margin:0">' + goodsEsc(w.priceType) + '</span>' : '') + '</td>'
+        + '<td>' + goodsEsc(w.tag || '—') + '</td>'
+        + '<td>' + goodsEsc(w.src || '—') + '</td>'
+        + '<td>' + (String(w.src||'') === '快照' ? '<span class="sub">—</span>' : '<button class="ico del" title="删除此条" onclick="intentDel(\'' + goodsEsc(w.id||'') + '\')">✕</button>') + '</td></tr>';
+    }).join('') : '<tr><td colspan="9" class="sub">暂无明细</td></tr>';
+  } catch(e){
+    ub.innerHTML = '<tr><td colspan="6" style="color:#c33">读取异常：' + goodsEsc(String(e&&e.message||e)) + '</td></tr>';
+    ib.innerHTML = '';
+  }
+}
+/* [INTENT539] 删除单条意向单（快照来源不可删） */
+async function intentDel(id){
+  if (!id) return;
+  if (!confirm('确定删除这条意向单？')) return;
+  try {
+    const r = await proxy('mxAdmin', { action:'intentDel', adminKey: ADMIN_KEY, id: id });
+    if (r && r.ok){ setMsg('intentCount','✅ 已删除','ok'); loadIntent(); }
+    else setMsg('intentCount','❌ 删除失败：'+goodsEsc((r&&r.msg)||'未知错误'),'bad');
+  } catch(e){ setMsg('intentCount','❌ 删除异常：'+goodsEsc(String(e&&e.message||e)),'bad'); }
+}
+
 /* [AD477] 商品配置历史版本：列表 + 一键恢复（云端 config_history，保留最近 30 版） */
 async function goodsHistory(){
   setMsg('goodsMsg','读取历史版本…','sub');
