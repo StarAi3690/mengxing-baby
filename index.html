@@ -29028,10 +29028,15 @@ function downloadResourceFromCloud(resId) {
   window.showEmailVerify = showEmailVerify;
   /* 通用只读云函数代理（替代前端 callFunction，规避匿名登录/白名单限制） */
   function mxApiProxy(fn, data) {
+    var d = data || {};
+    /* [ANON539] 自动补 uid：云端 mx_usage 记账读 body.data.uid，此前多数调用不带 uid
+       → 全部坍缩成 anon_<日期> 一行，后台看不出是谁。这里在调用方未显式传 uid 时补上
+       当前登录用户；未登录仍为空（=真游客，仍走 anon 桶，语义正确，不改业务字段）。 */
+    try { if (!d.uid && window.__mx_uid__) d = Object.assign({}, d, { uid: window.__mx_uid__ }); } catch (e) {}
     return fetch(MX_GATEWAY + '/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fn: fn, data: data || {} })
+      body: JSON.stringify({ fn: fn, data: d })
     })
       .then(function (r) { return r.json(); })
       .then(function (j) { return j || { ok: false, msg: '空响应' }; })

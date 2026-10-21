@@ -229,6 +229,8 @@
         <button class="btn ghost sm" onclick="exportCSV('usageTable','云调用次数表')" data-page-node-id="62qBQjxuORSP7Iazme2cQP">⬇ 导出 CSV</button>
       </div>
       <div class="hint" data-page-node-id="YRxsii1hqfZVJgCAkXYXWj">说明：应用层无法获取真实带宽字节数，此处为按 UID/设备聚合的「云函数调用次数」，可近似反映各用户消耗。真实带宽可在腾讯云控制台「云开发 → 运营分析」查看。</div>
+      <!-- [ANON539] anon 桶说明：未登录/未带 uid 的调用按天合并成一行，不是真实账号 -->
+      <div class="hint" id="usageAnonHint" style="color:#a06a00">⚠️ <b>anon 不是账号</b>，是「没带 uid 的调用」按天合并的桶（游客访问、登录前拉配置、验证码/卡密校验等）。新版前端已在 <code>mxApiProxy</code> 自动补 uid，此后登录用户的调用会落到各自 UID 行；<b>历史 anon 数据无法追溯归属</b>。要按设备维度拆开看，请到「📊 运营监控 → PV 明细（未登录访客按浏览器指纹）」。</div>
       <div class="scroll" data-page-node-id="tc8CsZU2sTEBxpyYfvCJia"><table id="usageTable" data-page-node-id="DFlLsXqxTU5zV0BeU0wHNk"><thead data-page-node-id="cXz5ih1NUFIFtUAVSJzLLJ"><tr data-page-node-id="oC05WeSjAHJLnuEOAtU9O6"><th data-page-node-id="3gdcgVXNdBQy1mfqGU5viZ">账号 / UID</th><th data-page-node-id="NDIDT4jxIoAygW0YYtphDr">调用次数</th><th data-page-node-id="cyXhGSlceIYfzf3v9KOV0s">⬆ 上行</th><th data-page-node-id="q415up2">⬇ 下行</th><th data-page-node-id="q415bar">占比</th></tr></thead><tbody data-page-node-id="oubnvtlfRLjy8x1sJLRLjI"></tbody></table></div>
     </div>
   <!-- #435(c) 一户一行表：激活码 → 账号 → 设备 -->
