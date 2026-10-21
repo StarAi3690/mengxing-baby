@@ -1388,7 +1388,9 @@ async function loadIntent(){
         + '<td>' + goodsEsc(w.price || '—') + (w.priceType ? ' <span class="hint" style="margin:0">' + goodsEsc(w.priceType) + '</span>' : '') + '</td>'
         + '<td>' + goodsEsc(w.tag || '—') + '</td>'
         + '<td>' + goodsEsc(w.src || '—') + '</td>'
-        + '<td>' + (String(w.src||'') === '快照' ? '<span class="sub">—</span>' : '<button class="ico del" title="删除此条" onclick="intentDel(\'' + goodsEsc(w.id||'') + '\')">✕</button>') + '</td></tr>';
+        /* [INTENTSNAPUI539] 只有「上报」来源可删；「快照」「周快照」等回灌记录的源数据在用户云快照中，
+           后端 intentDel 对 s: 前缀拒删 → 不渲染按钮，避免用户点了必报错。未来新增回灌来源默认不可删。 */
+        + '<td>' + (String(w.src||'') === '上报' ? '<button class="ico del" title="删除此条" onclick="intentDel(\'' + goodsEsc(w.id||'') + '\')">✕</button>' : '<span class="sub" title="回灌记录：源数据在用户云快照中，不可单独删除">—</span>') + '</td></tr>';
     }).join('') : '<tr><td colspan="9" class="sub">暂无明细</td></tr>';
   } catch(e){
     ub.innerHTML = '<tr><td colspan="6" style="color:#c33">读取异常：' + goodsEsc(String(e&&e.message||e)) + '</td></tr>';
