@@ -27788,7 +27788,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   #mx-vip-banner .mx-vip-close:hover{background:rgba(0,0,0,.34)}
   #mx-vip-banner.warn{background:#fff7d6;color:#8a6d00;border-bottom:1px solid #f0e2a0}
   #mx-vip-banner.over{background:#ff5a5f;color:#fff}
-  .mx-modal-mask{position:fixed;inset:0;z-index:99995;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  /* [GATEZ539] 原 99995 低于激活遮罩 #mx-gate(99999) → 弹窗被盖住、按钮点不到，用户表现为「激活后页面卡着没反应」；抬高到 100002（高于 gate 与 lock） */
+  .mx-modal-mask{position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
   .mx-modal{background:#fff;border-radius:18px;max-width:440px;width:calc(100% - 48px);padding:26px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 </style>
 <script>/* ==========================================================
@@ -28252,7 +28253,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     if (/\.example\.com/.test(vipUrl)) vipUrl = ''; /* [WLIB531] 占位符不显示按钮，避免死链 */
     var g = document.createElement('div');
     g.id = 'mx-lock';
-    g.style.cssText = 'position:fixed;inset:0;z-index:100000;background:linear-gradient(160deg,#fdf6ec,#fdeef0);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100001;background:linear-gradient(160deg,#fdf6ec,#fdeef0);display:flex;align-items:center;justify-content:center;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;';
     g.innerHTML =
       '<div style="background:#fff;border-radius:22px;box-shadow:0 18px 60px rgba(157,63,63,.18);max-width:440px;width:calc(100% - 48px);padding:34px 30px;text-align:center;margin:auto">' +
         '<div style="font-size:52px">🔒</div>' +
@@ -29077,7 +29078,20 @@ function downloadResourceFromCloud(resId) {
     mask.className = 'mx-modal-mask';
     mask.innerHTML = '<div class="mx-modal">' + html + '</div>';
     document.body.appendChild(mask);
-    mask.close = function () { if (mask.parentNode) mask.parentNode.removeChild(mask); };
+    /* [GATEZ539] 兜底：全屏遮罩(#mx-gate / #mx-lock)会拦截 pointer events，
+       导致本弹窗的按钮点不到（用户表现为「激活后卡着没反应」）。
+       弹窗打开期间把它们的 pointer-events 关掉，关闭时恢复。 */
+    var _peers = [];
+    try {
+      ['mx-gate', 'mx-lock'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { _peers.push({ el: el, pe: el.style.pointerEvents }); el.style.pointerEvents = 'none'; }
+      });
+    } catch (e) {}
+    mask.close = function () {
+      try { _peers.forEach(function (p) { p.el.style.pointerEvents = p.pe; }); } catch (e2) {}
+      if (mask.parentNode) mask.parentNode.removeChild(mask);
+    };
     return mask;
   }
   var PURCHASE_URL = (cloudConf() && cloudConf().purchaseUrl) || 'https://your-purchase-link.example.com';
