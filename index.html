@@ -28098,10 +28098,17 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       msg.textContent = '';
       if (!/^[!-~]{16,}$/.test(code)) { msg.textContent = '请输入有效的卡密'; return; }
       btn.disabled = true; btn.textContent = '校验中…';
+      /* [ACTREDLINE539] EVENT_POINT_SUBMIT */
+      mxActReport('submit', 'pending', { code: code });
       redeem(code, deviceId()).then(function (res) {
         btn.disabled = false; btn.textContent = '立即激活';
         if (!res || !res.ok) {
           msg.textContent = (res && res.msg) || '激活失败，请重试';
+          /* [ACTREDLINE539] EVENT_POINT_REJECT */
+          mxActReport('reject', (res && res.already_bound) ? 'already_bound' : 'rejected', {
+            code: code, err: (res && res.msg) || '', vip: (res && res.vip) || 0,
+            validDays: (res && res.valid_days) || 0, expireAt: (res && res.expire_at) || ''
+          });
           if (res && res.already_bound) {
             // ★ P1-L1：普通码 + 同设备 → 直接重激活恢复本机数据（清缓存也能识别本机，不提示联系客服）
             if (res.same_device && !res.vip) {
@@ -28110,6 +28117,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
               mxWriteVipInfo({ vip: 0, vip_level: '1', expire_at: (res && res.expire_at) ? String(res.expire_at) : '' });
               lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
               mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种 */
+              /* [ACTREDLINE539] EVENT_POINT_RECOVER */
+              mxActReport('recover', 'recover', {
+                code: code, vip: (res && res.vip) || 0, validDays: (res && res.valid_days) || 0,
+                expireAt: (res && res.expire_at) || ''
+              });
               showLocalModePopup(function () { enterApp(false, '✅ 本机已识别，已自动恢复激活状态'); });
               return;
             }
@@ -28130,6 +28142,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         lsSet('mengxing_expire_at', (res && res.expire_at) ? String(res.expire_at) : '');
         mxSetCardKind(res.valid_days); /* [LOCK480] 回填卡种（formal=到期不锁站） */
         mxWriteVipInfo({ vip: res.vip ? 1 : 0, vip_level: res.vip_level || '1', expire_at: res.expire_at || '' });
+        /* [ACTREDLINE539] EVENT_POINT_SUCCESS */
+        mxActReport('success', 'ok', {
+          code: code, vip: res.vip || 0, validDays: res.valid_days || 0, expireAt: res.expire_at || ''
+        });
         if (res.vip) showVipRegister(code, function () { enterApp(true, '✅ VIP 激活成功，欢迎使用萌星宝宝！'); showManualHintOnce(); });
         else showLocalModePopup(function () { enterApp(false, '✅ 激活成功，欢迎使用萌星宝宝！'); showManualHintOnce(); });
       });
@@ -28504,6 +28520,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if (/404|Failed to fetch|NetworkError|load failed/i.test(msg) && i + 1 < urls.length) {
           return tryUrl(i + 1);
         }
+        /* [ACTREDLINE539] EVENT_POINT_NETFAIL */
+        try { mxActReport('netfail', 'netfail', { err: msg }); } catch (e) {}
         return { ok: false, msg: '网络请求失败：' + msg };
       });
     }
@@ -29092,11 +29110,52 @@ function downloadResourceFromCloud(resId) {
       try { _peers.forEach(function (p) { p.el.style.pointerEvents = p.pe; }); } catch (e2) {}
       if (mask.parentNode) mask.parentNode.removeChild(mask);
     };
+    /* [ACTREDLINE539] 可点性自动探针：弹窗出现 1.2s 后检查自身是否被别的遮罩压住
+       （elementFromPoint 命中自身才算可见可点）。被压住 = 用户点不到 = 「激活后卡死」。
+       这是 GATEZ539 那类 z-index 倒挂问题的**自动发现**手段。 */
+    try {
+      setTimeout(function () {
+        try {
+          if (!mask.parentNode) return;
+          var btn = mask.querySelector('button');
+          if (!btn) return;
+          var br = btn.getBoundingClientRect();
+          if (!br.width || !br.height) return;
+          var el = document.elementFromPoint(br.left + br.width / 2, br.top + br.height / 2);
+          if (el && !mask.contains(el)) {
+            if (typeof window.mxActReport === 'function') {
+              window.mxActReport('stuck', 'stuck', {
+                err: 'popup blocked, hit=' + (el.id || el.className || el.tagName)
+              });
+            }
+          }
+        } catch (e) {}
+      }, 1200);
+    } catch (e3) {}
     return mask;
   }
   var PURCHASE_URL = (cloudConf() && cloudConf().purchaseUrl) || 'https://your-purchase-link.example.com';
 
   /* 场景A：本地模式弹窗 */
+  /* [ACTREDLINE539] 激活红线埋点：激活链路每个关键节点上报云端，
+     后台「🚨 激活红线」页签实时可见 —— 目的：激活不了能被**自动发现**，不等用户投诉。
+     失败绝不阻塞主流程。 */
+  function mxActReport(stage, result, extra) {
+    try {
+      if (typeof window.mxApiProxy !== 'function') return;
+      var e = extra || {};
+      window.mxApiProxy('logSecurityEvent', {
+        type: 'EVENT', module: 'ACT:' + String(stage || ''),
+        stage: String(stage || ''), result: String(result || ''),
+        err: String(e.err || ''), code: String(e.code || ''),
+        vip: e.vip || 0, validDays: e.validDays || 0, expireAt: e.expireAt || '',
+        deviceId: (typeof window.deviceId === 'function') ? (window.deviceId() || '') : '',
+        uid: window.__mx_uid__ || '',
+        ua: (navigator && navigator.userAgent) ? navigator.userAgent : ''
+      }).catch(function () {});
+    } catch (e2) {}
+  }
+
   function showLocalModePopup(next) {
     var m = modal(
       '<div style="font-size:46px">📱</div>' +
