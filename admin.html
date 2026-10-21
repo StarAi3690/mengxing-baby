@@ -41,9 +41,13 @@
   .hint{font-size:12px;color:var(--sub);margin-top:6px}
   /* 商品配置表格化编辑器（#433） */
   .gt{min-width:700px}
-  .gt#gtMall{min-width:1620px}
-  /* WLIB532-fix：表格变宽后，操作列吸右固定，横向滑动时始终可点 */
-  .gt#gtMall th:last-child,.gt#gtMall td:last-child{position:sticky;right:0;background:#fff;z-index:2;box-shadow:-7px 0 9px -7px rgba(40,70,140,.28)}
+  .gt#gtMall{min-width:700px}
+  /* [WLIB533] 高级配置折叠行：链接 / 复制按钮文案 / 可复制内容（点 ⚙️ 展开，主表不再需要横向滚动） */
+  .gt .gt-sub td{background:#f6f9ff;border-top:1px dashed var(--line);padding:10px 12px}
+  .gt .gt-subgrid{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .gt .gt-subf{display:flex;flex-direction:column;gap:4px;flex:0 1 210px;min-width:170px}
+  .gt .gt-subf.grow{flex:1 1 320px}
+  .gt .gt-subf>label{font-size:11.5px;color:var(--sub);font-weight:600}
   .gt th,.gt td{padding:5px 5px;vertical-align:middle}
   .gt th{font-size:12px}
   .gt input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;width:100%}
@@ -292,10 +296,10 @@
         </span>
       </div>
       <div class="sub" style="margin:4px 0 8px">直接在表格里改，改完点最下方「发布」生效。<b>价格</b>写成 <code>¥199</code> 这样；<b>VIP价</b>、<b>链接</b>留空即不展示。<br>
-        <b>分类</b>：孩子端「萌星好物」顶部按此筛选（下拉可选 7 个预设分类，也可自定义；与前端筛选标签一致）。<b>复制按钮文案 / 可复制内容</b>：填了「可复制内容」的孩子端商品卡会出现一个复制按钮（文案取「复制按钮文案」，留空默认「复制」），点一下即复制该内容（如购买链接）。<b>留空 = 不可复制</b>（默认保持防盗）。<br>
-        <span style="color:#c26a00">👉 表格较宽，可<b>左右滑动</b>查看后面的「链接 / 复制按钮文案 / 可复制内容」列；最右侧「操作」列已固定，滑动时照样能点。</span></div>
+        <b>标签</b>：孩子端「萌星好物」顶部按此筛选（下拉可选 7 个预设标签，也可以自己写）。<b>链接 / 复制按钮文案 / 可复制内容</b> 已收进每行最右侧的 <b>⚙️</b>，点一下展开即可修改，再点收起。<br>
+        <span style="color:#c26a00">👉 复制玩法：只有「可复制内容」填了东西，孩子端那张商品卡才会出现复制按钮（文案取「复制按钮文案」，留空默认「复制」），点一下即复制（如淘宝口令 / 购买链接）；<b>留空 = 不可复制</b>（默认保持 F12 / 右键防盗）。</span></div>
       <div class="scroll"><table class="gt" id="gtMall"><thead id="gtMallHead"></thead><tbody id="gtMallBody"></tbody></table></div>
-      <datalist id="mallCatList">
+      <datalist id="mallTagList">
         <option value="双十一特惠"></option>
         <option value="绘本等虚拟资源"></option>
         <option value="食品用品类"></option>
@@ -1042,12 +1046,12 @@ const DEFAULT_SHOP_GOODS = [
   {id:'toy_pack', name:'实物周边兑换券', emoji:'🎁', cost:500, tag:'实物', desc:'兑换萌星周边实体礼包（包邮）'}
 ];
 const DEFAULT_MALL_PRODUCTS = [
-  {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'硬件', cat:'明星爆款特惠', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
-  {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'礼盒', cat:'绘本教具类', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
-  {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'教具', cat:'绘本教具类', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
-  {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'会员', cat:'萌星会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
-  {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', cat:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
-  {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', cat:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
+  {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'明星爆款特惠', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
+  {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'绘本教具类', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
+  {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'绘本教具类', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
+  {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'萌星会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
+  {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
+  {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
 ];
 /* ===== #433 商品配置：表格化编辑器 =====
    表格是唯一编辑入口；底部 JSON textarea 与表格双向同步（高级/批量用）。 */
@@ -1065,16 +1069,16 @@ const GOODS_FIELDS = {
   ],
   mall: [
     {k:'id',      t:'id',    cls:'c-id',  w:'74px',  ph:'p1'},
-    {k:'name',    t:'名称',  cls:'',      w:'120px', ph:'萌星点读笔'},
+    {k:'name',    t:'名称',  cls:'',      w:'100px', ph:'萌星点读笔'},
     {k:'emoji',   t:'图标',  cls:'c-emo', w:'52px',  ph:'🖊️'},
     {k:'price',   t:'价格',  cls:'c-num', w:'78px',  ph:'¥199'},
     {k:'vipPrice',t:'VIP价', cls:'c-num', w:'78px',  ph:'¥169'},
-    {k:'tag',     t:'标签',  cls:'',      w:'72px',  ph:'硬件'},
-    {k:'cat',     t:'分类',  cls:'',      w:'128px', ph:'绘本教具类', list:'mallCatList'},
-    {k:'desc',    t:'说明',  cls:'',      w:'260px', ph:'描述', ta:2},
-    {k:'url',     t:'链接',  cls:'c-id',  w:'150px', ph:'https://...'},
-    {k:'copyLabel',t:'复制按钮文案', cls:'', w:'110px', ph:'复制购买链接'},
-    {k:'copy',    t:'可复制内容', cls:'c-id', w:'240px', ph:'留空=不可复制', ta:2}
+    {k:'tag',     t:'标签',  cls:'',      w:'106px', ph:'绘本教具类', list:'mallTagList'},
+    {k:'desc',    t:'说明',  cls:'',      w:'',      ph:'描述', ta:2},
+    /* ↓ [WLIB533] 这 3 项折叠在每行最右「⚙️」里，主表不再横向溢出 */
+    {k:'url',     t:'链接',  cls:'c-id',  w:'', ph:'https://...', sub:true},
+    {k:'copyLabel',t:'复制按钮文案', cls:'', w:'', ph:'复制购买链接', sub:true},
+    {k:'copy',    t:'可复制内容', cls:'c-id', w:'', ph:'留空=不可复制', ta:2, sub:true}
   ]
 };
 /* [#442] 权益类型白名单（与孩子端 index.html GRANT_KINDS 对齐；此处仅用于发布前提示） */
@@ -1095,40 +1099,73 @@ function goodsIds(which){
   return which==='shop' ? {head:'gtShopHead', body:'gtShopBody', cnt:'gtShopCount', json:'goodsShop'}
                         : {head:'gtMallHead', body:'gtMallBody', cnt:'gtMallCount', json:'goodsMall'};
 }
+/* [WLIB533] 单元格渲染（主表与折叠行共用） */
+function gtFieldHtml(which, i, f, o){
+  const v = (o[f.k]==null) ? '' : String(o[f.k]);
+  const onin = 'oninput="goodsSet(\''+which+'\','+i+',\''+f.k+'\',this.value)"';
+  if (f.ta) {
+    return '<textarea rows="'+f.ta+'" placeholder="'+goodsEsc(f.ph||'')+'" '+onin+'>'+goodsEsc(v)+'</textarea>';
+  }
+  return '<input '+(f.num?'type="number" min="1" step="1" ':'type="text" ')
+    + (f.list?'list="'+f.list+'" ':'')
+    + 'value="'+goodsEsc(v)+'" placeholder="'+goodsEsc(f.ph||'')+'" '
+    + (v?'title="'+goodsEsc(v)+'" ':'')
+    + onin + '>';
+}
+/* [WLIB533] 高级配置（链接 / 复制按钮文案 / 可复制内容）展开状态 */
+var _gtOpen = {};
+function gtToggleSub(which, i){
+  var row = document.getElementById('gt-sub-'+which+'-'+i);
+  if (!row) return;
+  var opened = (row.style.display !== 'none');
+  row.style.display = opened ? 'none' : '';
+  _gtOpen[which+':'+i] = !opened;
+}
+function gtOpenAll(which, on){
+  GOODS[which].forEach(function(o,i){ _gtOpen[which+':'+i] = !!on; });
+  goodsRender(which);
+}
 function goodsRender(which){
   const ids = goodsIds(which), fields = GOODS_FIELDS[which];
+  const mains = fields.filter(function(f){ return !f.sub; });
+  const subs  = fields.filter(function(f){ return f.sub; });
+  const cols  = mains.length + 2;
   const head = $(ids.head), body = $(ids.body);
   if (!head || !body) return;
   head.innerHTML = '<tr><th style="width:28px">#</th>'
-    + fields.map(function(f){ return '<th'+(f.w?' style="width:'+f.w+'"':'')+'>'+f.t+'</th>'; }).join('')
-    + '<th style="width:96px">操作</th></tr>';
+    + mains.map(function(f){ return '<th'+(f.w?' style="width:'+f.w+'"':'')+'>'+f.t+'</th>'; }).join('')
+    + '<th style="width:'+(subs.length?150:96)+'px">操作</th></tr>';
   const arr = GOODS[which];
   if (!arr.length){
-    body.innerHTML = '<tr><td colspan="'+(fields.length+2)+'" style="padding:12px;color:#9aa">暂无商品，点「＋ 新增一行」添加</td></tr>';
+    body.innerHTML = '<tr><td colspan="'+cols+'" style="padding:12px;color:#9aa">暂无商品，点「＋ 新增一行」添加</td></tr>';
   } else {
     body.innerHTML = arr.map(function(o,i){
-      return '<tr'+((o.on===false)?' style="opacity:.55"':'')+'><td style="color:#9aa">'+(i+1)+'</td>'
-        + fields.map(function(f){
-            const v = (o[f.k]==null) ? '' : String(o[f.k]);
-            const onin = 'oninput="goodsSet(\''+which+'\','+i+',\''+f.k+'\',this.value)"';
-            if (f.ta) {
-              return '<td class="'+f.cls+'"><textarea rows="'+f.ta+'" placeholder="'+goodsEsc(f.ph||'')+'" '
-                + onin + '>' + goodsEsc(v) + '</textarea></td>';
-            }
-            return '<td class="'+f.cls+'"><input '+(f.num?'type="number" min="1" step="1" ':'type="text" ')
-              + (f.list?'list="'+f.list+'" ':'')
-              + 'value="'+goodsEsc(v)+'" placeholder="'+goodsEsc(f.ph||'')+'" '
-              + (v?'title="'+goodsEsc(v)+'" ':'')
-              + onin + '></td>';
+      const opened = !!_gtOpen[which+':'+i];
+      let h = '<tr'+((o.on===false)?' style="opacity:.55"':'')+'><td style="color:#9aa">'+(i+1)+'</td>'
+        + mains.map(function(f){
+            return '<td class="'+f.cls+'">'+gtFieldHtml(which,i,f,o)+'</td>';
           }).join('')
-        + '<td style="white-space:nowrap">'
-        + '<button class="ico" title="'+((o.on!==false)?'点击下架（孩子端不再展示）':'点击上架')+'" '
+        + '<td style="white-space:nowrap">';
+      if (subs.length){
+        h += '<button class="ico" title="展开 / 收起：链接 · 复制配置" onclick="gtToggleSub(\''+which+'\','+i+')">⚙️</button>';
+      }
+      h += '<button class="ico" title="'+((o.on!==false)?'点击下架（孩子端不再展示）':'点击上架')+'" '
           +'style="'+((o.on!==false)?'':'opacity:.45')+'" '
           +'onclick="goodsToggle(\''+which+'\','+i+')">'+((o.on!==false)?'🟢':'⚪')+'</button>'
         + '<button class="ico" title="上移" onclick="goodsMove(\''+which+'\','+i+',-1)">↑</button>'
         + '<button class="ico" title="下移" onclick="goodsMove(\''+which+'\','+i+',1)">↓</button>'
         + '<button class="ico del" title="删除此行" onclick="goodsDel(\''+which+'\','+i+')">✕</button>'
         + '</td></tr>';
+      if (subs.length){
+        h += '<tr class="gt-sub" id="gt-sub-'+which+'-'+i+'"'+(opened?'':' style="display:none"')+'>'
+          + '<td colspan="'+cols+'"><div class="gt-subgrid">'
+          + subs.map(function(f){
+              const grow = (f.ta || f.k==='copy') ? ' grow' : '';
+              return '<div class="gt-subf'+grow+(f.cls?' '+f.cls:'')+'"><label>'+f.t+'</label>'+gtFieldHtml(which,i,f,o)+'</div>';
+            }).join('')
+          + '</div></td></tr>';
+      }
+      return h;
     }).join('');
   }
   const c = $(ids.cnt); if (c) c.textContent = arr.length;
@@ -1168,6 +1205,7 @@ function goodsAdd(which){
   if (which==='shop'){ o.id='new_'+(GOODS.shop.length+1); o.name='新商品'; o.emoji='🎁'; o.cost=10; }
   else { o.id='p'+(GOODS.mall.length+1); o.name='新商品'; o.emoji='🎁'; o.price='¥0'; }
   GOODS[which].push(o);
+  _gtOpen = {};
   goodsRender(which); goodsSyncJson(which, true);
   setMsg('goodsMsg','已新增一行，改完点「发布」生效','warn');
 }
@@ -1175,6 +1213,7 @@ function goodsDel(which, i){
   const o = GOODS[which][i]; if (!o) return;
   if (!confirm('确认删除「'+(o.name||o.id||('第'+(i+1)+'行'))+'」？点「发布」后才真正下架。')) return;
   GOODS[which].splice(i,1);
+  _gtOpen = {};
   goodsRender(which); goodsSyncJson(which, true);
   setMsg('goodsMsg','已删除一行，点「发布」生效','warn');
 }
@@ -1182,12 +1221,13 @@ function goodsMove(which, i, d){
   const arr = GOODS[which], j = i + d;
   if (j < 0 || j >= arr.length) return;
   const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  _gtOpen = {};
   goodsRender(which); goodsSyncJson(which, true);
 }
 /* 出参前清洗：必填校验 + 空的可选字段直接删键（保持与旧数据同构） */
 function goodsBuild(which){
   const errs = [], out = [], seen = {};
-  const optStr = which==='shop' ? ['emoji','tag','desc','grant','url'] : ['emoji','vipPrice','tag','desc','url'];
+  const optStr = which==='shop' ? ['emoji','tag','desc','grant','url'] : ['emoji','vipPrice','tag','desc','url','copyLabel','copy'];
   GOODS[which].forEach(function(o,i){
     const label = (which==='shop'?'积分商品 ':'好物 ')+'第'+(i+1)+'行';
     const rec = {};

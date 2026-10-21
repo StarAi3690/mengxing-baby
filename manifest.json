@@ -1,6 +1,6 @@
 {
-  "name": "萌星宝宝·幼小衔接",
-  "short_name": "萌星宝宝",
+  "name": "萌星宝宝学习乐园",
+  "short_name": "萌星宝宝学习乐园",
   "description": "游戏化儿童学习工作台：拼音、识字、古诗、英语、数学、熏听磨耳朵一站式启蒙",
   "start_url": "./index.html",
   "scope": "./",

@@ -44,9 +44,25 @@
 
   <meta name="apple-mobile-web-app-status-bar-style" content="default" data-page-node-id="ZK84lmIIpZs5fR1qfsNspD">
 
-  <meta name="description" content="萌星宝宝·幼小衔接 — 游戏化儿童学习工作台" data-page-node-id="FnZDTpRXdX5bG95H1jI3ZV">
+  <!-- [WLIB533] 收藏夹 / 桌面快捷方式显示名固定为「萌星宝宝学习乐园」 -->
+  <meta name="application-name" content="萌星宝宝学习乐园">
+  <meta name="apple-mobile-web-app-title" content="萌星宝宝学习乐园">
 
-  <title>萌星宝宝·幼小衔接</title>
+  <meta name="description" content="萌星宝宝学习乐园 — 游戏化儿童学习工作台" data-page-node-id="FnZDTpRXdX5bG95H1jI3ZV">
+
+  <title>萌星宝宝学习乐园</title>
+  <script>
+    /* [WLIB533] 锁定页面标题：浏览器「添加到收藏夹 / 快捷方式」取的就是 document.title，
+       之前出现过被显示成某个模块名（如「闯关」）的情况，这里统一钉死。 */
+    (function(){
+      var TITLE = '萌星宝宝学习乐园';
+      function fix(){ try{ if(document.title !== TITLE) document.title = TITLE; }catch(e){} }
+      fix();
+      document.addEventListener('DOMContentLoaded', fix);
+      window.addEventListener('hashchange', fix);
+      window.addEventListener('load', fix);
+    })();
+  </script>
 
 
 
@@ -24938,19 +24954,19 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* ---------- 数据：外部电商商城 ---------- */
   var MALL_PRODUCTS=[
-    {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'硬件', cat:'明星爆款特惠', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
-    {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'礼盒', cat:'绘本教具类', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
-    {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'教具', cat:'绘本教具类', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
-    {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'会员', cat:'萌星会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
-    {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'周边', cat:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
-    {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'硬件', cat:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
+    {id:'p1', name:'萌星点读笔', emoji:'🖊️', price:'¥199', vipPrice:'¥169', tag:'明星爆款特惠', desc:'配套点读包，即点即读', url:'https://www.taobao.com/'},
+    {id:'p2', name:'幼小衔接大礼盒', emoji:'📦', price:'¥299', vipPrice:'¥259', tag:'绘本教具类', desc:'绘本+练习册+识字卡全套', url:'https://www.taobao.com/'},
+    {id:'p3', name:'拼音识字挂图', emoji:'🗺️', price:'¥49', tag:'绘本教具类', desc:'墙面贴图，随时随地认', url:'https://www.jd.com/'},
+    {id:'p4', name:'启蒙会员年卡', emoji:'👑', price:'¥365', vipPrice:'¥299', tag:'萌星会员', desc:'全平台VIP内容一年畅学', url:'https://www.taobao.com/'},
+    {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
+    {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
   ];
-  /* [WLIB532] 萌星好物分类（标签筛选，默认 7 类） */
-  var MALL_CATS=[
+  /* [WLIB533] 萌星好物标签：与后台「标签」列同一个字段，以下 7 个为预设提示（有商品命中才出现在筛选中） */
+  var MALL_TAGS=[
     '双十一特惠','绘本等虚拟资源','食品用品类','绘本教具类','服饰配饰类','萌星会员','明星爆款特惠'
   ];
-  /* [WLIB532] 萌星好物筛选状态（搜索关键词 + 分类） */
-  var _mallFilter = { kw:'', cat:'' };
+  /* [WLIB532] 萌星好物筛选状态（搜索关键词 + 标签） */
+  var _mallFilter = { kw:'', tag:'' };
 
   /* ---------- 图鉴卡册已知角色目录（进度与锁定槽用） ---------- */
   var ALBUM_THEMES=[
@@ -25111,6 +25127,16 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     });
   }
 
+  /* [WLIB533] 标签筛选列表：7 个预设标签中"有商品命中"的 + 商品上自定义的其它标签（保证不出现空分类） */
+  function mxMallTagList(){
+    var prods = MX_MALL_PRODUCTS() || [];
+    var used = {};
+    prods.forEach(function(p){ var t = String((p&&p.tag)||'').trim(); if(t) used[t]=1; });
+    var out = MALL_TAGS.filter(function(t){ return used[t]; });
+    Object.keys(used).forEach(function(t){ if(out.indexOf(t)<0) out.push(t); });
+    return out;
+  }
+
   /* ============ 渲染：外部电商商城 ============ */
   function renderMall(){
     var page=document.getElementById('page-mall'); if(!page) return;
@@ -25118,8 +25144,10 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       DB.getAll('virtualOrders').then(function(all){
         var orders=(all||[]).filter(function(o){return o&&o.kind==='mall'&&o.cid===cid;});
         var isVip=!!(window.isVip && window.isVip());
-        var chips='<button type="button" class="mx-chip'+(_mallFilter.cat===''?' on':'')+'" data-cat="">全部</button>'
-          + MALL_CATS.map(function(c){ return '<button type="button" class="mx-chip'+(_mallFilter.cat===c?' on':'')+'" data-cat="'+esc(c)+'">'+esc(c)+'</button>'; }).join('');
+        var tags=mxMallTagList();
+        if(_mallFilter.tag && tags.indexOf(_mallFilter.tag)<0) _mallFilter.tag='';
+        var chips='<button type="button" class="mx-chip'+(_mallFilter.tag===''?' on':'')+'" data-tag="">全部</button>'
+          + tags.map(function(c){ return '<button type="button" class="mx-chip'+(_mallFilter.tag===c?' on':'')+'" data-tag="'+esc(c)+'">'+esc(c)+'</button>'; }).join('');
         page.innerHTML='<div class="content-section-title">🏪 萌星好物推荐 <span class="sub">精选启蒙好物 · '+(isVip?'VIP专享折扣已自动应用':'开通VIP享部分商品专属折扣')+'</span></div>'
           + '<div class="mx-balance-bar">🛒 我的意向订单：<b>'+orders.length+'</b> 笔 &nbsp;<span class="sub">点击「去购买」将记录意向并跳转官方商城</span></div>'
           + '<div class="mx-mall-toolbar">'
@@ -25131,7 +25159,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         var searchEl=page.querySelector('#mx-mall-search');
         if(searchEl) searchEl.oninput=function(){ _mallFilter.kw=this.value.trim(); mxMallRenderList(cid,isVip); };
         page.querySelectorAll('.mx-chip').forEach(function(b){
-          b.onclick=function(){ _mallFilter.cat=this.getAttribute('data-cat')||''; page.querySelectorAll('.mx-chip').forEach(function(x){x.classList.toggle('on', x===b);}); mxMallRenderList(cid,isVip); };
+          b.onclick=function(){ _mallFilter.tag=this.getAttribute('data-tag')||''; page.querySelectorAll('.mx-chip').forEach(function(x){x.classList.toggle('on', x===b);}); mxMallRenderList(cid,isVip); };
         });
         mxMallRenderList(cid,isVip);
       }).catch(function(){ page.innerHTML='<div class="empty-tip">加载失败</div>'; });
@@ -25143,7 +25171,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     var listEl=document.getElementById('mx-mall-list'); if(!listEl) return;
     var kw=_mallFilter.kw.toLowerCase();
     var list=MX_MALL_PRODUCTS().filter(function(p){
-      if(_mallFilter.cat && p.cat!==_mallFilter.cat) return false;
+      if(_mallFilter.tag && String(p.tag||'').trim()!==_mallFilter.tag) return false;
       if(kw){ var hay=(p.name+' '+(p.desc||'')+' '+(p.tag||'')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
       return true;
     });
@@ -25154,8 +25182,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           + '<div class="sub" style="margin-bottom:10px">没找到想要的好物？告诉我们，上架后第一时间通知你～</div>'
           + '<button type="button" class="btn mx-mall-wish" data-kw="'+esc(_mallFilter.kw)+'">📝 没找到？一键提交需求</button>';
       } else {
-        html+='<div style="font-size:15px;margin-bottom:6px">该分类暂时没有好物</div>'
-          + '<div class="sub">去其他分类看看吧～</div>';
+        html+='<div style="font-size:15px;margin-bottom:6px">「'+esc(_mallFilter.tag)+'」标签下暂时没有好物</div>'
+          + '<div class="sub">去其他标签看看吧～</div>';
       }
       html+='</div>';
       listEl.innerHTML=html;
