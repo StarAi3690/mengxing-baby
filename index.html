@@ -36185,11 +36185,12 @@ window.MX_SPRITE_COORDS = {
     /* 今日概览条 */
     var active = tasks.filter(function(t){ return t.enabled !== false; });
     var listenToday = active.filter(function(t){ return ENGINE.isListenDay(t, tk); });
+    var tagTxt = !active.length ? '还没有熏听计划'
+      : (listenToday.length ? ('今天有 ' + listenToday.length + ' 个熏听计划') : '今天不安排熏听（休息日）');
+    var tagOn = !!(active.length && listenToday.length);
     html += '<div class="lsx-today-top">'
       + '<div class="lsx-today-date">' + esc(tk) + ' · ' + wkName + '</div>'
-      + '<div class="lsx-today-tag ' + (listenToday.length ? 'on' : 'off') + '">'
-      + (listenToday.length ? ('今天有 ' + listenToday.length + ' 个熏听计划') : '今天不安排熏听（休息日）')
-      + '</div></div>';
+      + '<div class="lsx-today-tag ' + (tagOn ? 'on' : 'off') + '">' + esc(tagTxt) + '</div></div>';
 
     if (!tasks.length || !albums.length) {
       html += guideCard(albums.length, tasks.length);
