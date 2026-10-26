@@ -7710,7 +7710,7 @@ html, body {
 
 const DB_NAME = 'mengxing_baby_db';
 
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 
 
@@ -7771,6 +7771,8 @@ const STORES = {
   costStats: { keyPath: 'key' },         // 成本统计 {key:'cost', totalSizeBytes, totalCostYuan, unitPrice} / {key:'res:xxx', size, costYuan}
 
   seedMeta: { keyPath: 'key' },          // 种子数据导入状态 {key:'seed:poems', importedAt, count} 等
+
+  listenAlbums: { keyPath: 'id' },      // 熏听专辑/播放列表 {id, childId, name, emoji, color, items:[resourceId], createdAt, updatedAt}
 
   syncMeta: { keyPath: 'key' },          // VIP 云同步状态 {key:'vip', lastSyncAt, deviceId}
 
@@ -7862,7 +7864,7 @@ function openDB() {
          → 删除本机该行 / 拒绝写回云端旧行。墓碑 120 天过期，上限 600 条（快照体积可控）。
    注意：同步落地内部的删除走 delRaw（不记墓碑），避免「删除本机旧行」被误标为新删除。 */
 var MX_TOMB_KEY = '__mx_tomb_v1';
-var MX_TOMB_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders', 'resources'];
+var MX_TOMB_STORES = ['listenAlbums', 'children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders', 'resources'];
 var MX_TOMB_TTL = 120 * 24 * 3600 * 1000, MX_TOMB_MAX = 600;
 function _mxTombLoad() { try { return JSON.parse(localStorage.getItem(MX_TOMB_KEY) || '{}') || {}; } catch (e) { return {}; } }
 function _mxTombStore(o) {
@@ -9026,6 +9028,14 @@ async function addScheduleTask(task) {
 
     startDate: task.startDate || (task.mode === 'ebbinghaus' ? formatDateKey(new Date()) : null),
 
+    albumIds: Array.isArray(task.albumIds) ? task.albumIds.slice() : [],
+
+    eb: task.eb || null,
+
+    prog: task.prog || null,
+
+    resourceId: task.resourceId || '',
+
     enabled: task.enabled !== false,
 
     createdAt: Date.now()
@@ -9127,15 +9137,24 @@ async function syncDayFromTasks(childId, dateKey, taskList) {
 
   }).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
-  const items = matched.map((t, seq) => ({
-
-    seq, time: t.time, duration: t.duration, subject: t.subject,
-
-    module: t.module, task: t.name, category: mxCatOf(t.subject, t.category),
-
-    mode: t.mode || 'sequence', done: false, doneAt: null
-
-  }));
+  /* [LISTENALBUM] 挂了专辑（或单曲）的熏听计划：展开成真实曲目，而不是一条占位任务 */
+  const items = [];
+  for (const _t of matched) {
+    const _hasAlb = (Array.isArray(_t.albumIds) && _t.albumIds.length) || _t.resourceId;
+    if (_hasAlb && window.MX_LS_STUDIO && window.MX_LS_STUDIO.expandTaskItems) {
+      let _exp = null;
+      try { _exp = await window.MX_LS_STUDIO.expandTaskItems(_t, childId, dateKey); }
+      catch (e) { console.error('[LS] expandTaskItems failed', _t.id, e); }
+      if (_exp && _exp.length) { _exp.forEach(it => items.push(it)); continue; }
+      if (_exp && !_exp.length) continue;   /* 非熏听日 / 无曲目 → 今天不排这一条 */
+    }
+    items.push({
+      seq: 0, time: _t.time, duration: _t.duration, subject: _t.subject,
+      module: _t.module, task: _t.name, category: mxCatOf(_t.subject, _t.category),
+      mode: _t.mode || 'sequence', done: false, doneAt: null
+    });
+  }
+  items.forEach((it, i) => { it.seq = i; });
 
   // 与已有实例合并（保留已完成状态）
 
@@ -9296,6 +9315,14 @@ async function putResource(res) {
     seed: !!res.seed,
 
     source: res.source || '',                     // [资源中心#358] 导入来源标识（folder-import 等）
+
+    duration: Number(res.duration) || 0,          // [LISTENALBUM] 音频时长(秒)，0=未知
+
+    blobRef: res.blobRef || '',                   // [LISTENALBUM] 视频派生音频：指向源文件 blob
+
+    derivedFrom: res.derivedFrom || '',           // [LISTENALBUM] 派生来源 resourceId
+
+    audioMime: res.audioMime || '',               // [LISTENALBUM] 播放用 mime（视频派生时用 audio/mp4）
 
     createdAt: Date.now()
 
@@ -9819,7 +9846,14 @@ async function saveResourceBlob(resourceId, blob, mediaType) {
 async function getResourceBlob(resourceId) {
   const cacheKey = 'res:' + resourceId;
   const rec = await get('audioCache', cacheKey);
-  if (!rec) return null;
+  if (!rec) {
+    /* [LISTENALBUM] 视频派生音频记录共用源文件 blob（blobRef 指向原生视频记录） */
+    try {
+      const _src = await get('resources', resourceId);
+      if (_src && _src.blobRef && _src.blobRef !== resourceId) return await getResourceBlob(_src.blobRef);
+    } catch (e) {}
+    return null;
+  }
   if (rec.blob) return { blob: rec.blob, type: rec.type };
   if (rec.data) {
     try { return { blob: new Blob([rec.data], { type: rec.type || 'application/octet-stream' }), type: rec.type }; }
@@ -10259,7 +10293,7 @@ window.DB = {
 
         { id: 'lstory',  label: '绘本', icon: '📚', page: 'page-listen-story' },
 
-        { id: 'lschedule', label: '排期', icon: '📆', page: 'page-listen-schedule' }
+        { id: 'lschedule', label: '熏听工坊', icon: '🎧', page: 'page-listen-schedule' }
 
       ]
 
@@ -10691,8 +10725,7 @@ window.DB = {
 
     'page-listen-story':  { title: '熏听·绘本', desc: '睡前故事、绘本音频合集。', icon: '📚', tag: '阶段四实现' },
 
-    'page-listen-schedule':{ title: '熏听·排期', desc: '家长按星期与时间段设定自动播放任务，存入本地排期表。', icon: '📆', tag: '智能工具' },
-
+    'page-listen-schedule':{ title: '熏听工坊', desc: '专辑 → 计划 → 今日自动排好，双曲线艾宾浩斯熏听。', icon: '🎧', tag: '智能工具' },
     'page-daily':    { title: '日常表现', desc: '幼儿自理日常打卡：叠被子、刷鞋、收拾玩具等，完成后奖励积分与成长看板。', icon: '🌟', tag: '已实装' },
 
     'page-games':    { title: '游戏互动', desc: '结合6大主题（PVZ/小马/爱莎/汪汪队/山海经/节奏盒子）的互动小游戏。', icon: '🎮', tag: '阶段四实现' },
@@ -16404,6 +16437,9 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
 
   async function renderListenSchedule() {
 
+    /* [LISTENALBUM] 旧的「周视图+模块排期」整页升级为熏听工坊（今日/专辑/计划三页签） */
+    if (window.MX_LS_STUDIO && window.MX_LS_STUDIO.render) { await window.MX_LS_STUDIO.render(); return; }
+
     const page = document.getElementById('page-listen-schedule');
 
     if (!page) return;
@@ -17025,8 +17061,11 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     }
     var LT = window.MX_LISTEN_TYPES || [];
     body.innerHTML = '<div class="cal-listen-list">' + list.map(function (it) {
-      var tinfo = LT.find(function (x) { return x.id === it.module; }) || { label: it.module || '熏听', color: '#26a69a' };
-      var modeTxt = it.mode === 'ebbinghaus' ? '🔁 艾宾浩斯曲线' : '▶ 顺序播放';
+      /* [LISTENALBUM] LT 里用 module 字段（无 id）；资源侧 key 是 listen-en，排期侧是 lenglish —— 两处都兜住 */
+      var _lsAlias = { 'listen-en': 'lenglish', 'lchinese': 'lchinese', 'lmath': 'lmath', 'lsci': 'lsci', 'lnews': 'lnews', 'lstory': 'lstory' };
+      var _mk = _lsAlias[it.module] || it.module;
+      var tinfo = LT.find(function (x) { return (x.id || x.module) === _mk; }) || { label: it.module || '熏听', color: '#26a69a' };
+      var modeTxt = (it.mode === 'ebbinghaus' || it.mode === 'ebb') ? '🔁 艾宾浩斯曲线' : '▶ 顺序播放';
       var end = mxEndTime(it.time, it.duration);
       return '<label class="cal-task' + (it.done ? ' cal-task-done' : '') + '">' +
         '<input type="checkbox" class="cal-check ls-check" data-pts="' + (it.pts != null ? it.pts : "") + '" data-seq="' + it.seq + '" data-cat="listen"' + (it.done ? ' checked' : '') + '>' +
@@ -25550,6 +25589,23 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         });
         /* [#421-e] 池命中则不再重复上传云端（省存储/流量）；未命中走原 [#417] VIP 自动上云 */
         if (!(_ph && !_ph.soft)) { uploadResourceToCloud(id).catch(function(){}); }
+        /* [LISTENALBUM] 视频导入熏听模块 → 自动派生「音频版」曲目（共用同一 blob，零额外空间）：
+           曲目可进专辑/曲线自动连播（<audio> 只出声不出画面）；原视频记录保留，只能手动点播 */
+        if (cls.mediaType === 'video' && MX_LS_LISTEN_MODS.indexOf(cls.module) >= 0) {
+          try {
+            var _did = id + '__a';
+            await window.DB.putResource({
+              id: _did, module: cls.module, category: cls.category,
+              title: String(file.name).replace(/\.[^.]+$/, '') + ' · 音频版',
+              original_filename: file.name,
+              size: (_upFile && _upFile.size) || file.size,
+              mediaType: 'audio', blobRef: id, derivedFrom: id,
+              duration: undefined, tags: (cls.tags || []).concat(['视频转音频']),
+              source: 'video-derive'
+            });
+            stats[cls.module] = (stats[cls.module]||0)+1;
+          } catch (e) { errors.push(file.name + '：音频版派生失败 ' + (e && e.message || e)); }
+        }
         stats[cls.module] = (stats[cls.module]||0)+1;
       } catch(e) { errors.push(file.name + '：' + (e && e.message || e)); }
       done++;
@@ -25843,7 +25899,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     reg(['熏听-绘本','睡前故事','lstory'], 'lstory');
     return m;
   })();
-  /* [#379] 各模块允许的文件类型白名单（mediaType 级）：熏听仅音频；绘本放行视频口子 */
+  /* [LISTENALBUM] 熏听类模块（视频可入，但只用于派生音频版） */
+  var MX_LS_LISTEN_MODS = ['listen-en','listen-music','lchinese','lmath','lsci','lnews','lstory'];
+  /* [#379] 各模块允许的文件类型白名单（mediaType 级）：熏听类收音频+视频（视频派生音频版）；绘本放行视频口子 */
   var RES_MODULE_TYPES = {
     'poem':        ['audio','pdf','image'],
     'literacy':    ['audio','pdf','image'],
@@ -25855,13 +25913,13 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     'words':       ['audio','pdf','image'],
     'algo':        ['pdf','image','video'],
     'workbook':    ['pdf','image','video'],
-    'listen-en':   ['audio'],
-    'listen-music':['audio'],
-    'lchinese':    ['audio'],
-    'lmath':       ['audio'],
-    'lsci':        ['audio'],
-    'lnews':       ['audio'],
-    'lstory':      ['audio']
+    'listen-en':   ['audio','video'],
+    'listen-music':['audio','video'],
+    'lchinese':    ['audio','video'],
+    'lmath':       ['audio','video'],
+    'lsci':        ['audio','video'],
+    'lnews':       ['audio','video'],
+    'lstory':      ['audio','video']
   };
 
   /* CSV 行导入：链接 → 跳转型资源；本地路径 → 引导用模式一 */
@@ -26391,6 +26449,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           time: time,
           repeat: rpt,
           module: r.module || 'lchinese',
+          resourceId: r.id,
           task: nameTxt
         });
       }).then(function(){
@@ -29534,7 +29593,7 @@ function downloadResourceFromCloud(resId) {
   }
 
   /* ================= VIP 多端同步(服务端云函数，断网降级) ================= */
-  var SYNC_STORES = ['children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders'];
+  var SYNC_STORES = ['listenAlbums', 'children', 'points', 'scheduleTasks', 'words', 'poems', 'cards', 'settings', 'rhythm_members', 'mx_tasksets', 'listen_log', 'dailySchedule', 'daily', 'pet', 'wrongQuestions', 'achievements', 'virtualOrders'];
   /* VIP 家长密码轻量加密上云：以 uid 派生密钥做 XOR 混淆（非强加密，仅避免明文落云） */
   function pinEncKey(uid) {
     var s = String(uid || '') + '::mx_parent_pin_v1';
@@ -35500,5 +35559,1314 @@ window.MX_SPRITE_COORDS = {
     _heartbeat: heartbeat
   };
 })();
+</script>
+<style>
+/* ===== [LISTENALBUM] 熏听工坊样式 ===== */
+/* === 熏听工坊（listen-studio）样式 · 全部 .lsx- 前缀，避免污染全局 === */
+.lsx-wrap{padding:14px 14px 120px;max-width:920px;margin:0 auto;box-sizing:border-box}
+.lsx-head{margin:0 0 10px}
+.lsx-h1{font-size:19px;font-weight:800;color:#1f3a5f;letter-spacing:.3px}
+.lsx-h2{font-size:12px;color:#8a97a8;margin-top:3px}
+.lsx-tabs{display:flex;gap:8px;margin:0 0 14px;background:#f1f5fb;padding:5px;border-radius:12px}
+.lsx-tab{flex:1;border:none;background:transparent;padding:9px 6px;border-radius:9px;font-size:13.5px;font-weight:700;color:#6b7c93;cursor:pointer;transition:.15s}
+.lsx-tab.on{background:#fff;color:#2b6cd4;box-shadow:0 2px 8px rgba(43,108,212,.14)}
+.lsx-body{min-height:120px}
+.lsx-loading{font-size:12.5px;color:#9aa;padding:18px;text-align:center}
+.lsx-empty{font-size:13px;color:#7b8aa0;background:#fff;border:1px dashed #d9e3f2;border-radius:12px;padding:22px 16px;text-align:center;line-height:1.7}
+.lsx-empty.sm{padding:14px 10px;font-size:12.5px}
+.lsx-tip{font-size:11.5px;color:#93a0b1;line-height:1.65;margin-top:12px;padding:10px 12px;background:#f7faff;border-radius:10px}
+
+/* 今日 */
+.lsx-today-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.lsx-today-date{font-size:13px;font-weight:700;color:#33475f}
+.lsx-today-tag{font-size:12px;padding:5px 11px;border-radius:20px;font-weight:700}
+.lsx-today-tag.on{background:#e8f6ec;color:#2e7d32}
+.lsx-today-tag.off{background:#f0f2f5;color:#8a97a8}
+.lsx-card{background:#fff;border-radius:14px;padding:13px 14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(31,58,95,.06);border:1px solid #eef3fa}
+.lsx-card-h{margin-bottom:9px}
+.lsx-card-title{font-size:15px;font-weight:800;color:#1f3a5f;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lsx-card-meta{font-size:11.5px;color:#8a97a8;margin-top:3px}
+.lsx-card-note{font-size:12.5px;color:#a3743a;background:#fff8ec;border-radius:9px;padding:9px 11px;line-height:1.6}
+.lsx-card-ops{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.lsx-q{border-top:1px dashed #e7eef8;padding-top:9px}
+.lsx-q-h{font-size:12px;color:#7b8aa0;margin-bottom:6px}
+.lsx-q-h b{color:#2b6cd4}
+.lsx-q-row{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #f5f8fc;font-size:13px}
+.lsx-q-row:last-child{border-bottom:none}
+.lsx-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.lsx-q-t{flex:1;color:#33475f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-q-alb{font-size:10.5px;color:#a9b6c6;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-q-dur{font-size:11px;color:#a9b6c6;font-variant-numeric:tabular-nums}
+.lsx-tag{font-size:10px;padding:2px 6px;border-radius:6px;font-weight:700;white-space:nowrap;flex:0 0 auto}
+.lsx-tag.new{background:#e6f2ff;color:#1f6fd0}
+.lsx-tag.rev{background:#fff1e0;color:#c07a1a}
+.lsx-tag.play{background:#eef1f5;color:#7b8aa0}
+.lsx-tag.off{background:#f0f2f5;color:#8a97a8;font-weight:600}
+.lsx-mini{flex:0 0 auto;width:26px;height:26px;border-radius:8px;border:1px solid #dbe6f5;background:#f7faff;color:#2b6cd4;font-size:12px;cursor:pointer;line-height:1}
+.lsx-mini.danger{color:#d06060;border-color:#f2d8d8;background:#fff7f7}
+.lsx-mini:active{transform:scale(.94)}
+
+/* 按钮 */
+.lsx-btn{border:1px solid #d5e3f7;background:#fff;color:#3a5570;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
+.lsx-btn.sm{font-size:12px;padding:5px 11px;border-radius:9px}
+.lsx-btn.main{border:none;background:linear-gradient(90deg,#4facfe,#3f7ef5);color:#fff;box-shadow:0 3px 10px rgba(63,126,245,.24)}
+.lsx-btn.danger{color:#c85c5c;border-color:#f0d6d6;background:#fff8f8}
+.lsx-btn:active{transform:scale(.98)}
+
+/* 专辑 */
+.lsx-sec-h{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:800;color:#1f3a5f;margin:4px 0 12px}
+.lsx-sec-h .lsx-btn{margin-left:auto}
+.lsx-cnt{background:#eef3fa;color:#5b7ba3;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.lsx-albs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.lsx-alb{background:#fff;border-radius:13px;border:1px solid #eef3fa;box-shadow:0 2px 10px rgba(31,58,95,.05);overflow:hidden}
+.lsx-alb-top{display:flex;align-items:center;gap:9px;padding:11px 12px}
+.lsx-alb-ico{font-size:22px;line-height:1}
+.lsx-alb-info{min-width:0;flex:1}
+.lsx-alb-name{font-size:13.5px;font-weight:800;color:#1f3a5f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-alb-meta{font-size:11px;color:#94a2b5;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-alb-ops{display:flex;gap:6px;padding:0 12px 11px;flex-wrap:wrap}
+
+/* 计划 */
+.lsx-albline{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px}
+.lsx-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#3a5570;background:#f8fbff;border:1px solid #dbe6f5;border-left-width:3px;border-radius:8px;padding:3px 8px}
+.lsx-pill i{font-style:normal;font-size:10px;color:#9aa9bc;background:#fff;border-radius:6px;padding:0 4px}
+.lsx-warn{font-size:12px;color:#c07a1a;background:#fff8ec;border-radius:8px;padding:4px 9px}
+.lsx-week{display:flex;gap:5px;margin:7px 0 2px}
+.lsx-wd{flex:1;text-align:center;font-size:11.5px;font-weight:700;color:#aeb9c7;background:#f5f8fc;border-radius:7px;padding:5px 0}
+.lsx-wd.on{background:#e6f2ff;color:#1f6fd0}
+.lsx-ebline{font-size:11.5px;color:#7b8aa0;margin-top:6px}
+
+/* 引导卡 */
+.lsx-guide{background:#fff;border-radius:14px;padding:16px;border:1px solid #e6effa;box-shadow:0 2px 12px rgba(31,58,95,.06)}
+.lsx-guide-t{font-size:14.5px;font-weight:800;color:#1f3a5f;margin-bottom:10px}
+.lsx-guide-s{font-size:12.5px;color:#63758c;line-height:1.75;margin-bottom:11px;padding-left:2px}
+.lsx-guide-s b{color:#2b6cd4;font-size:13px}
+.lsx-guide-ops{display:flex;gap:9px;margin-top:6px;flex-wrap:wrap}
+
+/* 模态框 */
+.lsx-modal{position:fixed;inset:0;background:rgba(15,35,70,.5);z-index:99996;display:flex;align-items:center;justify-content:center;padding:14px}
+.lsx-modal-box{background:#fff;border-radius:16px;width:min(96vw,560px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(10,30,60,.3)}
+.lsx-modal-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eef3fa;font-size:15px;color:#1f3a5f}
+.lsx-x{cursor:pointer;color:#9aa;font-size:18px;padding:0 4px;line-height:1}
+.lsx-modal-body{padding:14px 16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.lsx-modal-foot{display:flex;gap:9px;justify-content:flex-end;padding:12px 0 2px;border-top:1px solid #f2f6fb;margin-top:14px;align-items:center}
+.lsx-field{margin-bottom:14px}
+.lsx-field>label{display:block;font-size:12.5px;font-weight:700;color:#5b6b80;margin-bottom:6px}
+.lsx-field.row{display:flex;gap:10px}
+.lsx-field.row>div{flex:1}
+.lsx-field input[type=text],.lsx-field input[type=time],.lsx-field input[type=number],.lsx-field input[type=date],.lsx-field input:not([type]),.lsx-search{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #d5e3f7;border-radius:10px;font-size:13.5px;color:#22364d;background:#fbfdff;outline:none}
+.lsx-field input:focus,.lsx-search:focus{border-color:#7fb0f5;background:#fff}
+.lsx-sub{font-size:11.5px;color:#8a97a8;margin:8px 0 5px}
+.lsx-num{width:62px!important;display:inline-block;padding:5px 8px!important}
+.lsx-hint{font-size:11px;color:#9aa9bc;line-height:1.65;margin-top:7px;background:#f7faff;padding:8px 10px;border-radius:8px}
+.lsx-chips{display:flex;gap:6px;flex-wrap:wrap}
+.lsx-chips.wrap{gap:7px}
+.lsx-chip{border:1px solid #dbe6f5;background:#fff;color:#5b6b80;font-size:13px;font-weight:700;padding:7px 11px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.lsx-chip.on{border-color:#3f7ef5;background:#eaf3ff;color:#1f6fd0;box-shadow:0 0 0 1px rgba(63,126,245,.25) inset}
+.lsx-chip.dot{width:26px;height:26px;padding:0;border-radius:50%}
+.lsx-chip.dot.on{outline:3px solid rgba(63,126,245,.35)}
+.lsx-chip i{font-style:normal;font-size:10px;color:#9aa9bc;background:#f2f6fb;border-radius:6px;padding:0 4px}
+.lsx-chip.wd{min-width:38px;justify-content:center;padding:7px 0}
+.lsx-chip.all{padding:7px 12px}
+.lsx-chip.alb{max-width:100%;overflow:hidden}
+.lsx-chip.alb b{background:#3f7ef5;color:#fff;border-radius:50%;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+.lsx-modes{display:flex;flex-direction:column;gap:7px}
+.lsx-mode{text-align:left;border:1px solid #dbe6f5;background:#fff;border-radius:11px;padding:9px 12px;cursor:pointer;display:block}
+.lsx-mode b{display:block;font-size:13.5px;color:#33475f;margin-bottom:2px}
+.lsx-mode i{font-style:normal;font-size:11.5px;color:#8a97a8;line-height:1.5}
+.lsx-mode.on{border-color:#3f7ef5;background:#f4f9ff;box-shadow:0 0 0 1px rgba(63,126,245,.2) inset}
+.lsx-mode.on b{color:#1f6fd0}
+
+/* 曲目编辑行 */
+.lsx-tracks{border:1px solid #eef3fa;border-radius:11px;padding:2px 10px;margin-bottom:8px;max-height:34vh;overflow-y:auto}
+.lsx-tr{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid #f5f8fc;font-size:13px}
+.lsx-tr:last-child{border-bottom:none}
+.lsx-tr-n{width:18px;color:#aeb9c7;font-size:11px;font-weight:700;text-align:center;flex:0 0 auto}
+.lsx-tr-t{flex:1;min-width:0;color:#33475f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-tr-t i{display:block;font-style:normal;font-size:10.5px;color:#a9b6c6;margin-top:2px}
+
+/* 资源多选器 */
+.lsx-pk{border:1px solid #eef3fa;border-radius:11px;max-height:46vh;overflow-y:auto;margin-top:9px;padding:2px 10px}
+.lsx-pk-g{font-size:11px;font-weight:800;color:#94a2b5;padding:9px 0 5px;position:sticky;top:0;background:#fff}
+.lsx-pk-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f5f8fc;font-size:13px;cursor:pointer}
+.lsx-pk-row.on{background:#f7fbff}
+.lsx-pk-row input{width:17px;height:17px;flex:0 0 auto;accent-color:#3f7ef5}
+.lsx-pk-t{flex:1;min-width:0;color:#33475f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-pk-b{font-size:10px;background:#eef6ff;color:#3f7ef5;border-radius:6px;padding:1px 5px;white-space:nowrap}
+.lsx-pk-d{font-size:11px;color:#a9b6c6;font-variant-numeric:tabular-nums}
+.lsx-pk-cnt{margin-right:auto;font-size:12px;color:#8a97a8;font-weight:700}
+
+/* 播放器（底部固定，跨页常驻） */
+.lsx-player{position:fixed;left:0;right:0;bottom:0;z-index:99997;display:none;align-items:center;gap:10px;
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(246,250,255,.99));
+  border-top:1px solid #e2ecf8;box-shadow:0 -6px 22px rgba(20,45,80,.12);
+  padding:9px 14px calc(9px + env(safe-area-inset-bottom,0px)) 14px}
+.lsx-pmain{flex:1;min-width:0}
+.lsx-ptitle{font-size:13.5px;font-weight:800;color:#1f3a5f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-psub{font-size:11px;color:#8a97a8;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-pbar{height:3px;background:#e6eef9;border-radius:3px;margin-top:6px;overflow:hidden}
+.lsx-pbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4facfe,#3f7ef5);transition:width .2s linear}
+.lsx-pctl{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.lsx-ptime{font-size:10.5px;color:#9aa9bc;font-variant-numeric:tabular-nums;margin-right:2px}
+.lsx-pctl button{width:32px;height:32px;border-radius:10px;border:1px solid #dbe6f5;background:#fff;color:#2b6cd4;font-size:14px;cursor:pointer;line-height:1}
+.lsx-pctl button:active{transform:scale(.94)}
+
+@media (max-width:520px){
+  .lsx-wrap{padding:10px 10px 116px}
+  .lsx-albs{grid-template-columns:1fr}
+  .lsx-q-alb{display:none}
+  .lsx-ptime{display:none}
+  .lsx-modal{padding:0;align-items:flex-end}
+  .lsx-modal-box{width:100%;border-radius:16px 16px 0 0;max-height:92vh}
+}
+
+</style>
+<script>
+/* === js/listen-studio.js — 熏听工坊 v2.5.0 ===
+   专辑（播放列表）+ 双层艾宾浩斯 + 今日播放器 + 视频派生音频
+   · 第一层（曲目层）：每首曲目在「新学熏听日」引入 → 其后按 +1/2/4/7/15/30 个熏听日复习
+   · 第二层（天维度）：只有勾选的星期算「熏听日」，曲线在这串熏听日上滑动（没勾的日子自动跳过）
+   数据：listenAlbums（专辑）+ scheduleTasks（计划，扩 albumIds / eb / prog）
+   依赖：DB / showToast / MXPomo / mxApiProxy（均为可选降级）
+*/
+(function(){
+  'use strict';
+
+  /* ================= 常量 ================= */
+  var WD_JS = ['sun','mon','tue','wed','thu','fri','sat'];
+  var WD_ORD = ['mon','tue','wed','thu','fri','sat','sun'];
+  var WD_CN = { mon:'一', tue:'二', wed:'三', thu:'四', fri:'五', sat:'六', sun:'日' };
+  var EBB = [0,1,2,4,7,15,30];
+  var MODE_LABEL = { ebb:'艾宾浩斯曲线', seq:'顺序播放', daily:'每天从头' };
+  var MODE_DESC = {
+    ebb: '每首曲目按记忆曲线自动排复习（推荐，适合曲目多、要反复记）',
+    seq: '按专辑顺序每天往后推进，跨界接续（适合故事连载）',
+    daily: '每天从头把整张专辑播一遍（适合磨耳朵）'
+  };
+  var COLORS = ['#e57373','#64b5f6','#ffb74d','#4db6ac','#ba68c8','#f06292','#9575cd','#81c784'];
+  var EMOJIS = ['🔤','📖','🎵','📕','🧮','🔬','📰','🧸','🎼','🌈'];
+  var MOD_LABEL = {
+    'listen-en':'熏听·英语','listen-music':'熏听·SSS儿歌','lchinese':'熏听·语文','lmath':'熏听·数学',
+    'lsci':'熏听·科普','lnews':'熏听·实事','lstory':'熏听·绘本',
+    'poem':'古诗','literacy':'识字','pinyin':'拼音',
+    'story':'绘本故事','estory':'英语绘本','abc':'26字母','phonics':'自然拼读','words':'单词短语'
+  };
+  var DEFAULT_MIN_SEC = 180; /* 缺时长时按每首 3 分钟估算 */
+
+  /* ================= 小工具 ================= */
+  function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+  function ymd(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+  function todayKey(){
+    try { if (window.DB && window.DB.formatDateKey) return window.DB.formatDateKey(new Date()); } catch(e){}
+    return ymd(new Date());
+  }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function toast(msg){
+    if (window.showToast) { try { window.showToast(msg); return; } catch(e){} }
+    if (window.console) console.log('[LS]', msg);
+  }
+  function fmtDur(sec){
+    sec = Math.max(0, Math.round(Number(sec) || 0));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + pad2(s);
+  }
+  function fmtTotal(sec){
+    var m = Math.round((Number(sec)||0)/60);
+    if (m < 60) return m + ' 分钟';
+    return Math.floor(m/60) + ' 小时' + (m%60 ? ' ' + (m%60) + ' 分' : '');
+  }
+  function addMin(time, mins){
+    var m = /^(\d{1,2}):(\d{2})$/.exec(time || '');
+    if (!m) return time || '';
+    var h = parseInt(m[1],10), mm = parseInt(m[2],10) + (Number(mins)||0);
+    h += Math.floor(mm/60); mm = ((mm%60)+60)%60; h = h % 24;
+    return pad2(h) + ':' + pad2(mm);
+  }
+  async function childId(){
+    try { return (await window.DB.getActiveChildId()) || 'default'; } catch(e){ return 'default'; }
+  }
+
+  /* ================= 排期引擎（纯函数，无 IO） ================= */
+  var ENGINE = {
+    EBB: EBB,
+    /** 该日期是星期几的 key */
+    wdOf: function(key){ return WD_JS[new Date(key + 'T00:00:00').getDay()]; },
+    /** 该日期是否「熏听日」（天维度第一道闸门：没勾的星期直接不播） */
+    isListenDay: function(task, key){
+      var rep = (task && task.repeat) || { daily: true };
+      if (rep.daily) return true;
+      return !!rep[WD_JS[new Date(key + 'T00:00:00').getDay()]];
+    },
+    startKey: function(task){
+      if (task && task.startDate) return task.startDate;
+      var ts = (task && task.createdAt) || Date.now();
+      return ymd(new Date(ts));
+    },
+    /** 从计划开始日到 untilKey 之间的全部「熏听日」序列（天维度第二层就在这里） */
+    sessionDays: function(task, untilKey){
+      var s = this.startKey(task);
+      if (s > untilKey) return [];
+      var out = [], d = new Date(s + 'T00:00:00'), end = new Date(untilKey + 'T00:00:00'), g = 0;
+      while (d <= end && g++ < 1500) {
+        var k = ymd(d);
+        if (this.isListenDay(task, k)) out.push(k);
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    },
+    /** 哪些熏听日是「新课日」 */
+    newDayFlags: function(task, sdays){
+      var wds = (task && task.eb && Array.isArray(task.eb.newDays) && task.eb.newDays.length) ? task.eb.newDays : null;
+      var out = [];
+      for (var i = 0; i < sdays.length; i++) {
+        out.push(!wds || wds.indexOf(this.wdOf(sdays[i])) >= 0);
+      }
+      return out;
+    },
+    /**
+     * 核心：算出「dateKey 这天」要播哪些曲目
+     * 返回 { mode, sdays, todayIdx, ndays, learn, queue:[{t,kind,gap}], total }
+     *   kind: 'new' 新学 / 'rev' 复习 / 'play' 顺序·每天从头
+     */
+    plan: function(task, tracks, dateKey){
+      var n = (tracks || []).length;
+      var mode = (task && task.mode) || 'ebb';
+      var sdays = this.sessionDays(task, dateKey);
+      var todayIdx = -1;
+      if (sdays.length && sdays[sdays.length - 1] === dateKey) todayIdx = sdays.length - 1;
+      var res = { mode: mode, sdays: sdays, todayIdx: todayIdx, ndays: [], learn: [], queue: [], total: n };
+      if (todayIdx < 0 || !n) return res;
+      var per = Math.max(1, Number(task && task.eb && task.eb.newPerDay) || 2);
+
+      if (mode === 'daily') {
+        for (var t0 = 0; t0 < n; t0++) res.queue.push({ t: t0, kind: 'play', gap: 0 });
+        return res;
+      }
+      if (mode === 'seq') {
+        var start = (todayIdx * per) % n;
+        for (var j = 0; j < Math.min(per, n); j++) res.queue.push({ t: (start + j) % n, kind: 'play', gap: 0 });
+        return res;
+      }
+      /* 艾宾浩斯：曲目层曲线 */
+      var flags = this.newDayFlags(task, sdays);
+      var ndays = [];
+      for (var i = 0; i < flags.length; i++) if (flags[i]) ndays.push(i);
+      res.ndays = ndays;
+      var learn = [];
+      for (var q = 0; q < n; q++) {
+        var ndi = Math.floor(q / per);
+        learn[q] = ndi < ndays.length ? ndays[ndi] : -1;
+      }
+      res.learn = learn;
+      for (var a = 0; a < n; a++) if (learn[a] === todayIdx) res.queue.push({ t: a, kind: 'new', gap: 0 });
+      for (var b = 0; b < n; b++) {
+        var L = learn[b];
+        if (L < 0 || L >= todayIdx) continue;
+        var gap = todayIdx - L;
+        if (EBB.indexOf(gap) >= 0) res.queue.push({ t: b, kind: 'rev', gap: gap });
+      }
+      return res;
+    },
+    /** 按计划时长裁剪队列 */
+    cap: function(task, tracks, queue){
+      var capSec = (Number(task && task.duration) || 60) * 60;
+      var used = 0, list = [];
+      for (var i = 0; i < queue.length; i++) {
+        var r = tracks[queue[i].t];
+        if (!r) continue;
+        var sec = Number(r.duration) || DEFAULT_MIN_SEC;
+        if (used >= capSec && list.length) break;
+        used += sec;
+        list.push(queue[i]);
+      }
+      return { list: list, sec: used };
+    }
+  };
+
+  /* ================= 数据层 ================= */
+  async function listAlbums(cid){
+    cid = cid || await childId();
+    var all = [];
+    try { all = (await window.DB.getAll('listenAlbums')) || []; } catch(e){ all = []; }
+    return all.filter(function(a){ return !a.childId || a.childId === cid; })
+      .sort(function(a,b){ return (a.createdAt || 0) - (b.createdAt || 0); });
+  }
+  async function saveAlbum(a){
+    var cid = a.childId || await childId();
+    var row = {
+      id: a.id || ('alb' + Date.now() + Math.floor(Math.random()*1000)),
+      childId: cid,
+      name: a.name || '未命名专辑',
+      emoji: a.emoji || '🎵',
+      color: a.color || COLORS[0],
+      desc: a.desc || '',
+      items: Array.isArray(a.items) ? a.items.slice() : [],
+      createdAt: a.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    await window.DB.put('listenAlbums', row);
+    return row;
+  }
+  async function delAlbum(id){
+    try { await window.DB.del('listenAlbums', id); } catch(e){}
+    /* 计划里引用该专辑的一并摘掉，避免空引用 */
+    try {
+      var tasks = await allTasks();
+      for (var i = 0; i < tasks.length; i++) {
+        if (Array.isArray(tasks[i].albumIds) && tasks[i].albumIds.indexOf(id) >= 0) {
+          await window.DB.updateScheduleTask({ id: tasks[i].id, albumIds: tasks[i].albumIds.filter(function(x){ return x !== id; }) });
+        }
+      }
+    } catch(e){}
+  }
+  async function allTasks(cid){
+    cid = cid || await childId();
+    var rows = [];
+    try { rows = (await window.DB.getByChild('scheduleTasks', cid)) || []; } catch(e){ rows = []; }
+    return rows.filter(function(t){ return String(t.category||'') === 'listen' || t.subject === '熏听' || (Array.isArray(t.albumIds) && t.albumIds.length) || t.resourceId; })
+      .sort(function(a,b){ return (a.time || '').localeCompare(b.time || '') || ((a.createdAt||0)-(b.createdAt||0)); });
+  }
+  async function getRes(id){
+    if (!id) return null;
+    try { return await window.DB.get('resources', id); } catch(e){ return null; }
+  }
+  /** 按专辑顺序把曲目资源取出来（顺序 = 计划里 albumIds 顺序 + 专辑内 items 顺序） */
+  async function tracksOf(albumIds, cid){
+    var albums = await listAlbums(cid), map = {};
+    albums.forEach(function(a){ map[a.id] = a; });
+    var out = [];
+    (albumIds || []).forEach(function(aid){
+      var a = map[aid];
+      if (!a) return;
+      (a.items || []).forEach(function(rid){ out.push({ rid: rid, album: a }); });
+    });
+    var recs = [];
+    for (var i = 0; i < out.length; i++) {
+      var r = await getRes(out[i].rid);
+      if (r) { r.__album = out[i].album; recs.push(r); }
+    }
+    return recs;
+  }
+  /** 供 syncDayFromTasks 调用：把计划展开成当日 dailySchedule.items（含 resourceId） */
+  async function tracksOfTask(task, cid){
+    if (Array.isArray(task.albumIds) && task.albumIds.length) return await tracksOf(task.albumIds, cid);
+    if (task.resourceId) { var r1 = await getRes(task.resourceId); if (r1) return [r1]; }
+    return [];
+  }
+  /** 某计划在某天的「轨道 + 曲线 + 裁剪后队列」 */
+  async function planOf(task, cid, dateKey){
+    var tracks = await tracksOfTask(task, cid);
+    var p, queue;
+    if (Array.isArray(task.albumIds) && task.albumIds.length) {
+      p = ENGINE.plan(task, tracks, dateKey);
+      queue = p.queue;
+    } else {
+      p = { mode: task.mode || 'seq', sdays: [], todayIdx: ENGINE.isListenDay(task, dateKey) ? 0 : -1, ndays: [], learn: [], queue: [], total: tracks.length };
+      queue = p.todayIdx < 0 ? [] : [{ t: 0, kind: 'play', gap: 0 }];
+    }
+    return { tracks: tracks, plan: p, capped: ENGINE.cap(task, tracks, queue) };
+  }
+  async function expandTaskItems(task, cid, dateKey){
+    var po = await planOf(task, cid, dateKey);
+    var tracks = po.tracks, capped = po.capped;
+    if (!capped.list.length) return [];
+    var seen = {}, items = [];
+    for (var i = 0; i < capped.list.length; i++) {
+      var q = capped.list[i], r = tracks[q.t];
+      if (!r) continue;
+      var sec = Number(r.duration) || DEFAULT_MIN_SEC;
+      var title = r.title || r.original_filename || '未命名音频';
+      if (seen[title]) { seen[title]++; title = title + ' #' + seen[title]; } else { seen[title] = 1; }
+      items.push({
+        seq: items.length,
+        time: task.time || '17:00',
+        duration: Math.max(1, Math.round(sec / 60)),
+        subject: '熏听',
+        module: r.module || task.module || '',
+        task: title,
+        category: 'listen',
+        mode: task.mode || 'ebb',
+        done: false, doneAt: null,
+        resourceId: r.id,
+        albumId: (r.__album || {}).id,
+        albumName: (r.__album || {}).name,
+        lsKind: q.kind, lsGap: q.gap,
+        planId: task.id
+      });
+    }
+    return items;
+  }
+
+  /* ================= 播放器 ================= */
+  var P = { items: [], idx: 0, audio: null, url: null, bar: null, label: '' };
+
+  function ensureAudio(){
+    if (P.audio) return P.audio;
+    var a = document.createElement('audio');
+    a.preload = 'auto';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    P.audio = a;
+    a.addEventListener('ended', function(){
+      if (P.items.length > 1) loadTrack(P.idx + 1, true);
+      else { setPlayIcon(false); toast('🎉 今天的熏听播完啦'); }
+    });
+    a.addEventListener('timeupdate', function(){
+      var bar = P.bar && P.bar.querySelector('.lsx-pbar > i');
+      if (!bar) return;
+      var d = a.duration || 0;
+      bar.style.width = (d ? Math.min(100, (a.currentTime / d) * 100) : 0) + '%';
+      var tm = P.bar.querySelector('.lsx-ptime');
+      if (tm) tm.textContent = fmtDur(a.currentTime) + ' / ' + (d ? fmtDur(d) : '--:--');
+    });
+    a.addEventListener('play', function(){ setPlayIcon(true); });
+    a.addEventListener('pause', function(){ setPlayIcon(false); });
+    a.addEventListener('error', function(){
+      if (P.items.length > 1) loadTrack(P.idx + 1, true);
+    });
+    return a;
+  }
+
+  function setPlayIcon(playing){
+    if (!P.bar) return;
+    var b = P.bar.querySelector('[data-lsx-p="toggle"]');
+    if (b) b.textContent = playing ? '⏸' : '▶️';
+  }
+
+  function renderBar(label){
+    if (!P.bar) {
+      P.bar = document.createElement('div');
+      P.bar.className = 'lsx-player';
+      P.bar.innerHTML = '<div class="lsx-pmain"><div class="lsx-ptitle">—</div>'
+        + '<div class="lsx-psub"></div>'
+        + '<div class="lsx-pbar"><i></i></div></div>'
+        + '<div class="lsx-pctl">'
+        + '<span class="lsx-ptime">0:00 / --:--</span>'
+        + '<button data-lsx-p="prev" title="上一首">⏮</button>'
+        + '<button data-lsx-p="toggle" title="播放/暂停">▶️</button>'
+        + '<button data-lsx-p="next" title="下一首">⏭</button>'
+        + '<button data-lsx-p="close" title="关闭">✕</button>'
+        + '</div>';
+      document.body.appendChild(P.bar);
+      P.bar.addEventListener('click', function(e){
+        var b = e.target.closest('[data-lsx-p]');
+        if (!b) return;
+        var act = b.getAttribute('data-lsx-p');
+        if (act === 'prev') loadTrack(P.idx - 1, true);
+        else if (act === 'next') loadTrack(P.idx + 1, true);
+        else if (act === 'toggle') {
+          var a = ensureAudio();
+          if (a.paused) { try { a.play(); } catch(err){} } else { try { a.pause(); } catch(err){} }
+        } else if (act === 'close') stopAll();
+      });
+    }
+    P.label = label || '';
+    P.bar.style.display = 'flex';
+    return P.bar;
+  }
+
+  async function loadTrack(i, autoPlay){
+    if (!P.items.length) return;
+    P.idx = ((i % P.items.length) + P.items.length) % P.items.length;
+    var it = P.items[P.idx];
+    var a = ensureAudio();
+    if (P.url) { try { URL.revokeObjectURL(P.url); } catch(e){} P.url = null; }
+    if (P.bar) {
+      var t = P.bar.querySelector('.lsx-ptitle');
+      if (t) t.textContent = it.title || '未命名音频';
+      var sub = P.bar.querySelector('.lsx-psub');
+      if (sub) {
+        var tag = it.kind === 'new' ? '🆕 新学' : (it.kind === 'rev' ? ('🔁 复习 · 第' + it.gap + '天') : '▶️ 播放');
+        sub.textContent = '第 ' + (P.idx + 1) + ' / ' + P.items.length + ' 首 · ' + (it.albumName || '') + ' · ' + tag;
+      }
+      var bar = P.bar.querySelector('.lsx-pbar > i');
+      if (bar) bar.style.width = '0%';
+    }
+    try { if (window.MXPomo && window.MXPomo.setListen) window.MXPomo.setListen(it.module || 'listen'); } catch(e){}
+    try {
+      if (window.mxApiProxy) {
+        window.mxApiProxy('mxAdmin', { action: 'track', data: {
+          cat: 'res', resId: it.id || '', fname: it.fname || '', title: it.title || '',
+          module: it.module || '', uid: window.__mx_uid__ || '',
+          deviceId: (typeof window.deviceId === 'function') ? window.deviceId() : ''
+        } }).catch(function(){});
+      }
+    } catch(e){}
+    var src = null;
+    if (it.poolUrl) src = { url: it.poolUrl };
+    else {
+      var got = null;
+      try { got = await window.DB.getResourceBlob(it.id); } catch(e){ got = null; }
+      if (got && got.blob) {
+        var b = got.blob;
+        if (/^video\//i.test(b.type || '')) { try { b = new Blob([b], { type: 'audio/mp4' }); } catch(e){} }
+        try { P.url = URL.createObjectURL(b); src = { url: P.url }; } catch(e){ src = null; }
+      }
+    }
+    if (!src) { if (it.audioUrl) src = { url: it.audioUrl }; }
+    if (!src) {
+      if (P.bar) { var s2 = P.bar.querySelector('.lsx-psub'); if (s2) s2.textContent = '⚠️ 本地文件缺失，已跳到下一首'; }
+      if (P.items.length > 1) { setTimeout(function(){ loadTrack(P.idx + 1, true); }, 500); }
+      return;
+    }
+    a.src = src.url;
+    if (autoPlay !== false) { try { var pr = a.play(); if (pr && pr.catch) pr.catch(function(){}); } catch(e){} }
+  }
+
+  function stopAll(){
+    if (P.audio) { try { P.audio.pause(); } catch(e){} P.audio.removeAttribute('src'); }
+    try { if (window.MXPomo && window.MXPomo.setListen) window.MXPomo.setListen(null); } catch(e){}
+    if (P.url) { try { URL.revokeObjectURL(P.url); } catch(e){} P.url = null; }
+    if (P.bar && P.bar.parentNode) P.bar.parentNode.removeChild(P.bar);
+    P.bar = null; P.items = []; P.idx = 0;
+  }
+
+  function playItems(items, label){
+    if (!items || !items.length) { toast('没有可播放的音频'); return; }
+    stopAll();
+    P.items = items;
+    renderBar(label);
+    loadTrack(0, true);
+  }
+
+  /* ================= 页面：总控 ================= */
+  var S = { tab: 'today', cache: null };
+
+  function tabBtn(key, label){
+    return '<button class="lsx-tab" data-lsx-tab="' + key + '">' + label + '</button>';
+  }
+
+  async function render(){
+    var page = document.getElementById('page-listen-schedule');
+    if (!page) return;
+    if (!page.querySelector('.lsx-wrap')) {
+      page.innerHTML = '<div class="lsx-wrap">'
+        + '<div class="lsx-head"><div class="lsx-h1">🎧 熏听工坊</div>'
+        + '<div class="lsx-h2">专辑 → 计划 → 今日自动排好 · 双曲线艾宾浩斯</div></div>'
+        + '<div class="lsx-tabs">' + tabBtn('today','🎧 今日') + tabBtn('album','💿 专辑') + tabBtn('plan','🗓️ 计划') + '</div>'
+        + '<div class="lsx-body" id="lsx-body"><div class="lsx-loading">加载中…</div></div>'
+        + '</div>';
+      page.querySelector('.lsx-tabs').addEventListener('click', function(e){
+        var b = e.target.closest('[data-lsx-tab]');
+        if (!b) return;
+        S.tab = b.getAttribute('data-lsx-tab');
+        render();
+      });
+    }
+    page.querySelectorAll('[data-lsx-tab]').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-lsx-tab') === S.tab);
+    });
+    var body = page.querySelector('#lsx-body');
+    if (!body) return;
+    try {
+      if (S.tab === 'album') await renderAlbums(body);
+      else if (S.tab === 'plan') await renderPlans(body);
+      else await renderToday(body);
+    } catch(e) {
+      body.innerHTML = '<div class="lsx-empty">加载失败：' + esc(e && e.message || e) + '</div>';
+      if (window.console) console.error('[LS] render failed', e);
+    }
+  }
+
+  /* ================= 页面：今日 ================= */
+  async function renderToday(body){
+    var cid = await childId();
+    var tasks = await allTasks(cid);
+    var albums = await listAlbums(cid);
+    var tk = todayKey();
+    var wdKey = ENGINE.wdOf(tk);
+    var wkName = '周' + WD_CN[wdKey];
+
+    var html = '';
+    /* 今日概览条 */
+    var active = tasks.filter(function(t){ return t.enabled !== false; });
+    var listenToday = active.filter(function(t){ return ENGINE.isListenDay(t, tk); });
+    html += '<div class="lsx-today-top">'
+      + '<div class="lsx-today-date">' + esc(tk) + ' · ' + wkName + '</div>'
+      + '<div class="lsx-today-tag ' + (listenToday.length ? 'on' : 'off') + '">'
+      + (listenToday.length ? ('今天有 ' + listenToday.length + ' 个熏听计划') : '今天不安排熏听（休息日）')
+      + '</div></div>';
+
+    if (!tasks.length || !albums.length) {
+      html += guideCard(albums.length, tasks.length);
+      body.innerHTML = html;
+      bindToday(body, []);
+      return;
+    }
+
+    var entries = [], totalSec = 0;
+    for (var i = 0; i < active.length; i++) {
+      var t = active[i];
+      var po = await planOf(t, cid, tk);
+      entries.push({ task: t, tracks: po.tracks, plan: po.plan, capped: po.capped });
+      totalSec += po.capped.sec;
+    }
+    S.cache = entries;
+
+    if (!listenToday.length) {
+      html += '<div class="lsx-empty">今天是休息日，没有熏听计划。<br>想让今天也听？去「🗓️ 计划」把今天勾上即可。</div>';
+    }
+
+    entries.forEach(function(en, ei){
+      var t = en.task;
+      var isDay = ENGINE.isListenDay(t, tk);
+      var mode = t.mode || 'ebb';
+      var queueLen = en.capped.list.length;
+      html += '<div class="lsx-card" data-en="' + ei + '">'
+        + '<div class="lsx-card-h">'
+        + '<div class="lsx-card-title">' + esc(t.name || '熏听计划') + '</div>'
+        + '<div class="lsx-card-meta">🕐 ' + esc(t.time || '17:00') + '–' + esc(addMin(t.time, t.duration))
+        + ' · ' + (Number(t.duration)||60) + ' 分钟 · ' + esc(MODE_LABEL[mode] || mode) + '</div>'
+        + '</div>';
+      if (!isDay) {
+        html += '<div class="lsx-card-note">今天不在这个计划的熏听日内（周'
+          + weekdayChipsText(t.repeat) + '），今天跳过。</div></div>';
+        return;
+      }
+      if (!queueLen) {
+        var why = '';
+        if (!(t.albumIds||[]).length) why = '这个计划还没挂专辑。';
+        else if (!en.tracks.length) why = '计划里的专辑是空的（没有曲目）。';
+        else if (mode === 'ebb' && en.plan.todayIdx < 0) why = '计划还没开始（开始日 ' + esc(ENGINE.startKey(t)) + '）。';
+        else if (mode === 'ebb') why = '按曲线今天这节课不涉及任何曲目（可能已全部学完或新课未到）。';
+        else why = '今天没有可播曲目。';
+        html += '<div class="lsx-card-note">' + esc(why) + '</div>'
+          + '<div class="lsx-card-ops"><button class="lsx-btn" data-lsx-go="plan">去调整计划</button></div></div>';
+        return;
+      }
+      /* 队列 */
+      html += '<div class="lsx-q"><div class="lsx-q-h">今日队列 <b>' + queueLen + '</b> 首 · 约 ' + fmtTotal(en.capped.sec) + '</div>';
+      en.capped.list.forEach(function(q, qi){
+        var r = en.tracks[q.t];
+        if (!r) return;
+        var al = r.__album || {};
+        var tag = q.kind === 'new' ? '<span class="lsx-tag new">🆕 新学</span>'
+          : (q.kind === 'rev' ? '<span class="lsx-tag rev">🔁 第' + q.gap + '天复习</span>' : '<span class="lsx-tag play">▶️</span>');
+        html += '<div class="lsx-q-row">'
+          + '<span class="lsx-dot" style="background:' + esc(al.color || '#ccc') + '"></span>'
+          + '<span class="lsx-q-t">' + esc(r.title || r.original_filename || '未命名') + '</span>'
+          + tag
+          + '<span class="lsx-q-alb">' + esc(al.name || '') + '</span>'
+          + '<span class="lsx-q-dur">' + fmtDur(Number(r.duration) || DEFAULT_MIN_SEC) + '</span>'
+          + '<button class="lsx-mini" data-lsx-one="' + ei + ':' + qi + '" title="只播这首">▶</button>'
+          + '</div>';
+      });
+      html += '</div>';
+      html += '<div class="lsx-card-ops">'
+        + '<button class="lsx-btn main" data-lsx-playall="' + ei + '">▶️ 一键听今天（' + queueLen + ' 首）</button>'
+        + '<button class="lsx-btn" data-lsx-sync="' + ei + '">🔄 同步到今日清单</button>'
+        + '</div></div>';
+    });
+
+    html += '<div class="lsx-tip">「同步到今日清单」会把上面的曲目写进首页/日历的今日任务（可在那里逐条打勾）。</div>';
+    body.innerHTML = html;
+    bindToday(body, entries);
+  }
+
+  function weekdayChipsText(rep){
+    rep = rep || {daily:true};
+    if (rep.daily) return '一~日';
+    var arr = WD_ORD.filter(function(k){ return rep[k]; });
+    return arr.length ? arr.map(function(k){ return WD_CN[k]; }).join('') : '无';
+  }
+
+  function guideCard(hasAlbum, hasPlan){
+    var step1 = hasAlbum ? '✅' : '①';
+    var step2 = hasPlan ? '✅' : '②';
+    return '<div class="lsx-guide">'
+      + '<div class="lsx-guide-t">三步搞定熏听（第一次用看这里）</div>'
+      + '<div class="lsx-guide-s"><b>' + step1 + ' 建一个专辑（播放列表）</b><br>'
+      + '去「💿 专辑」→ 新建专辑 → 从「我的资源」里把 MP3 勾进来。一个专辑就是一张播放列表，'
+      + '比如「英文1基础」「古诗2级别」「拼音1级别」各建一个。</div>'
+      + '<div class="lsx-guide-s"><b>' + step2 + ' 建一个计划（什么时候听）</b><br>'
+      + '去「🗓️ 计划」→ 选要听的专辑（可多选，会按顺序连播）→ 勾星期、填时间、选模式。'
+      + '只有勾上的星期才会熏听，这就是「天维度」的曲线。</div>'
+      + '<div class="lsx-guide-s"><b>③ 每天看「🎧 今日」</b><br>'
+      + '系统自动按曲线排好今天该听哪几首（新学 + 该复习的），点一下就连播。</div>'
+      + '<div class="lsx-guide-ops">'
+      + '<button class="lsx-btn main" data-lsx-go="album">💿 去建专辑</button>'
+      + '<button class="lsx-btn" data-lsx-go="plan">🗓️ 去建计划</button>'
+      + '</div></div>';
+  }
+
+  function bindToday(body, entries){
+    body.querySelectorAll('[data-lsx-go]').forEach(function(b){
+      b.onclick = function(){ S.tab = b.getAttribute('data-lsx-go'); render(); };
+    });
+    body.querySelectorAll('[data-lsx-playall]').forEach(function(b){
+      b.onclick = function(){
+        var en = (S.cache || [])[Number(b.getAttribute('data-lsx-playall'))];
+        if (!en) return;
+        playItems(en.capped.list.map(function(q){ return playerItem(en.tracks[q.t], q); }), en.task.name);
+      };
+    });
+    body.querySelectorAll('[data-lsx-one]').forEach(function(b){
+      b.onclick = function(){
+        var parts = String(b.getAttribute('data-lsx-one')).split(':');
+        var en = (S.cache || [])[Number(parts[0])];
+        if (!en) return;
+        var q = en.capped.list[Number(parts[1])];
+        if (!q) return;
+        playItems([playerItem(en.tracks[q.t], q)], en.task.name);
+      };
+    });
+    body.querySelectorAll('[data-lsx-sync]').forEach(function(b){
+      b.onclick = async function(){
+        var en = (S.cache || [])[Number(b.getAttribute('data-lsx-sync'))];
+        if (!en) return;
+        try {
+          var cid = await childId();
+          var row = await window.DB.syncDayFromTasks(cid, todayKey());
+          toast('✅ 已同步到今日清单（' + ((row && row.items) ? row.items.length : 0) + ' 条）');
+        } catch(e) { toast('⚠️ 同步失败：' + (e && e.message || e)); }
+      };
+    });
+  }
+
+  function playerItem(r, q){
+    if (!r) return null;
+    return {
+      id: r.id, title: r.title || r.original_filename || '未命名音频', fname: r.original_filename || '',
+      module: r.module || '', albumName: (r.__album || {}).name || '',
+      kind: q.kind, gap: q.gap || 0,
+      mediaType: r.mediaType, blobRef: r.blobRef, poolUrl: r.poolUrl, audioUrl: r.audioUrl
+    };
+  }
+
+  /* ================= 页面：专辑 ================= */
+  async function renderAlbums(body){
+    var cid = await childId();
+    var albums = await listAlbums(cid);
+    var html = '<div class="lsx-sec-h">💿 我的专辑 <span class="lsx-cnt">' + albums.length + '</span>'
+      + '<button class="lsx-btn main sm" id="lsx-new-album">＋ 新建专辑</button></div>';
+    if (!albums.length) {
+      html += '<div class="lsx-empty">还没有专辑。专辑 = 播放列表，把同类的 MP3 编进一张专辑，才能排期和做曲线。</div>';
+    } else {
+      html += '<div class="lsx-albs">';
+      albums.forEach(function(a, ai){
+        html += '<div class="lsx-alb" data-alb="' + esc(a.id) + '">'
+          + '<div class="lsx-alb-top" style="border-left:4px solid ' + esc(a.color || '#ccc') + '">'
+          + '<span class="lsx-alb-ico">' + esc(a.emoji || '🎵') + '</span>'
+          + '<div class="lsx-alb-info"><div class="lsx-alb-name">' + esc(a.name) + '</div>'
+          + '<div class="lsx-alb-meta">' + (a.items || []).length + ' 首'
+          + ((a.desc) ? ' · ' + esc(a.desc) : '') + '</div></div>'
+          + '</div>'
+          + '<div class="lsx-alb-ops">'
+          + '<button class="lsx-btn sm" data-alb-edit="' + esc(a.id) + '">✏️ 编辑曲目</button>'
+          + '<button class="lsx-btn sm" data-alb-play="' + esc(a.id) + '">▶️ 播全部</button>'
+          + '<button class="lsx-btn sm danger" data-alb-del="' + esc(a.id) + '">🗑️</button>'
+          + '</div></div>';
+      });
+      html += '</div>';
+    }
+    body.innerHTML = html;
+
+    var nb = body.querySelector('#lsx-new-album');
+    if (nb) nb.onclick = function(){ openAlbumEditor(null); };
+    body.querySelectorAll('[data-alb-edit]').forEach(function(b){
+      b.onclick = function(){
+        var id = b.getAttribute('data-alb-edit');
+        listAlbums(cid).then(function(list){
+          openAlbumEditor(list.filter(function(x){ return x.id === id; })[0] || null);
+        });
+      };
+    });
+    body.querySelectorAll('[data-alb-play]').forEach(function(b){
+      b.onclick = async function(){
+        var id = b.getAttribute('data-alb-play');
+        var tracks = await tracksOf([id], cid);
+        if (!tracks.length) { toast('这张专辑还没有曲目'); return; }
+        playItems(tracks.map(function(r){ return playerItem(r, { kind: 'play', gap: 0 }); }), '整张专辑');
+      };
+    });
+    body.querySelectorAll('[data-alb-del]').forEach(function(b){
+      b.onclick = async function(){
+        var id = b.getAttribute('data-alb-del');
+        var list = await listAlbums(cid);
+        var a = list.filter(function(x){ return x.id === id; })[0];
+        if (!a) return;
+        if (!confirm('删除专辑「' + a.name + '」？计划里对它的引用会一并摘掉（音源文件不会删）。')) return;
+        await delAlbum(id);
+        toast('🗑️ 已删除专辑');
+        render();
+      };
+    });
+  }
+
+  /* ---------- 专辑编辑器 ---------- */
+  var AE = { draft: null, pick: [] };
+
+  async function openAlbumEditor(album){
+    var cid = await childId();
+    AE.draft = album ? JSON.parse(JSON.stringify(album))
+      : { id: null, name: '', emoji: '🎵', color: COLORS[0], desc: '', items: [], childId: cid };
+    drawAlbumEditor();
+  }
+
+  function drawAlbumEditor(){
+    var d = AE.draft;
+    var all = [], map = {};
+    var mask = document.createElement('div');
+    mask.className = 'lsx-modal';
+    mask.innerHTML = '<div class="lsx-modal-box">'
+      + '<div class="lsx-modal-h"><b>' + (d.id ? '编辑专辑' : '新建专辑') + '</b>'
+      + '<span class="lsx-x" data-lsx-close="1">✕</span></div>'
+      + '<div class="lsx-modal-body" id="lsx-ae-body"><div class="lsx-loading">加载曲目…</div></div>'
+      + '</div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function(e){ if (e.target === mask) mask.parentNode.removeChild(mask); });
+    mask.querySelector('[data-lsx-close]').onclick = function(){ mask.parentNode.removeChild(mask); };
+
+    (async function(){
+      try { all = (await window.DB.getAll('resources')) || []; } catch(e){ all = []; }
+      all.forEach(function(r){ map[r.id] = r; });
+      var rowsHtml = '';
+      (d.items || []).forEach(function(rid, i){
+        var r = map[rid];
+        var title = r ? (r.title || r.original_filename || '未命名') : '⚠️ 已失效的曲目';
+        var sub = r ? ((MOD_LABEL[r.module] || r.module || '资源') + ' · ' + fmtDur(Number(r.duration) || DEFAULT_MIN_SEC)) : '原文件已不在资源库';
+        rowsHtml += '<div class="lsx-tr" data-idx="' + i + '">'
+          + '<span class="lsx-tr-n">' + (i+1) + '</span>'
+          + '<span class="lsx-tr-t">' + esc(title) + '<i>' + esc(sub) + '</i></span>'
+          + '<button class="lsx-mini" data-tr-up="' + i + '" title="上移">↑</button>'
+          + '<button class="lsx-mini" data-tr-dn="' + i + '" title="下移">↓</button>'
+          + '<button class="lsx-mini danger" data-tr-rm="' + i + '" title="移除">✕</button>'
+          + '</div>';
+      });
+      if (!rowsHtml) rowsHtml = '<div class="lsx-empty sm">还没有曲目，点下面的「＋ 添加曲目」从资源库里挑。</div>';
+
+      var body = mask.querySelector('#lsx-ae-body');
+      body.innerHTML = '<div class="lsx-field"><label>专辑名</label>'
+        + '<input id="lsx-ae-name" maxlength="24" placeholder="如：英文1基础" value="' + esc(d.name) + '"></div>'
+        + '<div class="lsx-field"><label>图标</label><div class="lsx-chips" id="lsx-ae-emoji">'
+        + EMOJIS.map(function(e){ return '<button class="lsx-chip' + (e === d.emoji ? ' on' : '') + '" data-emoji="' + e + '">' + e + '</button>'; }).join('')
+        + '</div></div>'
+        + '<div class="lsx-field"><label>配色</label><div class="lsx-chips" id="lsx-ae-color">'
+        + COLORS.map(function(c){ return '<button class="lsx-chip dot' + (c === d.color ? ' on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>'; }).join('')
+        + '</div></div>'
+        + '<div class="lsx-field"><label>备注（可选）</label>'
+        + '<input id="lsx-ae-desc" maxlength="30" placeholder="如：Level 1 磨耳朵" value="' + esc(d.desc || '') + '"></div>'
+        + '<div class="lsx-field"><label>曲目（' + (d.items||[]).length + ' 首 · 顺序即播放顺序）</label>'
+        + '<div class="lsx-tracks">' + rowsHtml + '</div>'
+        + '<button class="lsx-btn sm" id="lsx-ae-add">＋ 添加曲目</button></div>'
+        + '<div class="lsx-modal-foot">'
+        + '<button class="lsx-btn" data-lsx-close2="1">取消</button>'
+        + '<button class="lsx-btn main" id="lsx-ae-save">💾 保存</button>'
+        + '</div>';
+
+      body.querySelectorAll('[data-lsx-close2]').forEach(function(b){
+        b.onclick = function(){ mask.parentNode.removeChild(mask); };
+      });
+      var em = body.querySelector('#lsx-ae-emoji');
+      em.onclick = function(e){
+        var b = e.target.closest('[data-emoji]'); if (!b) return;
+        d.emoji = b.getAttribute('data-emoji');
+        em.querySelectorAll('.lsx-chip').forEach(function(x){ x.classList.toggle('on', x === b); });
+      };
+      var co = body.querySelector('#lsx-ae-color');
+      co.onclick = function(e){
+        var b = e.target.closest('[data-color]'); if (!b) return;
+        d.color = b.getAttribute('data-color');
+        co.querySelectorAll('.lsx-chip').forEach(function(x){ x.classList.toggle('on', x === b); });
+      };
+      body.querySelector('.lsx-tracks').addEventListener('click', function(e){
+        var up = e.target.closest('[data-tr-up]'), dn = e.target.closest('[data-tr-dn]'), rm = e.target.closest('[data-tr-rm]');
+        if (up) { var i = Number(up.getAttribute('data-tr-up')); if (i > 0) { var a = d.items[i-1]; d.items[i-1] = d.items[i]; d.items[i] = a; } }
+        else if (dn) { var j = Number(dn.getAttribute('data-tr-dn')); if (j < d.items.length - 1) { var b2 = d.items[j+1]; d.items[j+1] = d.items[j]; d.items[j] = b2; } }
+        else if (rm) { d.items.splice(Number(rm.getAttribute('data-tr-rm')), 1); }
+        else return;
+        d.name = (body.querySelector('#lsx-ae-name').value || '').trim();
+        d.desc = (body.querySelector('#lsx-ae-desc').value || '').trim();
+        mask.parentNode.removeChild(mask);
+        drawAlbumEditor();
+    });
+      body.querySelector('#lsx-ae-add').onclick = function(){
+        d.name = (body.querySelector('#lsx-ae-name').value || '').trim();
+        d.desc = (body.querySelector('#lsx-ae-desc').value || '').trim();
+        mask.style.display = 'none';   /* 先藏起专辑编辑框，避免两个弹层叠在一起 */
+        openResPicker(d.items || [], function(picked){
+          d.items = picked;
+          if (mask.parentNode) mask.parentNode.removeChild(mask);
+          drawAlbumEditor();
+        }, function(){
+          mask.style.display = 'flex';
+        });
+      };
+      body.querySelector('#lsx-ae-save').onclick = async function(){
+        d.name = (body.querySelector('#lsx-ae-name').value || '').trim();
+        d.desc = (body.querySelector('#lsx-ae-desc').value || '').trim();
+        if (!d.name) { toast('⚠️ 请填写专辑名'); return; }
+        try {
+          await saveAlbum(d);
+          mask.parentNode.removeChild(mask);
+          toast('✅ 专辑已保存');
+          render();
+        } catch(e) { toast('⚠️ 保存失败：' + (e && e.message || e)); }
+      };
+    })();
+  }
+
+  /* ---------- 资源多选器 ---------- */
+  function openResPicker(selected, onDone, onCancel){
+    var sel = (selected || []).slice();
+    var mask = document.createElement('div');
+    mask.className = 'lsx-modal';
+    mask.innerHTML = '<div class="lsx-modal-box">'
+      + '<div class="lsx-modal-h"><b>＋ 从「我的资源」选音频</b><span class="lsx-x" data-lsx-close="1">✕</span></div>'
+      + '<div class="lsx-modal-body">'
+      + '<input class="lsx-search" id="lsx-pk-q" placeholder="搜索标题 / 模块…">'
+      + '<div class="lsx-pk" id="lsx-pk-list"><div class="lsx-loading">加载中…</div></div>'
+      + '<div class="lsx-modal-foot"><span class="lsx-pk-cnt" id="lsx-pk-cnt"></span>'
+      + '<button class="lsx-btn" data-lsx-close2="1">取消</button>'
+      + '<button class="lsx-btn main" id="lsx-pk-ok">确定添加</button></div>'
+      + '</div></div>';
+    document.body.appendChild(mask);
+    function back(){ if (mask.parentNode) mask.parentNode.removeChild(mask); if (onCancel) onCancel(); }
+    mask.addEventListener('click', function(e){ if (e.target === mask) back(); });
+    mask.querySelector('[data-lsx-close]').onclick = back;
+    mask.querySelector('[data-lsx-close2]').onclick = back;
+
+    var rows = [];
+    function draw(q){
+      q = (q || '').toLowerCase();
+      var box = mask.querySelector('#lsx-pk-list');
+      var list = rows.filter(function(r){
+        if (!q) return true;
+        return String(r.title || r.original_filename || '').toLowerCase().indexOf(q) >= 0
+          || String(MOD_LABEL[r.module] || r.module || '').toLowerCase().indexOf(q) >= 0;
+      });
+      if (!list.length) {
+        box.innerHTML = '<div class="lsx-empty sm">没有匹配的音频。先去「家长工作台 → 📥 资源中心」导入 MP3。</div>';
+        return;
+      }
+      /* 按模块分组 */
+      var groups = {};
+      list.forEach(function(r){ var m = r.module || 'other'; (groups[m] = groups[m] || []).push(r); });
+      var html = '';
+      Object.keys(groups).forEach(function(m){
+        html += '<div class="lsx-pk-g">' + esc(MOD_LABEL[m] || m) + ' · ' + groups[m].length + '</div>';
+        groups[m].forEach(function(r){
+          var on = sel.indexOf(r.id) >= 0;
+          html += '<label class="lsx-pk-row' + (on ? ' on' : '') + '">'
+            + '<input type="checkbox" data-rid="' + esc(r.id) + '"' + (on ? ' checked' : '') + '>'
+            + '<span class="lsx-pk-t">' + esc(r.title || r.original_filename || '未命名') + '</span>'
+            + (r.blobRef ? '<span class="lsx-pk-b">视频·音频版</span>' : '')
+            + '<span class="lsx-pk-d">' + fmtDur(Number(r.duration) || DEFAULT_MIN_SEC) + '</span>'
+            + '</label>';
+        });
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('input[data-rid]').forEach(function(cb){
+        cb.onchange = function(){
+          var id = cb.getAttribute('data-rid');
+          if (cb.checked) { if (sel.indexOf(id) < 0) sel.push(id); }
+          else { sel = sel.filter(function(x){ return x !== id; }); }
+          cb.closest('.lsx-pk-row').classList.toggle('on', cb.checked);
+          updCnt();
+        };
+      });
+      updCnt();
+    }
+    function updCnt(){
+      var c = mask.querySelector('#lsx-pk-cnt');
+      if (c) c.textContent = '已选 ' + sel.length + ' 首';
+    }
+    (async function(){
+      try {
+        var all = (await window.DB.getAll('resources')) || [];
+        rows = all.filter(function(r){ return r && (r.mediaType === 'audio' || (!r.mediaType && r.blobRef !== undefined)); })
+          .sort(function(a,b){
+            var ma = String(a.module||''), mb = String(b.module||'');
+            if (ma !== mb) return ma.localeCompare(mb);
+            return String(a.title||'').localeCompare(String(b.title||''));
+          });
+      } catch(e){ rows = []; }
+      draw('');
+      mask.querySelector('#lsx-pk-q').oninput = function(){ draw(this.value); };
+    })();
+    mask.querySelector('#lsx-pk-ok').onclick = function(){
+      mask.parentNode.removeChild(mask);
+      if (onDone) onDone(sel);
+    };
+  }
+
+  /* ================= 页面：计划 ================= */
+  async function renderPlans(body){
+    var cid = await childId();
+    var tasks = await allTasks(cid);
+    var albums = await listAlbums(cid);
+    var map = {};
+    albums.forEach(function(a){ map[a.id] = a; });
+
+    var html = '<div class="lsx-sec-h">🗓️ 熏听计划 <span class="lsx-cnt">' + tasks.length + '</span>'
+      + '<button class="lsx-btn main sm" id="lsx-new-plan">＋ 新建计划</button></div>';
+
+    if (!albums.length) {
+      html += '<div class="lsx-empty">先建专辑（播放列表），才能建计划。</div>';
+    } else if (!tasks.length) {
+      html += '<div class="lsx-empty">还没有计划。计划 = 什么时候听哪些专辑。</div>';
+    } else {
+      var tk = todayKey();
+      tasks.forEach(function(t){
+        var albs = (t.albumIds || []).map(function(id){ return map[id]; }).filter(Boolean);
+        var weekHtml = WD_ORD.map(function(k){
+          var on = (t.repeat && (t.repeat.daily || t.repeat[k]));
+          return '<span class="lsx-wd' + (on ? ' on' : '') + '">' + WD_CN[k] + '</span>';
+        }).join('');
+        var ebLine = '';
+        if ((t.mode || 'ebb') === 'ebb' && t.eb) {
+          var nds = (t.eb.newDays || []).length ? t.eb.newDays.map(function(k){ return WD_CN[k]; }).join('') : '同熏听日';
+          ebLine = '新课日 周' + nds + ' · 每次上新 ' + (t.eb.newPerDay || 2) + ' 首';
+        }
+        html += '<div class="lsx-card">'
+          + '<div class="lsx-card-h">'
+          + '<div class="lsx-card-title">' + esc(t.name || '熏听计划')
+          + (t.enabled === false ? ' <span class="lsx-tag off">已停用</span>' : '') + '</div>'
+          + '<div class="lsx-card-meta">🕐 ' + esc(t.time || '17:00') + '–' + esc(addMin(t.time, t.duration))
+          + ' · ' + (Number(t.duration)||60) + ' 分钟 · ' + esc(MODE_LABEL[t.mode] || t.mode || '艾宾浩斯曲线') + '</div>'
+          + '</div>'
+          + '<div class="lsx-albline">' + (albs.length
+              ? albs.map(function(a){ return '<span class="lsx-pill" style="border-color:' + esc(a.color||'#ccc') + '">'
+                  + esc(a.emoji || '🎵') + ' ' + esc(a.name) + '<i>' + (a.items||[]).length + '</i></span>'; }).join('')
+              : (t.resourceId ? '<span class="lsx-pill">🎵 单曲排期</span>' : '<span class="lsx-warn">未挂专辑</span>')) + '</div>'
+          + '<div class="lsx-week">' + weekHtml + '</div>'
+          + (ebLine ? '<div class="lsx-ebline">🧠 ' + esc(ebLine) + '</div>' : '')
+          + '<div class="lsx-card-ops">'
+          + '<button class="lsx-btn sm" data-plan-edit="' + esc(t.id) + '">✏️ 编辑</button>'
+          + '<button class="lsx-btn sm" data-plan-toggle="' + esc(t.id) + '">' + (t.enabled === false ? '🔔 启用' : '🔕 停用') + '</button>'
+          + '<button class="lsx-btn sm danger" data-plan-del="' + esc(t.id) + '">🗑️ 删除</button>'
+          + '</div></div>';
+      });
+    }
+    html += '<div class="lsx-tip">天维度曲线 = 上面勾选的星期，只有这些天算「一次熏听」；'
+      + '曲目维度曲线 = 每首曲目在「新学那些天」被引入，之后按第 1、2、4、7、15、30 次熏听日自动复习。</div>';
+    body.innerHTML = html;
+
+    var nb = body.querySelector('#lsx-new-plan');
+    if (nb) nb.onclick = function(){ openPlanEditor(null, albums); };
+    body.querySelectorAll('[data-plan-edit]').forEach(function(b){
+      b.onclick = function(){
+        var id = b.getAttribute('data-plan-edit');
+        var t = tasks.filter(function(x){ return x.id === id; })[0];
+        openPlanEditor(t, albums);
+      };
+    });
+    body.querySelectorAll('[data-plan-toggle]').forEach(function(b){
+      b.onclick = async function(){
+        var id = b.getAttribute('data-plan-toggle');
+        var t = tasks.filter(function(x){ return x.id === id; })[0];
+        if (!t) return;
+        await window.DB.updateScheduleTask({ id: id, enabled: t.enabled === false });
+        toast(t.enabled === false ? '🔔 已启用' : '🔕 已停用');
+        render();
+      };
+    });
+    body.querySelectorAll('[data-plan-del]').forEach(function(b){
+      b.onclick = async function(){
+        var id = b.getAttribute('data-plan-del');
+        var t = tasks.filter(function(x){ return x.id === id; })[0];
+        if (!t) return;
+        if (!confirm('删除计划「' + (t.name || '') + '」？')) return;
+        await window.DB.deleteScheduleTask(id);
+        toast('🗑️ 已删除计划');
+        render();
+      };
+    });
+  }
+
+  /* ---------- 计划编辑器 ---------- */
+  var PE = { draft: null, albums: [] };
+
+  function albChipsHtml(d){
+    return PE.albums.map(function(a){
+      var ord = (d.albumIds || []).indexOf(a.id);
+      var on = ord >= 0;
+      return '<button class="lsx-chip alb' + (on ? ' on' : '') + '" data-aid="' + esc(a.id) + '" style="border-color:' + esc(a.color||'#ccc') + '">'
+        + (on ? '<b>' + (ord + 1) + '</b> ' : '') + esc(a.emoji || '🎵') + ' ' + esc(a.name)
+        + '<i>' + (a.items || []).length + '</i></button>';
+    }).join('');
+  }
+
+  function openPlanEditor(task, albums){
+    PE.albums = albums || [];
+    var tk = todayKey();
+    PE.draft = task ? JSON.parse(JSON.stringify(task)) : {
+      id: null, name: '', albumIds: [], repeat: { mon:true,tue:true,wed:true,thu:true,fri:true,sat:true,sun:true },
+      time: '17:00', duration: 60, mode: 'ebb',
+      eb: { newDays: ['mon','tue','wed','thu','fri','sat','sun'], newPerDay: 2 },
+      startDate: tk, enabled: true
+    };
+    if (!PE.draft.eb) PE.draft.eb = { newDays: ['mon','tue','wed','thu','fri','sat','sun'], newPerDay: 2 };
+    if (!Array.isArray(PE.draft.eb.newDays) || !PE.draft.eb.newDays.length) PE.draft.eb.newDays = ['mon','tue','wed','thu','fri','sat','sun'];
+    if (!PE.draft.repeat || (!PE.draft.repeat.daily && !Object.keys(PE.draft.repeat).length)) {
+      PE.draft.repeat = { mon:true,tue:true,wed:true,thu:true,fri:true,sat:true,sun:true };
+    }
+    drawPlanEditor();
+  }
+
+  function drawPlanEditor(){
+    var d = PE.draft;
+    var mask = document.createElement('div');
+    mask.className = 'lsx-modal';
+    mask.innerHTML = '<div class="lsx-modal-box"><div class="lsx-modal-h"><b>'
+      + (d.id ? '编辑计划' : '新建计划') + '</b><span class="lsx-x" data-lsx-close="1">✕</span></div>'
+      + '<div class="lsx-modal-body">'
+      + '<div class="lsx-field"><label>计划名</label><input id="lsx-pe-name" maxlength="20" placeholder="如：每天17点熏听" value="' + esc(d.name) + '"></div>'
+      + '<div class="lsx-field"><label>选专辑（可多选，按点击顺序连播）</label><div class="lsx-chips wrap" id="lsx-pe-albs">'
+      + albChipsHtml(d) + '</div></div>'
+      + '<div class="lsx-field"><label>熏听日（只有勾上的星期才算一次熏听）</label>'
+      + '<div class="lsx-chips" id="lsx-pe-wd">'
+      + WD_ORD.map(function(k){
+          var on = !!(d.repeat && (d.repeat.daily || d.repeat[k]));
+          return '<button class="lsx-chip wd' + (on ? ' on' : '') + '" data-wd="' + k + '">' + WD_CN[k] + '</button>';
+        }).join('')
+      + '<button class="lsx-chip all' + (WD_ORD.every(function(k){ return d.repeat && (d.repeat.daily || d.repeat[k]); }) ? ' on' : '') + '" data-wd="all">每天</button></div></div>'
+      + '<div class="lsx-field row"><div><label>开始时间</label><input type="time" id="lsx-pe-time" value="' + esc(d.time || '17:00') + '"></div>'
+      + '<div><label>每天时长(分)</label><input type="number" id="lsx-pe-dur" min="5" max="180" step="5" value="' + (Number(d.duration)||60) + '"></div></div>'
+      + '<div class="lsx-field"><label>播放模式</label><div class="lsx-modes" id="lsx-pe-mode">'
+      + ['ebb','seq','daily'].map(function(m){
+          return '<button class="lsx-mode' + ((d.mode||'ebb') === m ? ' on' : '') + '" data-mode="' + m + '">'
+            + '<b>' + MODE_LABEL[m] + '</b><i>' + MODE_DESC[m] + '</i></button>';
+        }).join('')
+      + '</div></div>'
+      + '<div class="lsx-field" id="lsx-pe-ebbox"><label>艾宾浩斯参数</label>'
+      + '<div class="lsx-sub">新课日（哪几天上新曲目）</div><div class="lsx-chips" id="lsx-pe-nd">'
+      + WD_ORD.map(function(k){
+          var on = (d.eb.newDays || []).indexOf(k) >= 0;
+          return '<button class="lsx-chip wd' + (on ? ' on' : '') + '" data-nd="' + k + '">' + WD_CN[k] + '</button>';
+        }).join('')
+      + '</div>'
+      + '<div class="lsx-sub">每次新课曲目数 <input type="number" id="lsx-pe-per" min="1" max="10" value="' + (d.eb.newPerDay || 2) + '" class="lsx-num"></div>'
+      + '<div class="lsx-hint">例：每张专辑 10 首、每次上新 2 首 → 5 次新课日学完；每首学完当天起，第 1/2/4/7/15/30 次熏听日自动复习。</div>'
+      + '</div>'
+      + '<div class="lsx-field"><label>开始日期</label><input type="date" id="lsx-pe-start" value="' + esc(d.startDate || todayKey()) + '"></div>'
+      + '<div class="lsx-modal-foot"><button class="lsx-btn" data-lsx-close2="1">取消</button>'
+      + '<button class="lsx-btn main" id="lsx-pe-save">💾 保存计划</button></div>'
+      + '</div></div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function(e){ if (e.target === mask) mask.parentNode.removeChild(mask); });
+    mask.querySelector('[data-lsx-close]').onclick = function(){ mask.parentNode.removeChild(mask); };
+    mask.querySelector('[data-lsx-close2]').onclick = function(){ mask.parentNode.removeChild(mask); };
+
+    function syncEbBox(){
+      var b = mask.querySelector('#lsx-pe-ebbox');
+      if (b) b.style.display = ((d.mode || 'ebb') === 'ebb') ? 'block' : 'none';
+    }
+    syncEbBox();
+
+    var ab = mask.querySelector('#lsx-pe-albs');
+    function onAlbClick(e){
+      var b = e.target && e.target.closest ? e.target.closest('[data-aid]') : null;
+      if (!b) return;
+      var aid = b.getAttribute('data-aid');
+      var arr = d.albumIds || (d.albumIds = []);
+      var i = arr.indexOf(aid);
+      if (i >= 0) arr.splice(i, 1); else arr.push(aid);
+      ab.innerHTML = albChipsHtml(d);   /* 只重绘 chips，不动其它输入框，避免用户已填内容丢失 */
+    }
+    ab.onclick = onAlbClick;
+    var wb = mask.querySelector('#lsx-pe-wd');
+    wb.onclick = function(e){
+      var b = e.target.closest('[data-wd]'); if (!b) return;
+      var k = b.getAttribute('data-wd');
+      if (!d.repeat || d.repeat.daily) d.repeat = {};
+      if (k === 'all') {
+        var allOn = WD_ORD.every(function(x){ return d.repeat[x]; });
+        d.repeat = {};
+        if (!allOn) WD_ORD.forEach(function(x){ d.repeat[x] = true; });
+      } else {
+        if (d.repeat[k]) delete d.repeat[k]; else d.repeat[k] = true;
+      }
+      if (!Object.keys(d.repeat).length) d.repeat = { mon:true };
+      wb.querySelectorAll('[data-wd]').forEach(function(x){
+        var kk = x.getAttribute('data-wd');
+        if (kk === 'all') x.classList.toggle('on', WD_ORD.every(function(y){ return d.repeat[y]; }));
+        else x.classList.toggle('on', !!d.repeat[kk]);
+      });
+    };
+    var mb = mask.querySelector('#lsx-pe-mode');
+    mb.onclick = function(e){
+      var b = e.target.closest('[data-mode]'); if (!b) return;
+      d.mode = b.getAttribute('data-mode');
+      mb.querySelectorAll('.lsx-mode').forEach(function(x){ x.classList.toggle('on', x === b); });
+      syncEbBox();
+    };
+    var nb = mask.querySelector('#lsx-pe-nd');
+    nb.onclick = function(e){
+      var b = e.target.closest('[data-nd]'); if (!b) return;
+      var k = b.getAttribute('data-nd');
+      var arr = d.eb.newDays || (d.eb.newDays = []);
+      var i = arr.indexOf(k);
+      if (i >= 0) arr.splice(i, 1); else arr.push(k);
+      if (!arr.length) arr.push(k);
+      b.classList.toggle('on', arr.indexOf(k) >= 0);
+    };
+    mask.querySelector('#lsx-pe-save').onclick = async function(){
+      d.name = (mask.querySelector('#lsx-pe-name').value || '').trim();
+      d.time = mask.querySelector('#lsx-pe-time').value || '17:00';
+      d.duration = Number(mask.querySelector('#lsx-pe-dur').value) || 60;
+      d.startDate = mask.querySelector('#lsx-pe-start').value || todayKey();
+      d.eb.newPerDay = Math.max(1, Math.min(10, Number(mask.querySelector('#lsx-pe-per').value) || 2));
+      d.eb.newDays = WD_ORD.filter(function(k){ return (d.eb.newDays || []).indexOf(k) >= 0; });
+      if (!d.name) { toast('⚠️ 请填写计划名'); return; }
+      if (!(d.albumIds || []).length) { toast('⚠️ 请至少选一个专辑'); return; }
+      try {
+        var cid = await childId();
+        var firstTrack = null;
+        var tr = await tracksOf(d.albumIds, cid);
+        if (tr.length) firstTrack = tr[0];
+        var payload = {
+          id: d.id || undefined,
+          childId: cid,
+          name: d.name,
+          subject: '熏听',
+          category: 'listen',
+          module: (firstTrack && firstTrack.module) || 'listen-en',
+          time: d.time,
+          duration: d.duration,
+          repeat: d.repeat,
+          mode: d.mode || 'ebb',
+          startDate: d.startDate,
+          albumIds: d.albumIds.slice(),
+          eb: { newDays: d.eb.newDays.slice(), newPerDay: d.eb.newPerDay },
+          enabled: d.enabled !== false
+        };
+        if (d.id) await window.DB.updateScheduleTask(payload);
+        else await window.DB.addScheduleTask(payload);
+        /* 立刻同步今日清单，让首页/日历跟上 */
+        try { await window.DB.syncDayFromTasks(cid, todayKey()); } catch(e){}
+        mask.parentNode.removeChild(mask);
+        toast('✅ 计划已保存，今日清单已更新');
+        S.tab = 'plan';
+        render();
+      } catch(e) { toast('⚠️ 保存失败：' + (e && e.message || e)); }
+    };
+  }
+
+  /* ================= 暴露 ================= */
+  window.MX_LS_ENGINE = {
+    plan: function(t, tracks, dateKey){ return ENGINE.plan(t, tracks, dateKey); },
+    sessionDays: function(t, untilKey){ return ENGINE.sessionDays(t, untilKey); },
+    isListenDay: function(t, k){ return ENGINE.isListenDay(t, k); },
+    cap: function(t, tracks, queue){ return ENGINE.cap(t, tracks, queue); },
+    expandTaskItems: expandTaskItems,
+    EBB: EBB
+  };
+  window.MX_LS_STUDIO = {
+    render: render,
+    engine: ENGINE,
+    listAlbums: listAlbums,
+    saveAlbum: saveAlbum,
+    delAlbum: delAlbum,
+    tracksOf: tracksOf,
+    expandTaskItems: expandTaskItems,
+    brand: 'LS-STUDIO-250'
+  };
+})();
+
 </script>
 </body>
