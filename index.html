@@ -9944,6 +9944,9 @@ function mxWriteVipInfo(res) {
       localStorage.setItem('mengxing_vip', '1');
       localStorage.setItem('mengxing_activated_vip', '1');   // 同步写入 STORAGE.vip（pushCloud/pullCloud 闸门依赖此键）
       localStorage.setItem('mengxing_vip_level', String(res.vip_level || '1'));
+      /* [FREERES539] 记下卡种原始天数（1=体验/~31=月/~93=季/~183=半年/365=年），
+         免费资源库据此判档位算配额；缺失时模块会异步问 getVipStatus 补齐 */
+      try { if (res.valid_days !== undefined && res.valid_days !== null && String(res.valid_days) !== '') localStorage.setItem('mengxing_valid_days', String(res.valid_days)); } catch (eVD) {}
       localStorage.setItem('mengxing_expire_at', res.expire_at || '');
       localStorage.setItem('mengxing_auth_ts', String(Date.now()));
     } else {
@@ -18885,6 +18888,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
               if (r.linkage.goods && Array.isArray(r.linkage.goods.mall) && r.linkage.goods.mall.length) window.MX_GOODS_MALL = r.linkage.goods.mall;
               /* [#449] 兑换规则（每日限兑/说明）随配置下发 */
               window.MX_GOODS_RULES = (r.linkage.goods && r.linkage.goods.rules) ? r.linkage.goods.rules : null;
+              /* [FREERES539] 免费资源库配置：后台「📦 免费资源库」发布到 linkage_config.freeRes
+                 （资源项列表 / 各卡种配额 / 小红书链接 / 横幅文案） */
+              if (r.linkage.freeRes && typeof r.linkage.freeRes === 'object') window.MX_FREE_RES = r.linkage.freeRes;
             } catch (eG) {}
             /* [imgopt B] 管理端在配置表把 imgVer 改大 → 全端图片URL带新?v= → 强制刷新图鉴/卡面缓存 */
             try { var nv = parseInt(r.linkage.imgVer, 10); if (nv > 0) window.MX_IMG_VER = nv; } catch (e) {}
@@ -23283,6 +23289,9 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     };
 
     /* 页签切换：主页/日历/套组 在同一页内切换，不触发 navigateTo，因此不重复弹密码 */
+    /* [LISTENALBUM] 导出到 window：gotoParentListen / 熏听到点提醒都用 window.switchParentTab 跳转，
+       此前从未导出 → 那些调用一直是静默失效（函数声明会提升，此处赋值有效） */
+    window.switchParentTab = switchParentTab;
     function switchParentTab(tab) {
       window.__parentCalMount = null; window.__parentTaskMount = null;
       var homeEl = s.querySelector('#mx-parent-home');
@@ -25356,6 +25365,8 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* ============ 渲染：免费资源库 ============ */
   function renderResources(){
+    /* [FREERES539] 免费资源库改为 VIP 分级配额版；模块未加载时走下方旧实现兜底 */
+    try { if (window.MX_FREERES && typeof window.MX_FREERES.render === 'function') return window.MX_FREERES.render(); } catch (eFR) {}
     var page=document.getElementById('page-tool-resources'); if(!page) return;
     childId().then(function(cid){
       DB.getSetting('mx_free_claims', '{}').then(function(raw){
@@ -25456,11 +25467,22 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
         if(window.mxRefreshCfgNow) window.mxRefreshCfgNow().then(function(){ var _ma=window.MX_GOODS_MALL?JSON.stringify(window.MX_GOODS_MALL):''; if(_ma!==_mb) setTimeout(renderMall,30); });
       } catch(e) {}
     }
-    else if(p==='page-tool-resources') setTimeout(renderResources,60);
+    else if(p==='page-tool-resources') {
+      setTimeout(renderResources,60);
+      /* [FREERES539] 后台改了免费资源/配额，进页面立刻拉新配置；确有变化再二次渲染（防闪烁） */
+      try { var _fb = window.MX_FREE_RES ? JSON.stringify(window.MX_FREE_RES) : '';
+        if (window.mxRefreshCfgNow) window.mxRefreshCfgNow().then(function(){
+          var _fa = window.MX_FREE_RES ? JSON.stringify(window.MX_FREE_RES) : '';
+          if (_fa !== _fb) setTimeout(renderResources,30);
+        });
+      } catch (eFR2) {}
+    }
     else if(p==='page-resource-center') setTimeout(renderResourceCenter,60);
   });
 
-  window.MX_MALL={renderShop:renderShop,renderMall:renderMall,renderResources:renderResources,renderCollectionAdv:renderCollectionAdv};
+  /* [FREERES539] 补导出商品取值函数：免费资源库「升级 VIP」要在站内定位 VIP 月卡商品卡 */
+  window.MX_MALL={renderShop:renderShop,renderMall:renderMall,renderResources:renderResources,renderCollectionAdv:renderCollectionAdv,
+    products:MX_MALL_PRODUCTS, defaults:MALL_PRODUCTS};
 
   /* ============================================================
      📥 资源中心·全模块傻瓜式导入（#358 阶段一）
@@ -35743,8 +35765,61 @@ window.MX_SPRITE_COORDS = {
   .lsx-modal-box{width:100%;border-radius:16px 16px 0 0;max-height:92vh}
 }
 
+/* ===== 到点提醒（浮在底部播放条上方，不遮操作） ===== */
+.lsx-remind{position:fixed;right:14px;bottom:80px;z-index:99998;display:flex;align-items:center;gap:11px;
+  max-width:min(340px,calc(100vw - 28px));background:#fff;border:1px solid #d6e8d0;border-left:4px solid #7ec850;
+  border-radius:15px;padding:11px 13px;box-shadow:0 12px 32px rgba(20,60,20,.20);
+  opacity:0;transform:translateY(16px);transition:opacity .22s ease,transform .22s ease}
+.lsx-remind.on{opacity:1;transform:none}
+.lsx-rm-emoji{flex:0 0 auto;font-size:24px;animation:lsxRing 1.4s ease-in-out infinite}
+@keyframes lsxRing{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.lsx-rm-body{flex:1;min-width:0}
+.lsx-rm-t{font-size:13.5px;font-weight:800;color:#2b5c1e}
+.lsx-rm-s{font-size:11.5px;color:#7b8a7b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lsx-rm-ops{flex:0 0 auto;display:flex;flex-direction:column;gap:5px}
+.lsx-rm-ops .lsx-btn{padding:4px 10px;font-size:11.5px;white-space:nowrap}
+
+/* 计划页：到点提醒开关条 */
+.lsx-rmbar{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
+  background:#f6faf4;border:1px solid #e2efdb;border-radius:12px;padding:9px 12px;margin:0 0 12px;
+  font-size:12px;color:#4e6a44;line-height:1.55}
+.lsx-rmbar i{font-style:normal;color:#94a58c;font-size:11px}
+.lsx-switch{flex:0 0 auto;position:relative;width:44px;height:25px;border-radius:999px;border:none;cursor:pointer;
+  background:#d6ddd2;transition:background .18s ease;padding:0}
+.lsx-switch b{position:absolute;top:2.5px;left:2.5px;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.22);transition:left .18s ease}
+.lsx-switch.on{background:#7ec850}
+.lsx-switch.on b{left:21.5px}
+
+/* ===== [LSXTAG552] 标签一键整批选中 ===== */
+.lsx-tagbar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px;max-height:31vh;overflow-y:auto;padding:1px}
+.lsx-tagchip{display:inline-flex;align-items:center;gap:5px;border:1px solid #dfe8f6;background:#fff;color:#41556f;
+  border-radius:20px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+  transition:background .15s,border-color .15s,color .15s}
+.lsx-tagchip:hover{border-color:#9dc0ff;background:#f7fbff}
+.lsx-tagchip b{font-size:10px;font-weight:800;background:#eef4ff;color:#3f7ef5;border-radius:9px;padding:1px 5px;
+  font-variant-numeric:tabular-nums}
+.lsx-tagchip.part{border-color:#9dc0ff;background:#f2f7ff}
+.lsx-tagchip.on{border-color:#3f7ef5;background:#3f7ef5;color:#fff}
+.lsx-tagchip.on b{background:rgba(255,255,255,.92);color:#2b62c9}
+.lsx-pk-gt{border:none;background:none;color:#94a2b5;font-size:11px;cursor:pointer;padding:0 3px;line-height:1;
+  flex:0 0 auto;font-family:inherit}
+.lsx-pk-gt:hover{color:#3f7ef5}
+.lsx-pk-gn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.lsx-pk-gn b{color:#3f7ef5;font-weight:800}
+.lsx-more{display:block;width:100%;margin:7px 0 3px;border:1px dashed #cfdcf0;background:#fbfdff;color:#5b7392;
+  border-radius:9px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit}
+.lsx-more:hover{background:#f2f7ff;border-color:#9dc0ff;color:#2b62c9}
+
 </style>
 <script>
+/* === _ls_lib_man.js — 熏听曲库清单（自动生成，勿手改）===
+   生成脚本：temp/_ls_lib_build.py（扫 assets/audio + 读 MX_POEM_CATALOG）
+   结构：g=组 / t=标签 / i=各组曲目（古诗条目带「体裁码+年级」）
+   合计 1915 首（古诗 122 / 英语 75 / 拼音 1708 / 节奏盒子 10）
+*/
+var LIB_MAN={"g":[["poem","📜 古诗·范读","lchinese",45],["english","🔤 英语·单词","listen-en",8],["pinyin","🈶 拼音·音节","pinyin",3],["sprunki","🎛️ 节奏盒子·配乐","listen-music",40]],"t":[["pb","📜 古诗·小学必备","部编版小学教材内必学篇目"],["pk","📜 古诗·小学拓展","课标推荐 / 课外拓展篇目"],["pc","📜 古诗·初中衔接","初中教材篇目，小学高年级可提前听"],["px","📜 古诗·课外补充","不在目录映射内的补充篇目"],["pg1","📜 古诗·一年级",""],["pg2","📜 古诗·二年级",""],["pg3","📜 古诗·三年级",""],["pg4","📜 古诗·四年级",""],["pg5","📜 古诗·五年级",""],["pg6","📜 古诗·六年级",""],["ea","🔤 英语·单词启蒙","内置 26 字母 + 常用词"],["ya","🈶 拼音·音节全库","声母/韵母/整体认读的四个声调范读"],["sa","🎛️ 节奏盒子·角色配乐","节奏盒子 10 个角色曲"],["y1","🈶 拼音·一声",""],["y2","🈶 拼音·二声",""],["y3","🈶 拼音·三声",""],["y4","🈶 拼音·四声",""]],"i":{"poem":[["古朗月行","b1"],["咏鹅","b1"],["小池","b1"],["悯农（其二）","b1"],["池上","b1"],["画","b1"],["画鸡","b1"],["赠汪伦","b1"],["静夜思","b1"],["风","b1"],["咏柳","b2"],["夜宿山寺","b2"],["小儿垂钓","b2"],["悯农（其一）","b2"],["望庐山瀑布","b2"],["村居","b2"],["梅花","b2"],["江雪","b2"],["登鹳雀楼","b2"],["绝句","b2"],["赋得古原草送别","b2"],["三衢道中","b3"],["九月九日忆山东兄弟","b3"],["元日","b3"],["夜书所见","b3"],["山行","b3"],["忆江南","b3"],["所见","b3"],["望天门山","b3"],["望洞庭","b3"],["清明","b3"],["绝句（迟日）","b3"],["赠刘景文","b3"],["采莲曲","b3"],["饮湖上初晴后雨","b3"],["凉州词（其一）","b4"],["别董大","b4"],["夏日绝句","b4"],["嫦娥","b4"],["暮江吟","b4"],["雪梅","b4"],["题西林壁","b4"],["鹿柴","b4"],["乞巧","b5"],["山居秋暝","b5"],["示儿","b5"],["蝉","b5"],["题临安邸","b5"],["七律","b6"],["书湖阴先生壁","b6"],["六月二十七日望湖楼醉书","b6"],["回乡偶书","b6"],["宿建德江","b6"],["早春呈水部张十八员外","b6"],["春日","b6"],["江南春","b6"],["浪淘沙（其一）","b6"],["游园不值","b6"],["石灰吟","b6"],["竹石","b6"],["菩萨蛮","b6"],["过故人庄","b6"],["送元二使安西","b6"],["浪淘沙","b0"],["寻隐者不遇","k1"],["春晓","k1"],["江南","k1"],["敕勒歌","k2"],["晓出净慈寺送林子方","k2"],["舟夜书所见","k2"],["惠崇春江晚景","k3"],["早发白帝城","k3"],["滁州西涧","k3"],["出塞","k4"],["四时田园杂兴（其二十五）","k4"],["塞下曲","k4"],["墨梅","k4"],["宿新市徐公店","k4"],["江畔独步寻花","k4"],["独坐敬亭山","k4"],["芙蓉楼送辛渐","k4"],["蜂","k4"],["乡村四月","k5"],["从军行","k5"],["凉州词（黄河远上）","k5"],["四时田园杂兴（其三十一）","k5"],["己亥杂诗","k5"],["村晚","k5"],["枫桥夜泊","k5"],["渔歌子","k5"],["游子吟","k5"],["秋夜将晓出篱门迎凉有感","k5"],["稚子弄冰","k5"],["观书有感","k5"],["长相思","k5"],["闻官军收河南河北","k5"],["鸟鸣涧","k5"],["黄鹤楼送孟浩然之广陵","k5"],["春夜喜雨","k6"],["江上渔者","k6"],["泊船瓜洲","k6"],["西江月","k6"],["长歌行","k6"],["四时田园杂兴","k0"],["清平乐","k0"],["天净沙","c0"],["泊秦淮","c0"],["游山西村","c0"],["闻王昌龄左迁龙标遥有此寄","c0"],["七步诗","x0"],["乐游原","x0"],["凉州词","x0"],["卜算子","x0"],["如梦令","x0"],["山亭夏日","x0"],["峨眉山月歌","x0"],["望月怀远","x0"],["汉江临泛","x0"],["江上","x0"],["秋夕","x0"],["舟过安仁","x0"],["问刘十九","x0"]],"english":[["a"],["apple"],["b"],["ball"],["bat"],["bed"],["big"],["box"],["boy"],["bus"],["c"],["cat"],["cup"],["d"],["dog"],["e"],["egg"],["f"],["fish"],["fox"],["g"],["grape"],["h"],["hat"],["hen"],["hot"],["i"],["ice"],["j"],["jet"],["juice"],["k"],["kite"],["l"],["leg"],["lion"],["m"],["man"],["map"],["moon"],["n"],["nose"],["o"],["orange"],["p"],["pen"],["pig"],["pot"],["q"],["queen"],["r"],["rabbit"],["red"],["run"],["s"],["sad"],["six"],["sun"],["t"],["ten"],["tiger"],["u"],["umbrella"],["v"],["van"],["w"],["water"],["wet"],["win"],["x"],["y"],["yellow"],["z"],["zebra"],["zip"]],"pinyin":[["_hm1"],["_hm2"],["_hm3"],["_hm4"],["_hng1"],["_hng2"],["_hng3"],["_hng4"],["_lvan1"],["_lvan2"],["_lvan3"],["_lvan4"],["_m1"],["_m2"],["_m3"],["_m4"],["_n1"],["_n2"],["_n3"],["_n4"],["_ng1"],["_ng2"],["_ng3"],["_ng4"],["_nia1"],["_nia2"],["_nia3"],["_nia4"],["a1"],["a2"],["a3"],["a4"],["a5"],["ai1"],["ai2"],["ai3"],["ai4"],["ai5"],["an1"],["an2"],["an3"],["an4"],["an5"],["ang1"],["ang2"],["ang3"],["ang4"],["ang5"],["ao1"],["ao2"],["ao3"],["ao4"],["ao5"],["ba1"],["ba2"],["ba3"],["ba4"],["ba5"],["bai1"],["bai2"],["bai3"],["bai4"],["bai5"],["ban1"],["ban2"],["ban3"],["ban4"],["ban5"],["bang1"],["bang2"],["bang3"],["bang4"],["bang5"],["bao1"],["bao2"],["bao3"],["bao4"],["bao5"],["bei1"],["bei2"],["bei3"],["bei4"],["bei5"],["ben1"],["ben2"],["ben3"],["ben4"],["ben5"],["beng1"],["beng2"],["beng3"],["beng4"],["beng5"],["bi1"],["bi2"],["bi3"],["bi4"],["bi5"],["bian1"],["bian2"],["bian3"],["bian4"],["bian5"],["biao1"],["biao2"],["biao3"],["biao4"],["biao5"],["bie1"],["bie2"],["bie3"],["bie4"],["bie5"],["bin1"],["bin2"],["bin3"],["bin4"],["bin5"],["bing1"],["bing2"],["bing3"],["bing4"],["bing5"],["bo1"],["bo2"],["bo3"],["bo4"],["bu1"],["bu2"],["bu3"],["bu4"],["ca1"],["ca2"],["ca3"],["ca4"],["cai1"],["cai2"],["cai3"],["cai4"],["can1"],["can2"],["can3"],["can4"],["cang1"],["cang2"],["cang3"],["cang4"],["cao1"],["cao2"],["cao3"],["cao4"],["ce1"],["ce2"],["ce3"],["ce4"],["cei1"],["cei2"],["cei3"],["cei4"],["cen1"],["cen2"],["cen3"],["cen4"],["ceng1"],["ceng2"],["ceng3"],["ceng4"],["cha1"],["cha2"],["cha3"],["cha4"],["chai1"],["chai2"],["chai3"],["chai4"],["chan1"],["chan2"],["chan3"],["chan4"],["chang1"],["chang2"],["chang3"],["chang4"],["chao1"],["chao2"],["chao3"],["chao4"],["che1"],["che2"],["che3"],["che4"],["chen1"],["chen2"],["chen3"],["chen4"],["cheng1"],["cheng2"],["cheng3"],["cheng4"],["chi1"],["chi2"],["chi3"],["chi4"],["chong1"],["chong2"],["chong3"],["chong4"],["chou1"],["chou2"],["chou3"],["chou4"],["chu1"],["chu2"],["chu3"],["chu4"],["chua1"],["chua2"],["chua3"],["chua4"],["chuai1"],["chuai2"],["chuai3"],["chuai4"],["chuan1"],["chuan2"],["chuan3"],["chuan4"],["chuang1"],["chuang2"],["chuang3"],["chuang4"],["chui1"],["chui2"],["chui3"],["chui4"],["chun1"],["chun2"],["chun3"],["chun4"],["chuo1"],["chuo2"],["chuo3"],["chuo4"],["ci1"],["ci2"],["ci3"],["ci4"],["cong1"],["cong2"],["cong3"],["cong4"],["cou1"],["cou2"],["cou3"],["cou4"],["cu1"],["cu2"],["cu3"],["cu4"],["cuan1"],["cuan2"],["cuan3"],["cuan4"],["cui1"],["cui2"],["cui3"],["cui4"],["cun1"],["cun2"],["cun3"],["cun4"],["cuo1"],["cuo2"],["cuo3"],["cuo4"],["da1"],["da2"],["da3"],["da4"],["dai1"],["dai2"],["dai3"],["dai4"],["dan1"],["dan2"],["dan3"],["dan4"],["dang1"],["dang2"],["dang3"],["dang4"],["dao1"],["dao2"],["dao3"],["dao4"],["de1"],["de2"],["de3"],["de4"],["dei1"],["dei2"],["dei3"],["dei4"],["den1"],["den2"],["den3"],["den4"],["deng1"],["deng2"],["deng3"],["deng4"],["di1"],["di2"],["di3"],["di4"],["dia1"],["dia2"],["dia3"],["dia4"],["dian1"],["dian2"],["dian3"],["dian4"],["diao1"],["diao2"],["diao3"],["diao4"],["die1"],["die2"],["die3"],["die4"],["ding1"],["ding2"],["ding3"],["ding4"],["diu1"],["diu2"],["diu3"],["diu4"],["dong1"],["dong2"],["dong3"],["dong4"],["dou1"],["dou2"],["dou3"],["dou4"],["du1"],["du2"],["du3"],["du4"],["duan1"],["duan2"],["duan3"],["duan4"],["dui1"],["dui2"],["dui3"],["dui4"],["dun1"],["dun2"],["dun3"],["dun4"],["duo1"],["duo2"],["duo3"],["duo4"],["e1"],["e2"],["e3"],["e4"],["ei1"],["ei2"],["ei3"],["ei4"],["en1"],["en2"],["en3"],["en4"],["eng1"],["eng2"],["eng3"],["eng4"],["er1"],["er2"],["er3"],["er4"],["f_k"],["fa1"],["fa2"],["fa3"],["fa4"],["fan1"],["fan2"],["fan3"],["fan4"],["fang1"],["fang2"],["fang3"],["fang4"],["fe1"],["fe2"],["fe3"],["fe4"],["fei1"],["fei2"],["fei3"],["fei4"],["fen1"],["fen2"],["fen3"],["fen4"],["feng1"],["feng2"],["feng3"],["feng4"],["fiao1"],["fiao2"],["fiao3"],["fiao4"],["fo1"],["fo2"],["fo3"],["fo4"],["fou1"],["fou2"],["fou3"],["fou4"],["fu1"],["fu2"],["fu3"],["fu4"],["ga1"],["ga2"],["ga3"],["ga4"],["gai1"],["gai2"],["gai3"],["gai4"],["gan1"],["gan2"],["gan3"],["gan4"],["gang1"],["gang2"],["gang3"],["gang4"],["gao1"],["gao2"],["gao3"],["gao4"],["ge1"],["ge2"],["ge3"],["ge4"],["gei1"],["gei2"],["gei3"],["gei4"],["gen1"],["gen2"],["gen3"],["gen4"],["geng1"],["geng2"],["geng3"],["geng4"],["gong1"],["gong2"],["gong3"],["gong4"],["gou1"],["gou2"],["gou3"],["gou4"],["gu1"],["gu2"],["gu3"],["gu4"],["gua1"],["gua2"],["gua3"],["gua4"],["guai1"],["guai2"],["guai3"],["guai4"],["guan1"],["guan2"],["guan3"],["guan4"],["guang1"],["guang2"],["guang3"],["guang4"],["gui1"],["gui2"],["gui3"],["gui4"],["gun1"],["gun2"],["gun3"],["gun4"],["guo1"],["guo2"],["guo3"],["guo4"],["ha1"],["ha2"],["ha3"],["ha4"],["hai1"],["hai2"],["hai3"],["hai4"],["han1"],["han2"],["han3"],["han4"],["hang1"],["hang2"],["hang3"],["hang4"],["hao1"],["hao2"],["hao3"],["hao4"],["he1"],["he2"],["he3"],["he4"],["hei1"],["hei2"],["hei3"],["hei4"],["hen1"],["hen2"],["hen3"],["hen4"],["heng1"],["heng2"],["heng3"],["heng4"],["hong1"],["hong2"],["hong3"],["hong4"],["hou1"],["hou2"],["hou3"],["hou4"],["hu1"],["hu2"],["hu3"],["hu4"],["hua1"],["hua2"],["hua3"],["hua4"],["huai1"],["huai2"],["huai3"],["huai4"],["huan1"],["huan2"],["huan3"],["huan4"],["huang1"],["huang2"],["huang3"],["huang4"],["hui1"],["hui2"],["hui3"],["hui4"],["hun1"],["hun2"],["hun3"],["hun4"],["huo1"],["huo2"],["huo3"],["huo4"],["ji1"],["ji2"],["ji3"],["ji4"],["jia1"],["jia2"],["jia3"],["jia4"],["jian1"],["jian2"],["jian3"],["jian4"],["jiang1"],["jiang2"],["jiang3"],["jiang4"],["jiao1"],["jiao2"],["jiao3"],["jiao4"],["jie1"],["jie2"],["jie3"],["jie4"],["jin1"],["jin2"],["jin3"],["jin4"],["jing1"],["jing2"],["jing3"],["jing4"],["jiong1"],["jiong2"],["jiong3"],["jiong4"],["jiu1"],["jiu2"],["jiu3"],["jiu4"],["ju1"],["ju2"],["ju3"],["juan1"],["juan2"],["juan3"],["juan4"],["jue1"],["jue2"],["jue3"],["jue4"],["jun1"],["jun2"],["jun3"],["jun4"],["jv4"],["ka1"],["ka2"],["ka3"],["ka4"],["kai1"],["kai2"],["kai3"],["kai4"],["kan1"],["kan2"],["kan3"],["kan4"],["kang1"],["kang2"],["kang3"],["kang4"],["kao1"],["kao2"],["kao3"],["kao4"],["ke1"],["ke2"],["ke3"],["ke4"],["kei1"],["kei2"],["kei3"],["kei4"],["ken1"],["ken2"],["ken3"],["ken4"],["keng1"],["keng2"],["keng3"],["keng4"],["kong1"],["kong2"],["kong3"],["kong4"],["kou1"],["kou2"],["kou3"],["kou4"],["ku1"],["ku2"],["ku3"],["ku4"],["kua1"],["kua2"],["kua3"],["kua4"],["kuai1"],["kuai2"],["kuai3"],["kuai4"],["kuan1"],["kuan2"],["kuan3"],["kuan4"],["kuang1"],["kuang2"],["kuang3"],["kuang4"],["kui1"],["kui2"],["kui3"],["kui4"],["kun1"],["kun2"],["kun3"],["kun4"],["kuo1"],["kuo2"],["kuo3"],["kuo4"],["la1"],["la2"],["la3"],["la4"],["lai1"],["lai2"],["lai3"],["lai4"],["lan1"],["lan2"],["lan3"],["lan4"],["lang1"],["lang2"],["lang3"],["lang4"],["lao1"],["lao2"],["lao3"],["lao4"],["le1"],["le2"],["le3"],["le4"],["lei1"],["lei2"],["lei3"],["lei4"],["leng1"],["leng2"],["leng3"],["leng4"],["li1"],["li2"],["li3"],["li4"],["lia1"],["lia2"],["lia3"],["lia4"],["lian1"],["lian2"],["lian3"],["lian4"],["liang1"],["liang2"],["liang3"],["liang4"],["liao1"],["liao2"],["liao3"],["liao4"],["lie1"],["lie2"],["lie3"],["lie4"],["lin1"],["lin2"],["lin3"],["lin4"],["ling1"],["ling2"],["ling3"],["ling4"],["liu1"],["liu2"],["liu3"],["liu4"],["lo1"],["lo2"],["lo3"],["lo4"],["long1"],["long2"],["long3"],["long4"],["lou1"],["lou2"],["lou3"],["lou4"],["lu1"],["lu2"],["lu3"],["lu4"],["luan1"],["luan2"],["luan3"],["luan4"],["lun1"],["lun2"],["lun3"],["lun4"],["luo1"],["luo2"],["luo3"],["luo4"],["lv1"],["lv2"],["lv3"],["lv4"],["lve1"],["lve2"],["lve3"],["lve4"],["ma1"],["ma2"],["ma3"],["ma4"],["mai1"],["mai2"],["mai3"],["mai4"],["man1"],["man2"],["man3"],["man4"],["mang1"],["mang2"],["mang3"],["mang4"],["mao1"],["mao2"],["mao3"],["mao4"],["me1"],["me2"],["me3"],["me4"],["mei1"],["mei2"],["mei3"],["mei4"],["men1"],["men2"],["men3"],["men4"],["meng1"],["meng2"],["meng3"],["meng4"],["mi1"],["mi2"],["mi3"],["mi4"],["mian1"],["mian2"],["mian3"],["mian4"],["miao1"],["miao2"],["miao3"],["miao4"],["mie1"],["mie2"],["mie3"],["mie4"],["min1"],["min2"],["min3"],["min4"],["ming1"],["ming2"],["ming3"],["ming4"],["miu1"],["miu2"],["miu3"],["miu4"],["mo1"],["mo2"],["mo3"],["mo4"],["mou1"],["mou2"],["mou3"],["mou4"],["mu1"],["mu2"],["mu3"],["mu4"],["na1"],["na2"],["na3"],["na4"],["nai1"],["nai2"],["nai3"],["nai4"],["nan1"],["nan2"],["nan3"],["nan4"],["nang1"],["nang2"],["nang3"],["nang4"],["nao1"],["nao2"],["nao3"],["nao4"],["ne1"],["ne2"],["ne3"],["ne4"],["nei1"],["nei2"],["nei3"],["nei4"],["nen1"],["nen2"],["nen3"],["nen4"],["neng1"],["neng2"],["neng3"],["neng4"],["ni1"],["ni2"],["ni3"],["ni4"],["nian1"],["nian2"],["nian3"],["nian4"],["niang1"],["niang2"],["niang3"],["niang4"],["niao1"],["niao2"],["niao3"],["niao4"],["nie1"],["nie2"],["nie3"],["nie4"],["nin1"],["nin2"],["nin3"],["nin4"],["ning1"],["ning2"],["ning3"],["ning4"],["niu1"],["niu2"],["niu3"],["niu4"],["nong1"],["nong2"],["nong3"],["nong4"],["nou1"],["nou2"],["nou3"],["nou4"],["nu1"],["nu2"],["nu3"],["nu4"],["nuan1"],["nuan2"],["nuan3"],["nuan4"],["nun1"],["nun2"],["nun3"],["nun4"],["nuo1"],["nuo2"],["nuo3"],["nuo4"],["nv1"],["nv2"],["nv3"],["nv4"],["nve1"],["nve2"],["nve3"],["nve4"],["o1"],["o2"],["o3"],["o4"],["ou1"],["ou2"],["ou3"],["ou4"],["pa1"],["pa2"],["pa3"],["pa4"],["pai1"],["pai2"],["pai3"],["pai4"],["pan1"],["pan2"],["pan3"],["pan4"],["pang1"],["pang2"],["pang3"],["pang4"],["pao1"],["pao2"],["pao3"],["pao4"],["pei1"],["pei2"],["pei3"],["pei4"],["pen1"],["pen2"],["pen3"],["pen4"],["peng1"],["peng2"],["peng3"],["peng4"],["pi1"],["pi2"],["pi3"],["pi4"],["pian1"],["pian2"],["pian3"],["pian4"],["piao1"],["piao2"],["piao3"],["piao4"],["pie1"],["pie2"],["pie3"],["pie4"],["pin1"],["pin2"],["pin3"],["pin4"],["ping1"],["ping2"],["ping3"],["ping4"],["po1"],["po2"],["po3"],["po4"],["pou1"],["pou2"],["pou3"],["pou4"],["pu1"],["pu2"],["pu3"],["pu4"],["qi1"],["qi2"],["qi3"],["qi4"],["qia1"],["qia2"],["qia3"],["qia4"],["qian1"],["qian2"],["qian3"],["qian4"],["qiang1"],["qiang2"],["qiang3"],["qiang4"],["qiao1"],["qiao2"],["qiao3"],["qiao4"],["qie1"],["qie2"],["qie3"],["qie4"],["qin1"],["qin2"],["qin3"],["qin4"],["qing1"],["qing2"],["qing3"],["qing4"],["qiong1"],["qiong2"],["qiong3"],["qiong4"],["qiu1"],["qiu2"],["qiu3"],["qiu4"],["qu1"],["qu2"],["qu3"],["qu4"],["quan1"],["quan2"],["quan3"],["quan4"],["que1"],["que2"],["que3"],["que4"],["qun1"],["qun2"],["qun3"],["qun4"],["ran1"],["ran2"],["ran3"],["ran4"],["rang1"],["rang2"],["rang3"],["rang4"],["rao1"],["rao2"],["rao3"],["rao4"],["re1"],["re2"],["re3"],["re4"],["ren1"],["ren2"],["ren3"],["ren4"],["reng1"],["reng2"],["reng3"],["reng4"],["ri1"],["ri2"],["ri3"],["ri4"],["rong1"],["rong2"],["rong3"],["rong4"],["rou1"],["rou2"],["rou3"],["rou4"],["ru1"],["ru2"],["ru3"],["ru4"],["rua1"],["rua2"],["rua3"],["rua4"],["ruan1"],["ruan2"],["ruan3"],["ruan4"],["rui1"],["rui2"],["rui3"],["rui4"],["run1"],["run2"],["run3"],["run4"],["ruo1"],["ruo2"],["ruo3"],["ruo4"],["sa1"],["sa2"],["sa3"],["sa4"],["sai1"],["sai2"],["sai3"],["sai4"],["san1"],["san2"],["san3"],["san4"],["sang1"],["sang2"],["sang3"],["sang4"],["sao1"],["sao2"],["sao3"],["sao4"],["se1"],["se2"],["se3"],["se4"],["sen1"],["sen2"],["sen3"],["sen4"],["seng1"],["seng2"],["seng3"],["seng4"],["sha1"],["sha2"],["sha3"],["sha4"],["shai1"],["shai2"],["shai3"],["shai4"],["shan1"],["shan2"],["shan3"],["shan4"],["shang1"],["shang2"],["shang3"],["shang4"],["shao1"],["shao2"],["shao3"],["shao4"],["she1"],["she2"],["she3"],["she4"],["shei1"],["shei2"],["shei3"],["shei4"],["shen1"],["shen2"],["shen3"],["shen4"],["sheng1"],["sheng2"],["sheng3"],["sheng4"],["shi1"],["shi2"],["shi3"],["shi4"],["shou1"],["shou2"],["shou3"],["shou4"],["shu1"],["shu2"],["shu3"],["shu4"],["shua1"],["shua2"],["shua3"],["shua4"],["shuai1"],["shuai2"],["shuai3"],["shuai4"],["shuan1"],["shuan2"],["shuan3"],["shuan4"],["shuang1"],["shuang2"],["shuang3"],["shuang4"],["shui1"],["shui2"],["shui3"],["shui4"],["shun1"],["shun2"],["shun3"],["shun4"],["shuo1"],["shuo2"],["shuo3"],["shuo4"],["si1"],["si2"],["si3"],["si4"],["song1"],["song2"],["song3"],["song4"],["sou1"],["sou2"],["sou3"],["sou4"],["su1"],["su2"],["su3"],["su4"],["suan1"],["suan2"],["suan3"],["suan4"],["sui1"],["sui2"],["sui3"],["sui4"],["sun1"],["sun2"],["sun3"],["sun4"],["suo1"],["suo2"],["suo3"],["suo4"],["ta1"],["ta2"],["ta3"],["ta4"],["tai1"],["tai2"],["tai3"],["tai4"],["tan1"],["tan2"],["tan3"],["tan4"],["tang1"],["tang2"],["tang3"],["tang4"],["tao1"],["tao2"],["tao3"],["tao4"],["te1"],["te2"],["te3"],["te4"],["tei1"],["tei2"],["tei3"],["tei4"],["teng1"],["teng2"],["teng3"],["teng4"],["ti1"],["ti2"],["ti3"],["ti4"],["tian1"],["tian2"],["tian3"],["tian4"],["tiao1"],["tiao2"],["tiao3"],["tiao4"],["tie1"],["tie2"],["tie3"],["tie4"],["ting1"],["ting2"],["ting3"],["ting4"],["tong1"],["tong2"],["tong3"],["tong4"],["tou1"],["tou2"],["tou3"],["tou4"],["tu1"],["tu2"],["tu3"],["tu4"],["tuan1"],["tuan2"],["tuan3"],["tuan4"],["tui1"],["tui2"],["tui3"],["tui4"],["tun1"],["tun2"],["tun3"],["tun4"],["tuo1"],["tuo2"],["tuo3"],["tuo4"],["wa1"],["wa2"],["wa3"],["wa4"],["wai1"],["wai2"],["wai3"],["wai4"],["wan1"],["wan2"],["wan3"],["wan4"],["wang1"],["wang2"],["wang3"],["wang4"],["wei1"],["wei2"],["wei3"],["wei4"],["wen1"],["wen2"],["wen3"],["wen4"],["weng1"],["weng2"],["weng3"],["weng4"],["wo1"],["wo2"],["wo3"],["wo4"],["wu1"],["wu2"],["wu3"],["wu4"],["xi1"],["xi2"],["xi3"],["xi4"],["xia1"],["xia2"],["xia3"],["xia4"],["xian1"],["xian2"],["xian3"],["xian4"],["xiang1"],["xiang2"],["xiang3"],["xiang4"],["xiao1"],["xiao2"],["xiao3"],["xiao4"],["xie1"],["xie2"],["xie3"],["xie4"],["xin1"],["xin2"],["xin3"],["xin4"],["xing1"],["xing2"],["xing3"],["xing4"],["xiong1"],["xiong2"],["xiong3"],["xiong4"],["xiu1"],["xiu2"],["xiu3"],["xiu4"],["xu1"],["xu2"],["xu3"],["xu4"],["xuan1"],["xuan2"],["xuan3"],["xuan4"],["xue1"],["xue2"],["xue3"],["xue4"],["xun1"],["xun2"],["xun3"],["xun4"],["ya1"],["ya2"],["ya3"],["ya4"],["yai1"],["yai2"],["yai3"],["yai4"],["yan1"],["yan2"],["yan3"],["yan4"],["yang1"],["yang2"],["yang3"],["yang4"],["yao1"],["yao2"],["yao3"],["yao4"],["ye1"],["ye2"],["ye3"],["ye4"],["yi1"],["yi2"],["yi3"],["yi4"],["yin1"],["yin2"],["yin3"],["yin4"],["ying1"],["ying2"],["ying3"],["ying4"],["yong1"],["yong2"],["yong3"],["yong4"],["you1"],["you2"],["you3"],["you4"],["yu1"],["yu2"],["yu3"],["yu4"],["yuan1"],["yuan2"],["yuan3"],["yuan4"],["yue1"],["yue2"],["yue3"],["yue4"],["yun1"],["yun2"],["yun3"],["yun4"],["za1"],["za2"],["za3"],["za4"],["zai1"],["zai2"],["zai3"],["zai4"],["zan1"],["zan2"],["zan3"],["zan4"],["zang1"],["zang2"],["zang3"],["zang4"],["zao1"],["zao2"],["zao3"],["zao4"],["ze1"],["ze2"],["ze3"],["ze4"],["zei1"],["zei2"],["zei3"],["zei4"],["zen1"],["zen2"],["zen3"],["zen4"],["zeng1"],["zeng2"],["zeng3"],["zeng4"],["zha1"],["zha2"],["zha3"],["zha4"],["zhai1"],["zhai2"],["zhai3"],["zhai4"],["zhan1"],["zhan2"],["zhan3"],["zhan4"],["zhang1"],["zhang2"],["zhang3"],["zhang4"],["zhao1"],["zhao2"],["zhao3"],["zhao4"],["zhe1"],["zhe2"],["zhe3"],["zhe4"],["zhei1"],["zhei2"],["zhei3"],["zhei4"],["zhen1"],["zhen2"],["zhen3"],["zhen4"],["zheng1"],["zheng2"],["zheng3"],["zheng4"],["zhi1"],["zhi2"],["zhi3"],["zhi4"],["zhong1"],["zhong2"],["zhong3"],["zhong4"],["zhou1"],["zhou2"],["zhou3"],["zhou4"],["zhu1"],["zhu2"],["zhu3"],["zhu4"],["zhua1"],["zhua2"],["zhua3"],["zhua4"],["zhuai1"],["zhuai2"],["zhuai3"],["zhuai4"],["zhuan1"],["zhuan2"],["zhuan3"],["zhuan4"],["zhuang1"],["zhuang2"],["zhuang3"],["zhuang4"],["zhui1"],["zhui2"],["zhui3"],["zhui4"],["zhun1"],["zhun2"],["zhun3"],["zhun4"],["zhuo1"],["zhuo2"],["zhuo3"],["zhuo4"],["zi1"],["zi2"],["zi3"],["zi4"],["zong1"],["zong2"],["zong3"],["zong4"],["zou1"],["zou2"],["zou3"],["zou4"],["zu1"],["zu2"],["zu3"],["zu4"],["zuan1"],["zuan2"],["zuan3"],["zuan4"],["zui1"],["zui2"],["zui3"],["zui4"],["zun1"],["zun2"],["zun3"],["zun4"],["zuo1"],["zuo2"],["zuo3"],["zuo4"]],"sprunki":[["sprunki_ensemble"],["sprunki_fun_computer"],["sprunki_funbot"],["sprunki_gray"],["sprunki_phase123"],["sprunki_pinki"],["sprunki_simon"],["sprunki_sun_concerto"],["sprunki_tree_fantasy"],["sprunki_wenda"]]}};
+
 /* === js/listen-studio.js — 熏听工坊 v2.5.0 ===
    专辑（播放列表）+ 双层艾宾浩斯 + 今日播放器 + 视频派生音频
    · 第一层（曲目层）：每首曲目在「新学熏听日」引入 → 其后按 +1/2/4/7/15/30 个熏听日复习
@@ -35774,17 +35849,51 @@ window.MX_SPRITE_COORDS = {
     'poem':'古诗','literacy':'识字','pinyin':'拼音',
     'story':'绘本故事','estory':'英语绘本','abc':'26字母','phonics':'自然拼读','words':'单词短语'
   };
-  /* 内置曲库（assets/audio 下现成音频，免上传直接进专辑）
-     来源：构建时扫描 projects/萌星宝宝/assets/audio/{poem,english}/*.mp3 */
-  var LIB = {
-    poem: ["七律.mp3","七步诗.mp3","三衢道中.mp3","乐游原.mp3","九月九日忆山东兄弟.mp3","乞巧.mp3","乡村四月.mp3","书湖阴先生壁.mp3","从军行.mp3","元日.mp3","六月二十七日望湖楼醉书.mp3","凉州词.mp3","凉州词（其一）.mp3","凉州词（黄河远上）.mp3","出塞.mp3","别董大.mp3","卜算子.mp3","古朗月行.mp3","咏柳.mp3","咏鹅.mp3","四时田园杂兴.mp3","四时田园杂兴（其三十一）.mp3","四时田园杂兴（其二十五）.mp3","回乡偶书.mp3","塞下曲.mp3","墨梅.mp3","夏日绝句.mp3","夜书所见.mp3","夜宿山寺.mp3","天净沙.mp3","如梦令.mp3","嫦娥.mp3","宿建德江.mp3","宿新市徐公店.mp3","寻隐者不遇.mp3","小儿垂钓.mp3","小池.mp3","山亭夏日.mp3","山居秋暝.mp3","山行.mp3","峨眉山月歌.mp3","己亥杂诗.mp3","忆江南.mp3","悯农（其一）.mp3","悯农（其二）.mp3","惠崇春江晚景.mp3","所见.mp3","敕勒歌.mp3","早发白帝城.mp3","早春呈水部张十八员外.mp3","春夜喜雨.mp3","春日.mp3","春晓.mp3","晓出净慈寺送林子方.mp3","暮江吟.mp3","望天门山.mp3","望庐山瀑布.mp3","望月怀远.mp3","望洞庭.mp3","村居.mp3","村晚.mp3","枫桥夜泊.mp3","梅花.mp3","汉江临泛.mp3","江上.mp3","江上渔者.mp3","江南.mp3","江南春.mp3","江畔独步寻花.mp3","江雪.mp3","池上.mp3","泊秦淮.mp3","泊船瓜洲.mp3","浪淘沙.mp3","浪淘沙（其一）.mp3","清平乐.mp3","清明.mp3","渔歌子.mp3","游园不值.mp3","游子吟.mp3","游山西村.mp3","滁州西涧.mp3","独坐敬亭山.mp3","画.mp3","画鸡.mp3","登鹳雀楼.mp3","石灰吟.mp3","示儿.mp3","秋夕.mp3","秋夜将晓出篱门迎凉有感.mp3","稚子弄冰.mp3","竹石.mp3","绝句.mp3","绝句（迟日）.mp3","舟夜书所见.mp3","舟过安仁.mp3","芙蓉楼送辛渐.mp3","菩萨蛮.mp3","蜂.mp3","蝉.mp3","西江月.mp3","观书有感.mp3","赋得古原草送别.mp3","赠刘景文.mp3","赠汪伦.mp3","过故人庄.mp3","送元二使安西.mp3","采莲曲.mp3","长歌行.mp3","长相思.mp3","问刘十九.mp3","闻官军收河南河北.mp3","闻王昌龄左迁龙标遥有此寄.mp3","雪梅.mp3","静夜思.mp3","题临安邸.mp3","题西林壁.mp3","风.mp3","饮湖上初晴后雨.mp3","鸟鸣涧.mp3","鹿柴.mp3","黄鹤楼送孟浩然之广陵.mp3"],
-    english: ["a.mp3","apple.mp3","b.mp3","ball.mp3","bat.mp3","bed.mp3","big.mp3","box.mp3","boy.mp3","bus.mp3","c.mp3","cat.mp3","cup.mp3","d.mp3","dog.mp3","e.mp3","egg.mp3","f.mp3","fish.mp3","fox.mp3","g.mp3","grape.mp3","h.mp3","hat.mp3","hen.mp3","hot.mp3","i.mp3","ice.mp3","j.mp3","jet.mp3","juice.mp3","k.mp3","kite.mp3","l.mp3","leg.mp3","lion.mp3","m.mp3","man.mp3","map.mp3","moon.mp3","n.mp3","nose.mp3","o.mp3","orange.mp3","p.mp3","pen.mp3","pig.mp3","pot.mp3","q.mp3","queen.mp3","r.mp3","rabbit.mp3","red.mp3","run.mp3","s.mp3","sad.mp3","six.mp3","sun.mp3","t.mp3","ten.mp3","tiger.mp3","u.mp3","umbrella.mp3","v.mp3","van.mp3","w.mp3","water.mp3","wet.mp3","win.mp3","x.mp3","y.mp3","yellow.mp3","z.mp3","zebra.mp3","zip.mp3"],
+  /* [LSXTAG552] 内置曲库清单：构建时扫描 assets/audio/{poem,english,pinyin,sprunki} 生成
+     （生成脚本 temp/_ls_lib_build.py，产物 _ls_lib_man.js 由补丁拼在本文件前面）
+     结构：LIB_MAN.g = [组key, 显示名, module, 估算秒]
+           LIB_MAN.t = [标签key, 显示名, 说明]
+           LIB_MAN.i = { 组key: [ ["曲目名(无后缀)"] 或 ["诗名","体裁码+年级"] ] }
+     · 古诗条目的体裁码：b=小学必备 k=小学拓展 c=初中衔接 x=课外补充；数字=年级
+     · 拼音/英语/节奏盒子的标签由组内规则推导（声调取文件名末位数字），不占清单体积 */
+  var CAT_TAG = { b: 'pb', k: 'pk', c: 'pc', x: 'px' };
+  var LIB_TAG_NAME = {}, LIB_TAG_DESC = {}, LIB_GROUP_LABEL = {}, LIB_GROUP_MOD = {}, LIB_EST_SEC = {};
+  var LIB_TRIBE = {};        /* 诗名 → 'b3' 这类体裁码，给 libTrack 还原标签 */
+  var LIB_GROUP_KW = {
+    poem: '古诗 诗词 唐诗 宋词 吟诵 国学 必备 拓展 初中',
+    english: '英语 单词 英文 english 字母 alphabet',
+    pinyin: '拼音 音节 声母 韵母 声调 整体认读',
+    sprunki: '节奏盒子 sprunki 配乐 角色 音乐'
   };
+  (function initLibMan(){
+    var M = (typeof LIB_MAN !== 'undefined' && LIB_MAN) ? LIB_MAN : { g: [], t: [], i: {} };
+    (M.t || []).forEach(function(x){ LIB_TAG_NAME[x[0]] = x[1]; LIB_TAG_DESC[x[0]] = x[2] || ''; });
+    (M.g || []).forEach(function(x){
+      LIB_GROUP_LABEL[x[0]] = x[1];
+      LIB_GROUP_MOD[x[0]] = x[2] || '';
+      LIB_EST_SEC[x[0]] = Number(x[3]) || 60;
+    });
+    var pi = (M.i || {}).poem || [];
+    pi.forEach(function(it){ LIB_TRIBE[it[0]] = it[1] || 'x0'; });
+  })();
 
-  /* 内置曲库分组显示名 + 时长估算（内置音频时长未预扫，按类型估；真实时长播放时由播放器校正） */
-  var LIB_GROUP_LABEL = { poem: '📜 内置·古诗范读（免上传）', english: '🔤 内置·英语单词' };
-  var LIB_GROUP_KW    = { poem: '古诗 诗词 唐诗 吟诵 国学', english: '英语 单词 英文 english' };
-  var LIB_EST_SEC     = { poem: 45, english: 8 };
+  /** 某首内置曲目的标签 key 列表（古诗=体裁+年级；拼音=全库+声调；英语/节奏盒子=整组） */
+  function libTagKeysOf(g, title){
+    var out = [];
+    function add(k){ if (k && LIB_TAG_NAME[k] && out.indexOf(k) < 0) out.push(k); }
+    if (g === 'poem') {
+      var code = LIB_TRIBE[title] || 'x0';
+      add(CAT_TAG[String(code).charAt(0)] || 'px');
+      var gr = Number(String(code).slice(1)) || 0;
+      if (gr) add('pg' + gr);
+    } else if (g === 'pinyin') {
+      add('ya');
+      var m = /([1-4])$/.exec(String(title));
+      if (m) add('y' + m[1]);
+    } else if (g === 'english') { add('ea'); }
+    else if (g === 'sprunki') { add('sa'); }
+    return out;
+  }
 
   /** 内置曲目 → 与资源记录同形状的伪记录（audioUrl 走相对路径，file:// 下也能直接播） */
   function libTrack(rid){
@@ -35792,26 +35901,39 @@ window.MX_SPRITE_COORDS = {
     var seg = p.split('/');
     var g = seg[0];
     var fn = seg[seg.length - 1];
+    var title = fn.replace(/\.[^.]+$/, '');
     return {
       id: rid,
-      title: fn.replace(/\.[^.]+$/, ''),
+      title: title,
       original_filename: fn,
-      module: g === 'poem' ? 'lchinese' : 'listen-en',
+      module: LIB_GROUP_MOD[g] || 'lchinese',
       mediaType: 'audio',
       audioUrl: 'assets/audio/' + p,
       duration: LIB_EST_SEC[g] || 60,
-      __lib: true, __libGroup: g, __libKw: LIB_GROUP_KW[g] || g
+      __lib: true, __libGroup: g,
+      __libKw: LIB_GROUP_KW[g] || g,
+      __libTags: libTagKeysOf(g, title)
     };
   }
   function isLibId(id){ return typeof id === 'string' && id.indexOf('lib:') === 0; }
+  /** 全部内置曲目（顺序 = 清单顺序：古诗按「必备→拓展→初中→课外，再按年级」排好） */
   function libRows(){
     var out = [];
-    Object.keys(LIB).forEach(function(g){
-      (LIB[g] || []).forEach(function(fn){ out.push(libTrack('lib:' + g + '/' + fn)); });
+    var M = (typeof LIB_MAN !== 'undefined' && LIB_MAN) ? LIB_MAN : { g: [], i: {} };
+    (M.g || []).forEach(function(g){
+      var gk = g[0];
+      ((M.i || {})[gk] || []).forEach(function(it){
+        out.push(libTrack('lib:' + gk + '/' + it[0] + '.mp3'));
+      });
     });
     return out;
   }
-
+  /** 标签定义（内置）+ 我的资源按模块生成的标签 */
+  function libTagDefs(){
+    var defs = [], M = (typeof LIB_MAN !== 'undefined' && LIB_MAN) ? LIB_MAN : { t: [] };
+    (M.t || []).forEach(function(x){ defs.push({ k: x[0], name: x[1], desc: x[2] || '' }); });
+    return defs;
+  }
   var DEFAULT_MIN_SEC = 180; /* 缺时长时按每首 3 分钟估算 */
 
   /* ================= 小工具 ================= */
@@ -36647,18 +36769,28 @@ window.MX_SPRITE_COORDS = {
     })();
   }
 
-  /* ---------- 资源多选器 ---------- */
+  /* ---------- [LSXTAG552] 资源多选器（标签一键整批选中） ----------
+     交互：顶部标签栏点一下 = 把该标签下所有曲目整批加入/移除；
+           多个标签可叠加（如「古诗·小学必备」+「古诗·小学拓展」）；
+           分组可折叠；拼音这类上千首的组按 300 条分批渲染，避免一次插几千行卡住。 */
   function openResPicker(selected, onDone, onCancel){
     var sel = (selected || []).slice();
+    var rows = [];
+    var openG = {}, capG = {}, STEP = 300, curQ = '';
+    var tagDefs = [];
+
     var mask = document.createElement('div');
     mask.className = 'lsx-modal';
     mask.innerHTML = '<div class="lsx-modal-box">'
       + '<div class="lsx-modal-h"><b>＋ 选音频</b><span class="lsx-x" data-lsx-close="1">✕</span></div>'
       + '<div class="lsx-modal-body">'
       + '<input class="lsx-search" id="lsx-pk-q" placeholder="搜索诗名 / 单词 / 模块（如 静夜思、古诗、cat）…">'
-      + '<div class="lsx-pk-note">内置曲库是项目自带的音频，<b>直接勾选即可，不用上传</b>；「我的资源」是你自己导入的文件。</div>'
+      + '<div class="lsx-pk-note">点<b>标签</b>可一键整批选中：先点「古诗·小学必备」再点「古诗·小学拓展」，两批就一起进专辑了；'
+      + '再点一次同一个标签就取消这一批。内置曲库是项目自带的音频，<b>直接勾选即可，不用上传</b>；「我的资源」是你自己导入的文件。</div>'
+      + '<div class="lsx-tagbar" id="lsx-pk-tags"></div>'
       + '<div class="lsx-pk" id="lsx-pk-list"><div class="lsx-loading">加载中…</div></div>'
       + '<div class="lsx-modal-foot"><span class="lsx-pk-cnt" id="lsx-pk-cnt"></span>'
+      + '<button class="lsx-btn" id="lsx-pk-clear">清空已选</button>'
       + '<button class="lsx-btn" data-lsx-close2="1">取消</button>'
       + '<button class="lsx-btn main" id="lsx-pk-ok">确定添加</button></div>'
       + '</div></div>';
@@ -36668,45 +36800,71 @@ window.MX_SPRITE_COORDS = {
     mask.querySelector('[data-lsx-close]').onclick = back;
     mask.querySelector('[data-lsx-close2]').onclick = back;
 
-    var rows = [];
+    function ugKey(r){ return 'u:' + (r.module || 'other'); }
+    function gKeyOf(r){ return r.__lib ? ('lib:' + r.__libGroup) : ugKey(r); }
+    function gNameOf(k){
+      if (k.indexOf('lib:') === 0) return LIB_GROUP_LABEL[k.slice(4)] || k.slice(4);
+      return '📥 我的·' + (MOD_LABEL[k.slice(2)] || k.slice(2));
+    }
+    function rowTags(r){ return r.__lib ? (r.__libTags || []) : [ugKey(r)]; }
+
     function draw(q){
-      q = (q || '').toLowerCase();
+      curQ = String(q || '').toLowerCase();
       var box = mask.querySelector('#lsx-pk-list');
+      var tagBox = mask.querySelector('#lsx-pk-tags');
       var list = rows.filter(function(r){
-        if (!q) return true;
-        return String(r.title || r.original_filename || '').toLowerCase().indexOf(q) >= 0
-          || String(MOD_LABEL[r.module] || r.module || '').toLowerCase().indexOf(q) >= 0
-          || String(r.__libKw || '').toLowerCase().indexOf(q) >= 0;
+        if (!curQ) return true;
+        return String(r.title || r.original_filename || '').toLowerCase().indexOf(curQ) >= 0
+          || String(MOD_LABEL[r.module] || r.module || '').toLowerCase().indexOf(curQ) >= 0
+          || String(r.__libKw || '').toLowerCase().indexOf(curQ) >= 0;
       });
-      if (!list.length) {
-        box.innerHTML = '<div class="lsx-empty sm">没有匹配的音频。试试搜「古诗」看内置曲库，或先去「家长工作台 → 📥 资源中心」导入 MP3。</div>';
-        return;
-      }
-      /* 按模块分组 */
+
+      /* ---- 标签栏：计数按「全部曲目」算（不随搜索跳变，避免误解） ---- */
+      var st = {};
+      rows.forEach(function(r){
+        rowTags(r).forEach(function(k){
+          var o = st[k] || (st[k] = { n: 0, s: 0 });
+          o.n++; if (sel.indexOf(r.id) >= 0) o.s++;
+        });
+      });
+      var tb = '';
+      tagDefs.forEach(function(t){
+        var o = st[t.k];
+        if (!o || !o.n) return;
+        var cls = o.s >= o.n ? ' on' : (o.s > 0 ? ' part' : '');
+        tb += '<button type="button" class="lsx-tagchip' + cls + '" data-tag="' + esc(t.k) + '" title="'
+          + esc(t.desc || ('共 ' + o.n + ' 首')) + '">' + esc(t.name)
+          + '<b>' + (o.s > 0 ? o.s + '/' + o.n : o.n) + '</b></button>';
+      });
+      tagBox.innerHTML = tb || '<span class="lsx-pk-d">（没有可用标签）</span>';
+
+      /* ---- 分组 ---- */
       var groups = {}, order = [];
-      /* 内置曲库按组名固定排在最前，其次才是「我的资源」按模块 */
-      Object.keys(LIB_GROUP_LABEL).forEach(function(g){ order.push('__lib_' + g); });
-      list.forEach(function(r){
-        var m = r.__libGroup ? ('__lib_' + r.__libGroup) : (r.module || 'other');
-        if (!groups[m]) groups[m] = [];
-        groups[m].push(r);
-      });
-      var keys = order.filter(function(k){ return groups[k] && groups[k].length; });
-      Object.keys(groups).forEach(function(k){ if (keys.indexOf(k) < 0) keys.push(k); });
+      (typeof LIB_MAN !== 'undefined' && LIB_MAN && LIB_MAN.g ? LIB_MAN.g : []).forEach(function(g){ order.push('lib:' + g[0]); });
+      rows.forEach(function(r){ var k = gKeyOf(r); if (!groups[k]) { groups[k] = []; if (order.indexOf(k) < 0) order.push(k); } });
+      /* 只装「搜索后还在」的曲目；空组不显示 */
+      var vis = {};
+      list.forEach(function(r){ var k = gKeyOf(r); (vis[k] = vis[k] || []).push(r); });
 
       var html = '';
-      keys.forEach(function(m){
-        var isLib = m.indexOf('__lib_') === 0;
-        var gk = isLib ? m.slice(6) : '';
-        var gname = isLib ? (LIB_GROUP_LABEL[gk] || gk) : (MOD_LABEL[m] || m);
-        var _ids = groups[m].map(function(r){ return r.id; });
-        var _allSel = isLib && _ids.every(function(id){ return sel.indexOf(id) >= 0; });
-        html += '<div class="lsx-pk-g"><span>' + esc(gname) + ' · ' + groups[m].length + '</span>'
-          + (isLib ? '<button type="button" class="lsx-mini" data-pickall="' + esc(gk) + '" title="'
-              + (_allSel ? '把本组从专辑里全部移除' : '把本组全部加入专辑') + '">'
-              + (_allSel ? '取消' : '全选') + '</button>' : '')
+      order.forEach(function(k){
+        var arr = vis[k];
+        if (!arr || !arr.length) return;
+        var ids = arr.map(function(r){ return r.id; });
+        var selN = ids.filter(function(id){ return sel.indexOf(id) >= 0; }).length;
+        var allOn = selN === ids.length;
+        var opened = !!curQ || !!openG[k];
+        html += '<div class="lsx-pk-g">'
+          + '<button type="button" class="lsx-pk-gt" data-gtoggle="' + esc(k) + '">' + (opened ? '▾' : '▸') + '</button>'
+          + '<span class="lsx-pk-gn">' + esc(gNameOf(k)) + ' · ' + arr.length
+          + (selN ? ' <b>已选 ' + selN + '</b>' : '') + '</span>'
+          + '<button type="button" class="lsx-mini" data-pickall="' + esc(k) + '" title="'
+          + (allOn ? '把本组从专辑里全部移除' : '把本组全部加入专辑') + '">' + (allOn ? '取消' : '全选') + '</button>'
           + '</div>';
-        groups[m].forEach(function(r){
+        if (!opened) return;
+        var cap = curQ ? arr.length : Math.min(arr.length, capG[k] || STEP);
+        for (var i = 0; i < cap; i++) {
+          var r = arr[i];
           var on = sel.indexOf(r.id) >= 0;
           html += '<label class="lsx-pk-row' + (on ? ' on' : '') + '">'
             + '<input type="checkbox" data-rid="' + esc(r.id) + '"' + (on ? ' checked' : '') + '>'
@@ -36715,17 +36873,44 @@ window.MX_SPRITE_COORDS = {
             + (r.__lib ? '<span class="lsx-pk-b lib">免上传</span>' : '')
             + '<span class="lsx-pk-d">' + (r.__lib ? '~' : '') + fmtDur(Number(r.duration) || DEFAULT_MIN_SEC) + '</span>'
             + '</label>';
-        });
+        }
+        if (cap < arr.length) {
+          html += '<button type="button" class="lsx-more" data-more="' + esc(k) + '">还有 ' + (arr.length - cap) + ' 首未显示，点这里继续</button>';
+        }
       });
+      if (!html) {
+        html = '<div class="lsx-empty sm">没有匹配的音频。试试搜「古诗」「拼音」看内置曲库，或先去「家长工作台 → 📥 资源中心」导入 MP3。</div>';
+      }
       box.innerHTML = html;
+
+      /* ---- 绑定 ---- */
+      tagBox.querySelectorAll('[data-tag]').forEach(function(b){
+        b.onclick = function(){ toggleTag(b.getAttribute('data-tag')); };
+      });
+      box.querySelectorAll('[data-gtoggle]').forEach(function(b){
+        b.onclick = function(){
+          var k = b.getAttribute('data-gtoggle');
+          openG[k] = !openG[k];
+          if (!openG[k]) capG[k] = 0;
+          draw(mask.querySelector('#lsx-pk-q').value);
+        };
+      });
       box.querySelectorAll('[data-pickall]').forEach(function(pb){
         pb.onclick = function(){
-          var g = pb.getAttribute('data-pickall');
-          var ids = rows.filter(function(r){ return r.__libGroup === g; }).map(function(r){ return r.id; });
+          var k = pb.getAttribute('data-pickall');
+          var ids = vis[k].map(function(r){ return r.id; });
           var allOn = ids.every(function(id){ return sel.indexOf(id) >= 0; });
           if (allOn) sel = sel.filter(function(x){ return ids.indexOf(x) < 0; });
           else ids.forEach(function(id){ if (sel.indexOf(id) < 0) sel.push(id); });
-          draw(mask.querySelector('#lsx-pk-q') ? mask.querySelector('#lsx-pk-q').value : '');
+          openG[k] = true;
+          draw(mask.querySelector('#lsx-pk-q').value);
+        };
+      });
+      box.querySelectorAll('[data-more]').forEach(function(mb){
+        mb.onclick = function(){
+          var k = mb.getAttribute('data-more');
+          capG[k] = (capG[k] || STEP) + STEP * 2;
+          draw(mask.querySelector('#lsx-pk-q').value);
         };
       });
       box.querySelectorAll('input[data-rid]').forEach(function(cb){
@@ -36734,15 +36919,67 @@ window.MX_SPRITE_COORDS = {
           if (cb.checked) { if (sel.indexOf(id) < 0) sel.push(id); }
           else { sel = sel.filter(function(x){ return x !== id; }); }
           cb.closest('.lsx-pk-row').classList.toggle('on', cb.checked);
+          /* 勾选会改变标签的「已选/总数」，但只刷标签栏和计数，不重绘整个列表（保滚动位置） */
+          drawTagsOnly();
           updCnt();
         };
       });
       updCnt();
     }
+
+    /* 只重绘标签栏（勾选单曲后不重排列表，避免滚动条跳回顶部） */
+    function drawTagsOnly(){
+      var tagBox = mask.querySelector('#lsx-pk-tags');
+      if (!tagBox) return;
+      var st = {};
+      rows.forEach(function(r){
+        rowTags(r).forEach(function(k){
+          var o = st[k] || (st[k] = { n: 0, s: 0 });
+          o.n++; if (sel.indexOf(r.id) >= 0) o.s++;
+        });
+      });
+      var tb = '';
+      tagDefs.forEach(function(t){
+        var o = st[t.k];
+        if (!o || !o.n) return;
+        var cls = o.s >= o.n ? ' on' : (o.s > 0 ? ' part' : '');
+        tb += '<button type="button" class="lsx-tagchip' + cls + '" data-tag="' + esc(t.k) + '" title="'
+          + esc(t.desc || ('共 ' + o.n + ' 首')) + '">' + esc(t.name)
+          + '<b>' + (o.s > 0 ? o.s + '/' + o.n : o.n) + '</b></button>';
+      });
+      tagBox.innerHTML = tb;
+      tagBox.querySelectorAll('[data-tag]').forEach(function(b){
+        b.onclick = function(){ toggleTag(b.getAttribute('data-tag')); };
+      });
+    }
+
+    /* 标签一键：本标签下全部已选 → 整批取消；否则整批加入 */
+    function toggleTag(k){
+      var ids = rows.filter(function(r){ return rowTags(r).indexOf(k) >= 0; }).map(function(r){ return r.id; });
+      if (!ids.length) return;
+      var allOn = ids.every(function(id){ return sel.indexOf(id) >= 0; });
+      if (allOn) sel = sel.filter(function(x){ return ids.indexOf(x) < 0; });
+      else ids.forEach(function(id){ if (sel.indexOf(id) < 0) sel.push(id); });
+      /* 点标签后把对应组展开，让用户看到结果 */
+      var gk = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rowTags(rows[i]).indexOf(k) >= 0) { gk = gKeyOf(rows[i]); break; }
+      }
+      if (gk) openG[gk] = true;
+      draw(mask.querySelector('#lsx-pk-q').value);
+      toast((allOn ? '已取消「' : '已选中「') + (LIB_TAG_NAME[k] || k) + '」共 ' + ids.length + ' 首');
+    }
+
     function updCnt(){
       var c = mask.querySelector('#lsx-pk-cnt');
       if (c) c.textContent = '已选 ' + sel.length + ' 首';
     }
+
+    mask.querySelector('#lsx-pk-clear').onclick = function(){
+      sel = [];
+      draw(mask.querySelector('#lsx-pk-q').value);
+    };
+
     (async function(){
       try {
         var all = (await window.DB.getAll('resources')) || [];
@@ -36752,11 +36989,25 @@ window.MX_SPRITE_COORDS = {
             if (ma !== mb) return ma.localeCompare(mb);
             return String(a.title||'').localeCompare(String(b.title||''));
           });
-        rows = libRows().concat(userRows);   /* 内置曲库（古诗/英语）排前面，免上传 */
+        rows = libRows().concat(userRows);
       } catch(e){ rows = []; }
+
+      /* 标签定义：内置标签 + 「我的资源」按模块动态生成的标签 */
+      tagDefs = libTagDefs();
+      var mods = [];
+      rows.forEach(function(r){ if (!r.__lib && r.module && mods.indexOf(r.module) < 0) mods.push(r.module); });
+      mods.forEach(function(m){ tagDefs.push({ k: 'u:' + m, name: '📥 我的·' + (MOD_LABEL[m] || m), desc: '你自己导入到「' + (MOD_LABEL[m] || m) + '」的音频' }); });
+
+      /* 默认展开：有已选曲目的组；都没选就展开第一个内置组 */
+      rows.forEach(function(r){ if (sel.indexOf(r.id) >= 0) openG[gKeyOf(r)] = true; });
+      if (!Object.keys(openG).length) {
+        var first = rows.filter(function(r){ return r.__lib; })[0];
+        if (first) openG[gKeyOf(first)] = true;
+      }
       draw('');
       mask.querySelector('#lsx-pk-q').oninput = function(){ draw(this.value); };
     })();
+
     mask.querySelector('#lsx-pk-ok').onclick = function(){
       mask.parentNode.removeChild(mask);
       if (onDone) onDone(sel);
@@ -36771,8 +37022,13 @@ window.MX_SPRITE_COORDS = {
     var map = {};
     albums.forEach(function(a){ map[a.id] = a; });
 
+    var _rmOn = !rmOff();
     var html = '<div class="lsx-sec-h">🗓️ 熏听计划 <span class="lsx-cnt">' + tasks.length + '</span>'
-      + '<button class="lsx-btn main sm" id="lsx-new-plan">＋ 新建计划</button></div>';
+      + '<button class="lsx-btn main sm" id="lsx-new-plan">＋ 新建计划</button></div>'
+      + '<div class="lsx-rmbar"><span>⏰ 到点提醒：计划时间到了，页面开着就弹一条提醒'
+      + '<i>（浏览器不允许后台自动开播，所以只能提醒你一下）</i></span>'
+      + '<button type="button" class="lsx-switch' + (_rmOn ? ' on' : '') + '" data-lsx-remind-sw="1" '
+      + 'title="' + (_rmOn ? '点击关闭到点提醒' : '点击开启到点提醒') + '"><b></b></button></div>';
 
     if (!albums.length) {
       html += '<div class="lsx-empty">先建专辑（播放列表），才能建计划。</div>';
@@ -36817,6 +37073,13 @@ window.MX_SPRITE_COORDS = {
 
     var nb = body.querySelector('#lsx-new-plan');
     if (nb) nb.onclick = function(){ openPlanEditor(null, albums); };
+    var rmSw = body.querySelector('[data-lsx-remind-sw]');
+    if (rmSw) rmSw.onclick = function(){
+      var nowOff = rmOff();
+      rmSetOff(!nowOff);
+      toast(nowOff ? '⏰ 已开启到点提醒' : '🔕 已关闭到点提醒');
+      refresh();
+    };
     body.querySelectorAll('[data-plan-edit]').forEach(function(b){
       b.onclick = function(){
         var id = b.getAttribute('data-plan-edit');
@@ -37016,6 +37279,107 @@ window.MX_SPRITE_COORDS = {
     };
   }
 
+  /* ================= 到点提醒（不是自动开播） =================
+     浏览器纯前端无法在页面关闭时自动播放，只能做到「页面开着 → 到点弹一条提醒 → 一键开播」。
+     规则：计划勾了今天 + 到了设定时间(含 40 分钟宽限) + 今天这条计划还没提醒过 + 页面可见。 */
+  var K_RM = 'mx_ls_remind';
+  var K_RM_OFF = 'mx_ls_remind_off';
+  var _rmTimer = null, _rmBusy = false;
+
+  function rmOff(){ try { return localStorage.getItem(K_RM_OFF) === '1'; } catch(e){ return false; } }
+  function rmSetOff(v){ try { if (v) localStorage.setItem(K_RM_OFF, '1'); else localStorage.removeItem(K_RM_OFF); } catch(e){} }
+  window.MX_LS_REMIND_OFF = rmOff;
+  window.MX_LS_SET_REMIND = rmSetOff;
+  function rmState(){
+    try { return JSON.parse(localStorage.getItem(K_RM) || '{}') || {}; } catch(e){ return {}; }
+  }
+  function rmDone(dateKey, planId){
+    var st = rmState();
+    return !!(st[dateKey] && st[dateKey][planId]);
+  }
+  function rmMark(dateKey, planId){
+    var st = rmState();
+    st[dateKey] = st[dateKey] || {};
+    st[dateKey][planId] = Date.now();
+    var keys = Object.keys(st).sort();
+    while (keys.length > 7) { delete st[keys.shift()]; }
+    try { localStorage.setItem(K_RM, JSON.stringify(st)); } catch(e){}
+  }
+  function minutesOf(s){
+    var p = String(s || '00:00').split(':');
+    return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+  }
+
+  async function remindTick(){
+    if (rmOff() || _rmBusy) return;
+    try { if (document.visibilityState !== 'visible') return; } catch(e){}
+    _rmBusy = true;
+    try {
+      var cid = await childId();
+      var tasks = await allTasks(cid);
+      var tk = todayKey();
+      var now = new Date();
+      var cur = now.getHours() * 60 + now.getMinutes();
+      var hit = null;
+      for (var i = 0; i < tasks.length; i++) {
+        var t = tasks[i];
+        if (!t || t.enabled === false) continue;
+        if (!ENGINE.isListenDay(t, tk)) continue;
+        var tm = minutesOf(t.time || '17:00');
+        if (cur < tm || cur > tm + 40) continue;
+        if (rmDone(tk, t.id)) continue;
+        hit = t; break;
+      }
+      if (hit) { rmMark(tk, hit.id); showReminder(hit); }
+    } catch(e) {} finally { _rmBusy = false; }
+  }
+
+  function showReminder(task){
+    try { var old = document.getElementById('lsx-remind'); if (old && old.parentNode) old.parentNode.removeChild(old); } catch(e){}
+    var box = document.createElement('div');
+    box.id = 'lsx-remind';
+    box.className = 'lsx-remind';
+    box.innerHTML = '<div class="lsx-rm-emoji">🎧</div>'
+      + '<div class="lsx-rm-body"><div class="lsx-rm-t">熏听时间到啦</div>'
+      + '<div class="lsx-rm-s">' + esc(task.name || '今日熏听') + (task.time ? (' · ' + esc(task.time)) : '') + '</div></div>'
+      + '<div class="lsx-rm-ops"><button type="button" class="lsx-btn main sm" data-rm-go="1">开始熏听</button>'
+      + '<button type="button" class="lsx-btn sm" data-rm-later="1">稍后</button></div>';
+    document.body.appendChild(box);
+    setTimeout(function(){ try { box.classList.add('on'); } catch(e){} }, 30);
+
+    function close(){ try { box.classList.remove('on'); setTimeout(function(){ try { if (box.parentNode) box.parentNode.removeChild(box); } catch(e){} }, 240); } catch(e){} }
+    var later = box.querySelector('[data-rm-later]'); if (later) later.onclick = close;
+    var go = box.querySelector('[data-rm-go]');
+    if (go) go.onclick = function(){
+      close();
+      try {
+        if (S.scope === 'parent') {
+          window.navigateTo('page-parent');
+          setTimeout(function(){
+            try { if (window.switchParentTab) window.switchParentTab('listen'); } catch(e){}
+            S.tab = 'today'; refresh();
+          }, 420);
+          return;
+        }
+        window.navigateTo('page-listen-schedule');
+        setTimeout(function(){ S.tab = 'today'; refresh(); }, 420);
+      } catch(e){}
+    };
+    setTimeout(close, 30000);
+  }
+
+  function startReminder(){
+    if (_rmTimer) return;
+    setTimeout(remindTick, 26000);                 /* 首屏等数据/登录就绪 */
+    _rmTimer = setInterval(remindTick, 60000);
+    try {
+      document.addEventListener('visibilitychange', function(){
+        if (document.visibilityState === 'visible') setTimeout(remindTick, 2500);
+      });
+    } catch(e){}
+  }
+  window.MX_LS_REMIND_TICK = remindTick;
+
   /* ================= 暴露 ================= */
   window.MX_LS_ENGINE = {
     plan: function(t, tracks, dateKey){ return ENGINE.plan(t, tracks, dateKey); },
@@ -37034,7 +37398,584 @@ window.MX_SPRITE_COORDS = {
     tracksOf: tracksOf,
     expandTaskItems: expandTaskItems,
     gotoParentListen: gotoParentListen,
-    brand: 'LS-STUDIO-251'
+    remindTick: remindTick,
+    remindOff: rmOff,
+    setRemindOff: rmSetOff,
+    /* [LSXTAG552] 曲库 + 标签：供 e2e 直接断言清单与标签归属（不做 UI 交互也能验） */
+    libRows: libRows,
+    libTagDefs: libTagDefs,
+    libTagKeysOf: libTagKeysOf,
+    brand: 'LS-STUDIO-253'
+  };
+  try { startReminder(); } catch (eRM) {}
+})();
+
+</script>
+<style>
+/* ===== [FREERES539] 免费资源库样式 ===== */
+/* ===== [FREERES539] 免费资源库 · VIP 分级配额 =====
+   层级说明：.frx-modal = 100003，高于 .mx-modal-mask(100002)（同页可能再开别的弹窗），
+   但本模块弹窗不会与家长密码框(#mx-lock 100001) / 激活门禁(#mx-gate 99999) 同时出现。 */
+.frx-banner{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;
+  background:linear-gradient(135deg,#fff4e0,#ffe9f0 60%,#eaf5ff);border:1px solid #ffe0b8;
+  border-radius:16px;padding:13px 15px;margin:0 0 16px;box-shadow:0 2px 10px rgba(255,183,77,.12)}
+.frx-banner-l{flex:1;min-width:190px}
+.frx-banner-t{font-size:15.5px;font-weight:800;color:#b25c00;letter-spacing:.2px}
+.frx-banner-s{font-size:12.5px;color:#8a6a3d;margin-top:3px;line-height:1.5}
+.frx-banner-q{font-size:12px;font-weight:700;color:#2f6b2f;background:#eefaf1;border:1px solid #cdebd3;
+  border-radius:9px;padding:3px 9px;display:inline-block;margin-top:7px}
+.frx-banner-r{flex:0 0 auto}
+.frx-up{background:linear-gradient(135deg,#ff9a3c,#ff6f61);color:#fff;border:none;border-radius:20px;
+  padding:9px 17px;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;
+  box-shadow:0 4px 12px rgba(255,111,97,.32)}
+.frx-up:active{transform:translateY(1px)}
+
+.frx-cat{margin-bottom:18px}
+.frx-cat-t{font-weight:800;font-size:14px;color:var(--accent-primary,#7ec850);margin-bottom:9px;
+  padding-left:10px;border-left:4px solid var(--accent-primary,#7ec850)}
+.frx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px}
+.frx-card{background:#fff;border:1px solid rgba(0,0,0,.09);border-radius:15px;padding:13px;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:6px}
+.frx-card.got{background:#f4fbf2;border-color:#c5e1a5}
+.frx-card.over{opacity:.78}
+.frx-emoji{font-size:27px;line-height:1.1}
+.frx-name{font-weight:800;font-size:13.5px;line-height:1.35;color:#2c3e2c}
+.frx-note{font-size:11.5px;color:#7b8a7b;min-height:30px;line-height:1.45}
+.frx-pan{font-size:10.5px;font-weight:700;color:#3f7ef5;background:#eef6ff;border-radius:7px;
+  padding:1px 7px;align-self:flex-start}
+.frx-get{margin-top:auto;background:var(--accent-primary,#7ec850);color:#fff;border:none;border-radius:20px;
+  padding:8px 12px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%}
+.frx-get.got{background:#e8f5e9;color:#2e7d32}
+.frx-get.lock{background:linear-gradient(135deg,#ffb74d,#ff8a65)}
+.frx-get.over{background:#eceff1;color:#78909c}
+.frx-foot-tip{font-size:11.5px;color:#9aa9b8;line-height:1.65;text-align:center;margin:6px 0 4px}
+
+/* 链接弹窗 */
+.frx-modal{position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:center;
+  justify-content:center;z-index:100003;padding:16px}
+.frx-box{background:#fff;border-radius:18px;width:100%;max-width:420px;overflow:hidden;
+  box-shadow:0 18px 48px rgba(0,0,0,.26);animation:frxIn .16s ease-out}
+@keyframes frxIn{from{transform:translateY(10px);opacity:.6}to{transform:none;opacity:1}}
+.frx-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;
+  border-bottom:1px solid #f0f2f5;font-size:14.5px;color:#243b2a}
+.frx-x{cursor:pointer;color:#9aa9b8;font-size:15px;padding:2px 4px}
+.frx-body{padding:12px 15px}
+.frx-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #eef1f4;font-size:12.5px}
+.frx-row:last-of-type{border-bottom:none}
+.frx-k{flex:0 0 62px;color:#8a97a8;font-weight:700}
+.frx-v{flex:1;min-width:0;word-break:break-all;color:#33475b}
+.frx-v a{color:#2b6cd4;text-decoration:none}
+.frx-code{font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:1px;color:#b25c00}
+.frx-mini{flex:0 0 auto;border:1px solid #d5e3f7;background:#f7faff;color:#2b6cd4;border-radius:8px;
+  padding:3px 9px;font-size:11.5px;font-weight:700;cursor:pointer}
+.frx-empty{font-size:12.5px;color:#8a97a8;padding:10px 0}
+.frx-tip{margin-top:10px;font-size:11.5px;color:#7b8a7b;background:#f7fbf7;border:1px solid #e6f2e6;
+  border-radius:9px;padding:8px 10px;line-height:1.6}
+.frx-foot{display:flex;gap:9px;justify-content:flex-end;padding:11px 15px;border-top:1px solid #f0f2f5}
+.frx-btn{border-radius:18px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;border:none;
+  text-decoration:none;display:inline-block}
+.frx-btn.ghost{background:#f2f4f7;color:#5b6b7c}
+.frx-btn.main{background:var(--accent-primary,#7ec850);color:#fff}
+
+/* 萌星好物 · 定位高亮（点「升级 VIP」后滚到 VIP 月卡） */
+.mx-mall-card.mx-mall-hit{box-shadow:0 0 0 3px #ffb74d, 0 8px 22px rgba(255,152,0,.35) !important;
+  animation:frxPulse 1.1s ease-in-out 3}
+@keyframes frxPulse{0%,100%{transform:none}50%{transform:scale(1.02)}}
+
+</style>
+<script>
+/* ============================================================
+ * [FREERES539] 免费资源库 · VIP 分级配额版
+ * - 取代 mx-mall 内旧 renderResources()（旧实现无条件免费，直接打开本地目录）
+ * - 档位按卡密 valid_days 区间判定（后台可配）：
+ *     体验卡 1 → 终身 1 次｜月卡 ~31 → 每月 3 次｜季卡 ~93 → 每月 6 次
+ *     半年卡 ~183 → 不限｜年卡/永久 → 不限｜非 VIP → 全部跳小红书
+ * - 数据：配置读 linkage_config.freeRes（window.MX_FREE_RES），用量读 DB setting mx_free_res_use
+ * - 依赖：window.DB / window.isVip / window.showToast / window.navigateTo / window.mxApiProxy
+ * ============================================================ */
+(function () {
+  'use strict';
+  if (window.MX_FREERES) return;
+
+  var K_USE = 'mx_free_res_use';
+  var K_VD  = 'mengxing_valid_days';
+
+  /* ---------------- 默认配置（后台发布后以云端为准） ---------------- */
+  var DEFAULT_CFG = {
+    ver: 1,
+    banner: {
+      title: '🎁 不定期发放免费资源',
+      sub: '',
+      tip: '如需畅享全部学习资源，请升级 VIP',
+      upgradeText: '👑 升级 VIP 月卡',
+      upgradeUrl: '',
+      xhsText: '去小红书看看',
+      xhsUrl: ''
+    },
+    tiers: [
+      { key: 'trial',   name: 'VIP 体验卡', minDays: 0,   maxDays: 1,     quota: 1,  scope: 'life'  },
+      { key: 'month',   name: 'VIP 月卡',   minDays: 2,   maxDays: 60,    quota: 3,  scope: 'month' },
+      { key: 'quarter', name: 'VIP 季卡',   minDays: 61,  maxDays: 120,   quota: 3,  scope: 'month' },
+      { key: 'half',    name: 'VIP 半年卡', minDays: 121, maxDays: 250,   quota: -1, scope: 'none'  },
+      { key: 'year',    name: 'VIP 年卡',   minDays: 251, maxDays: 99999, quota: -1, scope: 'none'  }
+    ],
+    items: [
+      { id: 'pointread',    cat: '点读包',   name: '幼小衔接点读包（拼音/识字）', emoji: '🔊', dir: 'assets/audio/',            note: '点读包音频，配套课本即点即读', panUrl: '', panCode: '', on: true },
+      { id: 'story_pdf',    cat: '绘本PDF',  name: '精选绘本PDF（20册）',       emoji: '📖', dir: 'assets/pdf/story/',          note: '可打印绘本，亲子共读',        panUrl: '', panCode: '', on: true },
+      { id: 'workbook_pdf', cat: '练习册',   name: '综合练习册PDF（数学/语文）',  emoji: '📝', dir: 'assets/pdf/workbook/',       note: '幼小衔接专项练习',            panUrl: '', panCode: '', on: true },
+      { id: 'raz',          cat: '英文分级', name: 'RAZ分级阅读音频',           emoji: '📚', dir: 'assets/audio/english/raz/',  note: '英文分级启蒙磨耳朵',          panUrl: '', panCode: '', on: true },
+      { id: 'sss',          cat: 'SSS儿歌',  name: 'Super Simple Songs 儿歌包', emoji: '🎵', dir: 'assets/audio/music/',        note: '英文儿歌，轻松启蒙',          panUrl: '', panCode: '', on: true },
+      { id: 'pinyin_pdf',   cat: '拼音',     name: '拼音学习PDF（7册）',        emoji: '🔤', dir: 'assets/pdf/pinyin/',         note: '拼音专项资料',                panUrl: '', panCode: '', on: true },
+      { id: 'math_pdf',     cat: '数学',     name: '数学练习册PDF',             emoji: '➗', dir: 'assets/pdf/math/',           note: '口算与思维训练',              panUrl: '', panCode: '', on: true }
+    ]
+  };
+
+  /* ---------------- 工具 ---------------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function T(msg) {
+    if (window.showToast) { try { window.showToast(msg); return; } catch (e) {} }
+    if (window.toast) { try { window.toast(msg); return; } catch (e) {} }
+    try { alert(msg); } catch (e) {}
+  }
+  function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  function isVipNow() { try { return !!(window.isVip && window.isVip()); } catch (e) { return false; } }
+  function monthKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
+  }
+  function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+
+  /* ---------------- 配置合并 ---------------- */
+  function cfg() {
+    var c = window.MX_FREE_RES;
+    if (!c || typeof c !== 'object') return DEFAULT_CFG;
+    var b = (c.banner && typeof c.banner === 'object') ? c.banner : {};
+    var out = {
+      ver: num(c.ver) || 1,
+      banner: {
+        title: String(b.title || DEFAULT_CFG.banner.title),
+        sub: String(b.sub || ''),
+        tip: String(b.tip || DEFAULT_CFG.banner.tip),
+        upgradeText: String(b.upgradeText || DEFAULT_CFG.banner.upgradeText),
+        upgradeUrl: String(b.upgradeUrl || ''),
+        xhsText: String(b.xhsText || DEFAULT_CFG.banner.xhsText),
+        xhsUrl: String(b.xhsUrl || '')
+      },
+      tiers: (Array.isArray(c.tiers) && c.tiers.length) ? c.tiers : DEFAULT_CFG.tiers,
+      items: (Array.isArray(c.items) && c.items.length) ? c.items : DEFAULT_CFG.items
+    };
+    return out;
+  }
+  function items() {
+    return cfg().items.filter(function (r) { return r && r.on !== false && r.id; });
+  }
+
+  /* ---------------- 档位判定 ---------------- */
+  /* 依据卡密 valid_days：1=体验卡、~31=月卡、~93=季卡、~183=半年卡、365=年卡、0(+vip)=永久 */
+  function effDays() {
+    var vd = num(lsGet(K_VD));
+    if (vd > 0) return vd;
+    /* 兜底：到期剩余天数（只是下界，故落档偏保守，不会白送额度） */
+    var exp = lsGet('mengxing_expire_at') || '';
+    var t = /^\d{10,14}$/.test(exp) ? Number(exp) : new Date(exp).getTime();
+    if (!isNaN(t) && t > Date.now()) return Math.max(1, Math.ceil((t - Date.now()) / 86400000));
+    return 0;
+  }
+  function tierOf() {
+    var c = cfg();
+    if (!isVipNow()) {
+      return { key: 'none', name: '未开通 VIP', quota: 0, scope: 'none', vip: false };
+    }
+    var d = effDays();
+    /* valid_days=0 且是 VIP = 永久 VIP → 取最高档（不限） */
+    if (d === 0) {
+      var top = c.tiers.filter(function (t) { return num(t.quota) < 0; })[0] || c.tiers[c.tiers.length - 1];
+      return { key: top.key, name: top.name, quota: num(top.quota), scope: String(top.scope || 'none'), vip: true, days: 0, permanent: true };
+    }
+    var hit = null;
+    for (var i = 0; i < c.tiers.length; i++) {
+      var t = c.tiers[i];
+      var lo = num(t.minDays), hi = (t.maxDays == null || t.maxDays === '') ? 999999 : num(t.maxDays);
+      if (d >= lo && d <= hi) { hit = t; break; }
+    }
+    if (!hit) {
+      /* 没命中任何区间：取配额最小的档（保守，宁可少给） */
+      hit = c.tiers.slice().sort(function (a, b) {
+        var qa = num(a.quota), qb = num(b.quota);
+        if (qa < 0) qa = 999999; if (qb < 0) qb = 999999;
+        return qa - qb;
+      })[0];
+    }
+    return { key: hit.key, name: hit.name, quota: num(hit.quota), scope: String(hit.scope || 'none'), vip: true, days: d };
+  }
+
+  /* ---------------- 用量 ---------------- */
+  function normUse(u) {
+    u = (u && typeof u === 'object') ? u : {};
+    return {
+      v: 1,
+      life: num(u.life),
+      months: (u.months && typeof u.months === 'object') ? u.months : {},
+      claims: (u.claims && typeof u.claims === 'object') ? u.claims : {}
+    };
+  }
+  function loadUse() {
+    return window.DB.getSetting(K_USE, '{}').then(function (raw) {
+      var o = {}; try { o = JSON.parse(raw || '{}'); } catch (e) { o = {}; }
+      return normUse(o);
+    }).catch(function () { return normUse({}); });
+  }
+  function saveUse(u) {
+    try { return window.DB.setSetting(K_USE, JSON.stringify(normUse(u))); } catch (e) { return Promise.resolve(); }
+  }
+  function monthUsed(u, mk) { return num((u.months || {})[mk || monthKey()]); }
+
+  /* ---------------- 判定某资源能不能拿 ---------------- */
+  function decide(item, u, tier) {
+    u = u || { life: 0, months: {}, claims: {} };
+    tier = tier || tierOf();
+    if (!item) return { ok: false, state: 'hide' };
+    if (!tier.vip) return { ok: false, state: 'nomember' };
+    if (u.claims && u.claims[item.id]) return { ok: true, state: 'already' };
+    if (tier.quota < 0) return { ok: true, state: 'unlimited' };
+    if (tier.scope === 'life') {
+      return (num(u.life) < tier.quota) ? { ok: true, state: 'ok' } : { ok: false, state: 'over' };
+    }
+    if (tier.scope === 'month') {
+      return (monthUsed(u) < tier.quota) ? { ok: true, state: 'ok' } : { ok: false, state: 'over' };
+    }
+    return { ok: true, state: 'unlimited' };
+  }
+
+  /* 剩余额度文案 */
+  function quotaText(u, tier) {
+    if (!tier.vip) return '开通 VIP 后可免费获取网盘链接';
+    if (tier.quota < 0) return '👑 ' + tier.name + '：免费获取次数不限';
+    if (tier.scope === 'life') {
+      var left = Math.max(0, tier.quota - num(u.life));
+      return '👑 ' + tier.name + '：体验额度共 ' + tier.quota + ' 次，还剩 ' + left + ' 次';
+    }
+    var mleft = Math.max(0, tier.quota - monthUsed(u));
+    return '👑 ' + tier.name + '：本月可免费获取 ' + tier.quota + ' 次，还剩 ' + mleft + ' 次';
+  }
+
+  /* ---------------- 异步补档位：本地没 valid_days 时问云端 ---------------- */
+  var _askingDays = false;
+  function askDays() {
+    if (_askingDays) return Promise.resolve(false);
+    if (num(lsGet(K_VD)) > 0) return Promise.resolve(false);
+    if (!isVipNow()) return Promise.resolve(false);
+    if (!window.mxApiProxy) return Promise.resolve(false);
+    var code = ''; try { code = localStorage.getItem('mengxing_card_code') || ''; } catch (e) {}
+    if (!code) { try { code = localStorage.getItem('mengxing_code') || ''; } catch (e) {} }
+    _askingDays = true;
+    return window.mxApiProxy('getVipStatus', { code: code, uid: window.__mx_uid__ || '' }).then(function (r) {
+      _askingDays = false;
+      var vd = num(r && (r.vip_days || r.valid_days));
+      if (r && r.ok && r.vip && vd > 0) { lsSet(K_VD, vd); return true; }
+      return false;
+    }).catch(function () { _askingDays = false; return false; });
+  }
+
+  /* ---------------- 升级 VIP / 小红书 ---------------- */
+  /* 取商品列表：三级兜底，任何一级拿到 Aray 就用
+     ① window.MX_MALL.products()（本页 renderMall 用的同一个取值函数，最准）
+     ② window.MX_GOODS_MALL（后台「🛍️ 商品配置」下发的云端数组）
+     ③ window.MX_MALL.defaults（页面内置 MALL_PRODUCTS，离线/未拉配置时兜底）
+     ⚠️ 这里原来只认 window.MX_MALL_PRODUCTS，那个函数在 IIFE 里、从未导出到 window
+        → 离线/配置未到时 list 恒为空 → goUpgrade 提前 return，按钮点了没反应 */
+  function mallList() {
+    var out = null;
+    try { if (window.MX_MALL && typeof window.MX_MALL.products === 'function') out = window.MX_MALL.products(); } catch (e1) {}
+    if ((!out || !out.length) && window.MX_GOODS_MALL && window.MX_GOODS_MALL.length) out = window.MX_GOODS_MALL;
+    if ((!out || !out.length) && window.MX_MALL && window.MX_MALL.defaults) out = window.MX_MALL.defaults;
+    return (out || []).filter(function (p) { return p && p.on !== false; });
+  }
+  function mallVipMonth() {
+    var list = mallList();
+    var hit = list.filter(function (p) { return /月卡/.test(String(p.name || '')); })[0];
+    if (hit) return hit;
+    return list.filter(function (p) { return /VIP|会员|年卡/.test(String(p.name || '')); })[0] || null;
+  }
+  /* 按名称在已渲染的 DOM 里找卡片（名称逐级放宽：月卡 → VIP/会员 → 首张卡） */
+  function findMallCard(p) {
+    var scope = document.getElementById('page-mall');
+    if (!scope) return null;
+    var card = null, i;
+    if (p && p.id) {
+      var btn = scope.querySelector('.mx-mall-buy[data-id="' + p.id + '"]');
+      if (btn) card = btn.closest('.mx-mall-card');
+    }
+    var names = scope.querySelectorAll('.mx-mall-name');
+    function byRe(re) {
+      for (var k = 0; k < names.length; k++) {
+        if (re.test(String(names[k].textContent || ''))) return names[k].closest('.mx-mall-card');
+      }
+      return null;
+    }
+    if (!card && p && p.name) {
+      for (i = 0; i < names.length; i++) {
+        if (String(names[i].textContent || '').indexOf(String(p.name)) >= 0) { card = names[i].closest('.mx-mall-card'); break; }
+      }
+    }
+    if (!card) card = byRe(/月卡/);
+    if (!card) card = byRe(/VIP|会员|年卡/);
+    if (!card && names.length) card = names[0].closest('.mx-mall-card');
+    return card;
+  }
+  /* 站内跳到「萌星好物」并高亮 VIP 月卡商品卡
+     ⚠️ 找不到具体商品也**必须照跳**（用户点按钮的意图是去商城），
+        只有跳过去、渲染完、DOM 里一张卡都没有时才提示去后台配置。 */
+  function goUpgrade() {
+    var c = cfg();
+    if (c.banner.upgradeUrl) { try { window.open(c.banner.upgradeUrl, '_blank'); return; } catch (e) {} }
+    var p = mallVipMonth();
+    try {
+      if (window.navigateTo) window.navigateTo('page-mall', 'mall');
+      else document.dispatchEvent(new CustomEvent('navigation', { detail: { page: 'page-mall' } }));
+    } catch (e) {}
+    /* 等渲染完再滚动高亮（商品列表是异步渲染的） */
+    var tries = 0;
+    (function seek() {
+      tries++;
+      var card = findMallCard(p);
+      if (card) {
+        try {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.classList.add('mx-mall-hit');
+          setTimeout(function () { try { card.classList.remove('mx-mall-hit'); } catch (e2) {} }, 6000);
+        } catch (e) {}
+        return;
+      }
+      if (tries < 24) { setTimeout(seek, 250); return; }
+      if (!p) T('还没上架 VIP 月卡商品，请先在后台「🛍️ 商品配置」添加名称含「月卡」的商品');
+    })();
+  }
+  function goXhs(reason) {
+    var c = cfg();
+    if (!c.banner.xhsUrl) {
+      T(reason || '免费额度已用完，请升级 VIP 继续获取');
+      goUpgrade();
+      return;
+    }
+    try { window.open(c.banner.xhsUrl, '_blank'); } catch (e) {}
+    T(reason || '已为你打开小红书获取入口');
+  }
+
+  /* ---------------- 复制 ---------------- */
+  function copyText(txt) {
+    txt = String(txt || '');
+    if (!txt) return Promise.resolve(false);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(txt).then(function () { return true; }).catch(function () { return fallbackCopy(txt); });
+    }
+    return Promise.resolve(fallbackCopy(txt));
+  }
+  function fallbackCopy(txt) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  /* ---------------- 链接弹窗 ---------------- */
+  function openLinkModal(item) {
+    var mask = document.createElement('div');
+    mask.className = 'frx-modal';
+    var url = String(item.panUrl || '');
+    var code = String(item.panCode || '');
+    var localDir = String(item.dir || '');
+    var rows = '';
+    if (url) {
+      rows += '<div class="frx-row"><span class="frx-k">网盘链接</span>'
+        + '<span class="frx-v"><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a></span>'
+        + '<button type="button" class="frx-mini" data-cp="' + esc(url) + '">复制</button></div>';
+    }
+    if (code) {
+      rows += '<div class="frx-row"><span class="frx-k">提取码</span>'
+        + '<span class="frx-v frx-code">' + esc(code) + '</span>'
+        + '<button type="button" class="frx-mini" data-cp="' + esc(code) + '">复制</button></div>';
+    }
+    if (!url && localDir) {
+      rows += '<div class="frx-row"><span class="frx-k">本地目录</span>'
+        + '<span class="frx-v">' + esc(localDir) + '</span>'
+        + '<button type="button" class="frx-mini" data-open="' + esc(localDir) + '">打开</button></div>';
+    }
+    if (!url && !localDir) rows = '<div class="frx-empty">这个资源包还在整理中，暂时没有可用的下载入口。</div>';
+
+    mask.innerHTML = '<div class="frx-box">'
+      + '<div class="frx-h"><b>' + esc(item.emoji || '📦') + ' ' + esc(item.name || '资源') + '</b><span class="frx-x">✕</span></div>'
+      + '<div class="frx-body">' + rows
+      + '<div class="frx-tip">建议先转存到自己网盘再下载，避免链接被平台限流。</div></div>'
+      + '<div class="frx-foot"><button type="button" class="frx-btn ghost frx-close">关闭</button>'
+      + (url ? '<a class="frx-btn main" href="' + esc(url) + '" target="_blank" rel="noopener">打开网盘</a>' : '')
+      + '</div></div>';
+    document.body.appendChild(mask);
+    function close() { try { mask.parentNode.removeChild(mask); } catch (e) {} }
+    mask.querySelector('.frx-x').onclick = close;
+    mask.querySelector('.frx-close').onclick = close;
+    mask.addEventListener('click', function (e) { if (e.target === mask) close(); });
+    mask.querySelectorAll('[data-cp]').forEach(function (b) {
+      b.onclick = function () {
+        copyText(b.getAttribute('data-cp')).then(function (ok) {
+          T(ok ? '✅ 已复制' : '复制失败，请长按手动复制');
+        });
+      };
+    });
+    mask.querySelectorAll('[data-open]').forEach(function (b) {
+      b.onclick = function () {
+        var d = b.getAttribute('data-open');
+        try {
+          var base = location.href.split('/').slice(0, -1).join('/');
+          window.open(base + '/' + d, '_blank');
+        } catch (e) {}
+      };
+    });
+  }
+
+  /* ---------------- 领取 ---------------- */
+  function claim(item, u, tier) {
+    var d = decide(item, u, tier);
+    if (!d.ok) {
+      if (d.state === 'nomember') { goXhs('开通 VIP 就能免费获取这个资源，先带你去看看'); return; }
+      if (d.state === 'over') { goXhs('免费额度已用完，升级 VIP 可继续获取'); return; }
+      return;
+    }
+    if (d.state === 'already') { openLinkModal(item); return; }
+
+    /* 记录用量（already 不重复扣） */
+    var mk = monthKey();
+    var n = normUse(u);
+    n.claims[item.id] = { at: Date.now(), tier: tier.key, month: mk };
+    if (tier.quota >= 0 && tier.scope === 'life') n.life = num(n.life) + 1;
+    if (tier.quota >= 0 && tier.scope === 'month') n.months[mk] = monthUsed(n, mk) + 1;
+    saveUse(n).then(function () {
+      openLinkModal(item);
+      render();   /* ⚠️ 本模块的刷新是 render()，不要写成熏听模块的 refresh() */
+    });
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  var S = { use: null, tier: null, loading: true };
+
+  function bannerHtml(c, tier, u) {
+    var isMem = tier.vip;
+    var quotaLine = quotaText(u || normUse({}), tier);
+    var rightBtn = isMem
+      ? '<button type="button" class="frx-up" data-frx="up">续费 / 升级</button>'
+      : '<button type="button" class="frx-up" data-frx="up">' + esc(c.banner.upgradeText) + '</button>';
+    return '<div class="frx-banner">'
+      + '<div class="frx-banner-l">'
+      + '<div class="frx-banner-t">' + esc(c.banner.title) + '</div>'
+      + '<div class="frx-banner-s">' + esc(c.banner.sub || c.banner.tip) + '</div>'
+      + '<div class="frx-banner-q">' + esc(quotaLine) + '</div>'
+      + '</div>'
+      + '<div class="frx-banner-r">' + rightBtn + '</div>'
+      + '</div>';
+  }
+
+  function cardHtml(item, u, tier) {
+    var d = decide(item, u, tier);
+    var cls = 'frx-card';
+    var btn = '';
+    if (d.state === 'already') {
+      cls += ' got';
+      btn = '<button type="button" class="frx-get got" data-frx-get="' + esc(item.id) + '">✅ 已获取 · 查看链接</button>';
+    } else if (d.state === 'nomember') {
+      btn = '<button type="button" class="frx-get lock" data-frx-get="' + esc(item.id) + '">🔒 升级 VIP 解锁</button>';
+    } else if (d.state === 'over') {
+      cls += ' over';
+      btn = '<button type="button" class="frx-get over" data-frx-get="' + esc(item.id) + '">😢 额度已用完 · 去看看</button>';
+    } else {
+      btn = '<button type="button" class="frx-get" data-frx-get="' + esc(item.id) + '">📥 获取网盘链接</button>';
+    }
+    var hasPan = !!String(item.panUrl || '').trim();
+    return '<div class="' + cls + '">'
+      + '<div class="frx-emoji">' + esc(item.emoji || '📦') + '</div>'
+      + '<div class="frx-name">' + esc(item.name || '未命名资源') + '</div>'
+      + '<div class="frx-note">' + esc(item.note || '') + '</div>'
+      + (hasPan ? '<div class="frx-pan">☁️ 网盘资源</div>' : '')
+      + btn
+      + '</div>';
+  }
+
+  function render() {
+    var page = document.getElementById('page-tool-resources');
+    if (!page) return Promise.resolve();
+    var c = cfg();
+    var list = items();
+    if (!list.length) {
+      page.innerHTML = '<div class="content-section-title">📦 免费资源库</div><div class="empty-tip">后台还没有配置免费资源，请让家长在后台「📦 免费资源库」里添加。</div>';
+      return Promise.resolve();
+    }
+    var tier = tierOf();
+    S.tier = tier;
+
+    return loadUse().then(function (u) {
+      S.use = u;
+      S.loading = false;
+      var cats = {}, order = [];
+      list.forEach(function (r) {
+        var k = String(r.cat || '未分类');
+        if (!cats[k]) { cats[k] = []; order.push(k); }
+        cats[k].push(r);
+      });
+      var html = '<div class="content-section-title">📦 免费资源库 <span class="sub">幼小衔接福利资源 · VIP 分级免费获取</span></div>'
+        + bannerHtml(c, tier, u);
+      order.forEach(function (cat) {
+        html += '<div class="frx-cat"><div class="frx-cat-t">' + esc(cat) + '</div><div class="frx-grid">'
+          + cats[cat].map(function (r) { return cardHtml(r, u, tier); }).join('')
+          + '</div></div>';
+      });
+      html += '<div class="frx-foot-tip">资源为虚拟商品，获取后请及时转存；不同 VIP 卡种免费次数不同，具体见上方额度说明。</div>';
+      page.innerHTML = html;
+
+      /* 事件 */
+      var up = page.querySelector('[data-frx="up"]');
+      if (up) up.onclick = goUpgrade;
+      page.querySelectorAll('[data-frx-get]').forEach(function (b) {
+        b.onclick = function () {
+          var id = b.getAttribute('data-frx-get');
+          var item = items().filter(function (x) { return String(x.id) === String(id); })[0];
+          if (!item) return;
+          claim(item, S.use, S.tier);
+        };
+      });
+
+      /* 本地缺卡种信息 → 异步补一次并重绘（只补一次，避免抖动） */
+      askDays().then(function (changed) { if (changed) render(); });
+      return undefined;
+    }).catch(function () {
+      S.loading = false;
+      page.innerHTML = '<div class="empty-tip">加载失败，请下拉刷新重试</div>';
+    });
+  }
+
+  window.MX_FREERES = {
+    render: render,
+    cfg: cfg,
+    items: items,
+    tierOf: tierOf,
+    decide: decide,
+    quotaText: quotaText,
+    effDays: effDays,
+    monthKey: monthKey,
+    goUpgrade: goUpgrade,
+    goXhs: goXhs,
+    /* 测试用（e2e 直接调，不碰 DOM） */
+    _t: {
+      cfg: cfg, decide: decide, tierOf: tierOf, monthKey: monthKey,
+      normUse: normUse, quotaText: quotaText, DEFAULT_CFG: DEFAULT_CFG
+    }
   };
 })();
 

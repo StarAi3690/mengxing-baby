@@ -86,6 +86,7 @@
     <div class="tab" id="tab-data" onclick="switchTab('data')" data-page-node-id="2Vt2j8HyzhM0J9P7PUhA8H">📋 数据明细</div>
     <div class="tab" id="tab-sec" onclick="switchTab('sec')" data-page-node-id="J0dqbNKoDJq6GcIyTyOGFb">⚙️ 账号安全</div>
     <div class="tab" id="tab-goods" onclick="switchTab('goods')">🛍️ 商品配置</div>
+    <div class="tab" id="tab-freeres" onclick="switchTab('freeres')">📦 免费资源库</div>
     <div class="tab" id="tab-wish" onclick="switchTab('wish')">🛒 缺货登记</div>
     <div class="tab" id="tab-intent" onclick="switchTab('intent')">🧾 用户意向单</div>
     <div class="tab" id="tab-pub" onclick="switchTab('pub')">🚀 一键发布</div>
@@ -340,6 +341,67 @@
     </div>
   </div>
 
+  <!-- [FREERES539] 免费资源库配置 -->
+  <div id="pane-freeres" hidden>
+    <div class="card">
+      <h3 style="margin:0 0 4px">📦 免费资源库配置（VIP 分级配额）</h3>
+      <div class="sub">资源项、各卡种免费次数、小红书售卖链接都在这里配；点「发布」后全端生效。数据存于云端 <code>CFG::linkage_config.freeRes</code>，孩子端进页面即拉新配置。</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost sm" onclick="loadFreeRes()">↻ 从云端重新读取</button>
+        <button class="btn ghost sm" onclick="frReset()">↺ 重置为默认</button>
+        <span class="hint" style="margin:0">首次使用（云端还没有配置）会显示内置默认模板，改完点发布即可。</span>
+      </div>
+
+      <h3 style="margin:18px 0 4px">① 各卡种免费次数</h3>
+      <div class="sub" style="margin:4px 0 8px">
+        按卡密的 <b>valid_days</b>（卡种原始天数）命中「最少天数 ~ 最多天数」区间来定档。
+        线上实际取值：<code>1</code>=体验卡、<code>31</code>=月卡、<code>93</code>=季卡、<code>183/184</code>=半年卡、<code>365</code>=年卡、<code>0</code>=永久 VIP。<br>
+        <b>免费次数</b>：<code>-1</code> = 不限次数；<code>0</code> = 完全不给（点了跳小红书）。<br>
+        <b>计数周期</b>：<code>life</code> = 终身只算一次（体验卡用这个）｜<code>month</code> = 每个自然月重置｜<code>none</code> = 不计数（配合 -1 用）。<br>
+        <span style="color:#c26a00">⚠️ 区间必须覆盖所有天数，且不要互相重叠（重叠时取靠上的那行）。</span>
+      </div>
+      <div class="scroll"><table class="gt" id="frTierTable"><thead id="frTierHead"></thead><tbody id="frTierBody"></tbody></table></div>
+      <div class="row"><button class="btn ghost sm" onclick="frAdd('tiers')">＋ 新增档位</button><span class="hint" style="margin:0">共 <b id="frTierCount">0</b> 个</span></div>
+
+      <h3 style="margin:18px 0 4px">② 免费资源项</h3>
+      <div class="sub" style="margin:4px 0 8px">
+        <b>网盘链接</b>填了才会走「获取网盘链接」（弹窗显示链接+提取码+一键复制）；<b>留空</b>则退化成本地目录打开（仅供你自己在电脑上验收）。<br>
+        <b>本地目录</b>可选，如 <code>assets/pdf/story/</code>；<b>下架</b>（⚪）后孩子端不展示但保留配置。
+      </div>
+      <div class="scroll"><table class="gt" id="frItemTable"><thead id="frItemHead"></thead><tbody id="frItemBody"></tbody></table></div>
+      <div class="row"><button class="btn ghost sm" onclick="frAdd('items')">＋ 新增资源</button><span class="hint" style="margin:0">共 <b id="frItemCount">0</b> 个</span></div>
+
+      <h3 style="margin:18px 0 4px">③ 横幅文案与跳转链接</h3>
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:220px"><label>横幅标题</label><input id="frBTitle" type="text" oninput="frBannerSet('title',this.value)" placeholder="🎁 不定期发放免费资源"></div>
+        <div style="flex:1;min-width:220px"><label>横幅副标题（留空则用下面那句升级提示）</label><input id="frBSub" type="text" oninput="frBannerSet('sub',this.value)" placeholder="每周上新，先到先得"></div>
+      </div>
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:220px"><label>升级提示语</label><input id="frBTip" type="text" oninput="frBannerSet('tip',this.value)" placeholder="如需畅享全部学习资源，请升级 VIP"></div>
+        <div style="flex:0 0 190px"><label>升级按钮文案</label><input id="frBUpText" type="text" oninput="frBannerSet('upgradeText',this.value)" placeholder="👑 升级 VIP 月卡"></div>
+      </div>
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:240px"><label>升级按钮链接（<b>留空</b> = 站内跳到「萌星好物」并高亮 VIP 月卡商品）</label><input id="frBUpUrl" type="text" oninput="frBannerSet('upgradeUrl',this.value)" placeholder="留空即可，会自动找名称含「月卡」的商品"></div>
+      </div>
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:240px"><label>小红书售卖链接（非 VIP / 额度用完点「获取」时跳这里）</label><input id="frBXhsUrl" type="text" oninput="frBannerSet('xhsUrl',this.value)" placeholder="https://www.xiaohongshu.com/user/profile/..."></div>
+        <div style="flex:0 0 190px"><label>小红书按钮文案</label><input id="frBXhsText" type="text" oninput="frBannerSet('xhsText',this.value)" placeholder="去小红书看看"></div>
+      </div>
+      <div class="hint" style="margin-top:6px">⚠️ 没填小红书链接时，非 VIP 点「获取」会退化为提示 + 跳到升级 VIP。</div>
+
+      <details style="margin-top:16px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--sub)">高级：以 JSON 粘贴 / 备份（与上方表格双向同步）</summary>
+        <textarea id="frJson" rows="10" style="font-family:monospace;font-size:12px" oninput="frJsonIn()"></textarea>
+        <div class="hint">粘贴合法 JSON 对象会自动同步到上方表格；表格修改也会实时回写这里。</div>
+      </details>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="saveFreeRes()">🚀 发布免费资源库配置到全站</button>
+        <span id="frMsg" class="msg"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- 缺货登记（WLIB532） -->
   <div id="pane-wish" hidden>
     <div class="card">
@@ -548,7 +610,7 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','nav','mon','fb','data','sec','goods','wish','intent','pub','resops'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec','goods','freeres','wish','intent','pub','resops'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
@@ -557,6 +619,7 @@ function switchTab(t){
   if (t==='sec') loadSecQ();
   if (t==='nav') loadNavOrder();
   if (t==='goods') loadGoods();
+  if (t==='freeres') loadFreeRes();
   if (t==='wish') loadWishList();
   if (t==='intent') loadIntent();
   if (t==='pub') pubRender();
@@ -1115,6 +1178,233 @@ const DEFAULT_MALL_PRODUCTS = [
   {id:'p5', name:'萌星公仔', emoji:'🧸', price:'¥89', vipPrice:'¥69', tag:'服饰配饰类', desc:'6大主题角色公仔', url:'https://www.jd.com/'},
   {id:'p6', name:'护眼学习台灯', emoji:'💡', price:'¥159', tag:'食品用品类', desc:'国AA级护眼，陪伴学习', url:'https://www.jd.com/'}
 ];
+/* ===== [FREERES539] 免费资源库配置（表格化编辑 + JSON 双向） ===== */
+const FR = { banner: {}, tiers: [], items: [] };
+const FR_DEFAULT = {
+  banner: { title: '🎁 不定期发放免费资源', sub: '', tip: '如需畅享全部学习资源，请升级 VIP',
+    upgradeText: '👑 升级 VIP 月卡', upgradeUrl: '', xhsText: '去小红书看看', xhsUrl: '' },
+  tiers: [
+    { key:'trial',   name:'VIP 体验卡', minDays:0,   maxDays:1,     quota:1,  scope:'life'  },
+    { key:'month',   name:'VIP 月卡',   minDays:2,   maxDays:60,    quota:3,  scope:'month' },
+    { key:'quarter', name:'VIP 季卡',   minDays:61,  maxDays:120,   quota:3,  scope:'month' },
+    { key:'half',    name:'VIP 半年卡', minDays:121, maxDays:250,   quota:-1, scope:'none'  },
+    { key:'year',    name:'VIP 年卡',   minDays:251, maxDays:99999, quota:-1, scope:'none'  }
+  ],
+  items: [
+    { id:'pointread',    cat:'点读包',   name:'幼小衔接点读包（拼音/识字）', emoji:'🔊', note:'点读包音频，配套课本即点即读', dir:'assets/audio/',           panUrl:'', panCode:'', on:true },
+    { id:'story_pdf',    cat:'绘本PDF',  name:'精选绘本PDF（20册）',       emoji:'📖', note:'可打印绘本，亲子共读',        dir:'assets/pdf/story/',       panUrl:'', panCode:'', on:true },
+    { id:'workbook_pdf', cat:'练习册',   name:'综合练习册PDF（数学/语文）',  emoji:'📝', note:'幼小衔接专项练习',            dir:'assets/pdf/workbook/',    panUrl:'', panCode:'', on:true },
+    { id:'raz',          cat:'英文分级', name:'RAZ分级阅读音频',           emoji:'📚', note:'英文分级启蒙磨耳朵',          dir:'assets/audio/english/raz/', panUrl:'', panCode:'', on:true },
+    { id:'sss',          cat:'SSS儿歌',  name:'Super Simple Songs 儿歌包', emoji:'🎵', note:'英文儿歌，轻松启蒙',          dir:'assets/audio/music/',     panUrl:'', panCode:'', on:true },
+    { id:'pinyin_pdf',   cat:'拼音',     name:'拼音学习PDF（7册）',        emoji:'🔤', note:'拼音专项资料',                dir:'assets/pdf/pinyin/',      panUrl:'', panCode:'', on:true },
+    { id:'math_pdf',     cat:'数学',     name:'数学练习册PDF',             emoji:'➗', note:'口算与思维训练',              dir:'assets/pdf/math/',        panUrl:'', panCode:'', on:true }
+  ]
+};
+const FR_TIER_FIELDS = [
+  { k:'key',     t:'档位key',  w:'86px',  ph:'month' },
+  { k:'name',    t:'名称',     w:'110px', ph:'VIP 月卡' },
+  { k:'minDays', t:'最少天数', w:'84px',  ph:'0',  num:true },
+  { k:'maxDays', t:'最多天数', w:'84px',  ph:'60', num:true },
+  { k:'quota',   t:'免费次数', w:'84px',  ph:'-1=不限', num:true },
+  { k:'scope',   t:'计数周期', w:'104px', sel:['life','month','none'] }
+];
+const FR_ITEM_FIELDS = [
+  { k:'id',      t:'id',       w:'96px',  ph:'story_pdf' },
+  { k:'cat',     t:'分类',     w:'80px',  ph:'绘本PDF' },
+  { k:'name',    t:'名称',     w:'168px', ph:'精选绘本PDF' },
+  { k:'emoji',   t:'图标',     w:'52px',  ph:'📖' },
+  { k:'note',    t:'说明',     w:'150px', ph:'一句话说明' },
+  { k:'panUrl',  t:'网盘链接', w:'190px', ph:'https://pan.baidu.com/s/...' },
+  { k:'panCode', t:'提取码',   w:'72px',  ph:'abcd' },
+  { k:'dir',     t:'本地目录', w:'150px', ph:'assets/pdf/story/' }
+];
+
+function frEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function frCellHtml(which, i, f, o){
+  const v = (o[f.k]==null) ? '' : String(o[f.k]);
+  const onin = "oninput=\"frSet('"+which+"',"+i+",'"+f.k+"',this.value)\"";
+  if (f.sel){
+    return '<select '+onin+'>'+f.sel.map(function(x){
+      return '<option value="'+x+'"'+(v===x?' selected':'')+'>'+x+'</option>';
+    }).join('')+'</select>';
+  }
+  return '<input '+(f.num?'type="number" step="1" ':'type="text" ')
+    + 'value="'+frEsc(v)+'" placeholder="'+frEsc(f.ph||'')+'" '+(v?'title="'+frEsc(v)+'" ':'')+onin+'>';
+}
+function frRender(which){
+  const isT = which==='tiers';
+  const fields = isT ? FR_TIER_FIELDS : FR_ITEM_FIELDS;
+  const head = $(isT?'frTierHead':'frItemHead'), body = $(isT?'frTierBody':'frItemBody');
+  if (!head || !body) return;
+  const arr = FR[which] || [];
+  head.innerHTML = '<tr><th style="width:28px">#</th>'
+    + fields.map(function(f){ return '<th'+(f.w?' style="width:'+f.w+'"':'')+'>'+f.t+'</th>'; }).join('')
+    + '<th style="width:132px">操作</th></tr>';
+  if (!arr.length){
+    body.innerHTML = '<tr><td colspan="'+(fields.length+2)+'" style="padding:12px;color:#9aa">暂无数据，点下方「＋」添加</td></tr>';
+  } else {
+    body.innerHTML = arr.map(function(o,i){
+      let h = '<tr'+((o.on===false)?' style="opacity:.55"':'')+'><td style="color:#9aa">'+(i+1)+'</td>'
+        + fields.map(function(f){ return '<td>'+frCellHtml(which,i,f,o)+'</td>'; }).join('')
+        + '<td style="white-space:nowrap">';
+      if (!isT){
+        h += '<button class="ico" title="'+(o.on!==false?'点击下架（孩子端不展示）':'点击上架')+'" onclick="frToggle(\''+which+'\','+i+')">'+(o.on!==false?'🟢':'⚪')+'</button>';
+      }
+      h += '<button class="ico" title="上移" onclick="frMove(\''+which+'\','+i+',-1)">↑</button>'
+        + '<button class="ico" title="下移" onclick="frMove(\''+which+'\','+i+',1)">↓</button>'
+        + '<button class="ico del" title="删除" onclick="frDel(\''+which+'\','+i+')">✕</button></td></tr>';
+      return h;
+    }).join('');
+  }
+  const cnt = $(isT?'frTierCount':'frItemCount');
+  if (cnt) cnt.textContent = arr.length;
+}
+function frSet(which, i, k, v){
+  if (!FR[which] || !FR[which][i]) return;
+  const f = (which==='tiers'?FR_TIER_FIELDS:FR_ITEM_FIELDS).filter(function(x){return x.k===k;})[0];
+  FR[which][i][k] = (f && f.num) ? (v===''||v==null?0:Number(v)) : v;
+  frJsonOut();
+}
+function frAdd(which){
+  if (which==='tiers'){
+    FR.tiers.push({ key:'tier'+(FR.tiers.length+1), name:'新档位', minDays:0, maxDays:0, quota:0, scope:'month' });
+    frRender('tiers');
+  } else {
+    FR.items.push({ id:'res'+(FR.items.length+1), cat:'未分类', name:'新资源', emoji:'📦', note:'', dir:'', panUrl:'', panCode:'', on:true });
+    frRender('items');
+  }
+  frJsonOut();
+}
+function frDel(which, i){
+  if (!FR[which] || !FR[which][i]) return;
+  const nm = which==='tiers' ? (FR.tiers[i].key||'该档位') : (FR.items[i].name||'该资源');
+  if (!confirm('确定删除「'+nm+'」？删除后需重新发布才生效。')) return;
+  FR[which].splice(i,1);
+  frRender(which); frJsonOut();
+}
+function frMove(which, i, d){
+  const arr = FR[which] || []; const j = i + d;
+  if (j < 0 || j >= arr.length) return;
+  const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  frRender(which); frJsonOut();
+}
+function frToggle(which, i){
+  if (!FR[which] || !FR[which][i]) return;
+  FR[which][i].on = (FR[which][i].on === false);
+  frRender(which); frJsonOut();
+}
+function frBannerSet(k, v){
+  FR.banner[k] = v;
+  frJsonOut();
+}
+function frFillBanner(){
+  FR.banner = FR.banner || {};
+  const map = { frBTitle:'title', frBSub:'sub', frBTip:'tip', frBUpText:'upgradeText', frBUpUrl:'upgradeUrl', frBXhsUrl:'xhsUrl', frBXhsText:'xhsText' };
+  Object.keys(map).forEach(function(id){
+    const el = $(id); if (el) el.value = FR.banner[map[id]] || '';
+  });
+}
+function frJsonOut(){
+  const box = $('frJson');
+  if (!box) return;
+  try { box.value = JSON.stringify({ ver:1, banner:FR.banner, tiers:FR.tiers, items:FR.items }, null, 1); } catch(e){}
+}
+function frJsonIn(){
+  const box = $('frJson'); if (!box) return;
+  let o;
+  try { o = JSON.parse(box.value || '{}'); } catch(e){ setMsg('frMsg','JSON 解析失败：'+String(e.message||e),'bad'); return; }
+  if (!o || typeof o !== 'object'){ setMsg('frMsg','JSON 需为对象','bad'); return; }
+  FR.banner = (o.banner && typeof o.banner==='object') ? o.banner : {};
+  FR.tiers  = Array.isArray(o.tiers) ? o.tiers : [];
+  FR.items  = Array.isArray(o.items) ? o.items : [];
+  frRender('tiers'); frRender('items'); frFillBanner();
+  setMsg('frMsg','已从 JSON 同步到表格','sub');
+}
+function frReset(){
+  if (!confirm('重置为代码内置默认模板？（不会立即发布，仍需点「发布」）')) return;
+  FR.banner = JSON.parse(JSON.stringify(FR_DEFAULT.banner));
+  FR.tiers  = JSON.parse(JSON.stringify(FR_DEFAULT.tiers));
+  FR.items  = JSON.parse(JSON.stringify(FR_DEFAULT.items));
+  frRender('tiers'); frRender('items'); frFillBanner(); frJsonOut();
+  setMsg('frMsg','已重置为默认模板（未发布）','sub');
+}
+function frValidate(){
+  const errs = [];
+  if (!FR.tiers.length) errs.push('至少要保留 1 个卡种档位');
+  const seenT = {};
+  FR.tiers.forEach(function(t,i){
+    const k = String(t.key||'').trim();
+    if (!k) errs.push('档位第 '+(i+1)+' 行缺少 key');
+    else if (seenT[k]) errs.push('档位 key 重复：'+k);
+    else seenT[k]=1;
+    if (['life','month','none'].indexOf(String(t.scope))<0) errs.push('档位「'+(k||i+1)+'」计数周期只能是 life / month / none');
+    if (!(Number(t.minDays)>=0)) errs.push('档位「'+(k||i+1)+'」最少天数需 ≥0');
+    if (!(Number(t.maxDays)>=Number(t.minDays))) errs.push('档位「'+(k||i+1)+'」最多天数需 ≥ 最少天数');
+    if (!(Number(t.quota)>=-1)) errs.push('档位「'+(k||i+1)+'」免费次数需 ≥ -1');
+  });
+  const seenI = {};
+  FR.items.forEach(function(it,i){
+    const id = String(it.id||'').trim();
+    if (!id) errs.push('资源第 '+(i+1)+' 行缺少 id');
+    else if (seenI[id]) errs.push('资源 id 重复：'+id);
+    else seenI[id]=1;
+    if (!String(it.name||'').trim()) errs.push('资源第 '+(i+1)+' 行缺少名称');
+    const u = String(it.panUrl||'').trim();
+    if (u && !/^https?:\/\//i.test(u)) errs.push('资源「'+(it.name||id)+'」网盘链接需以 http(s):// 开头');
+  });
+  const xu = String(FR.banner.xhsUrl||'').trim();
+  if (xu && !/^https?:\/\//i.test(xu)) errs.push('小红书链接需以 http(s):// 开头');
+  const uu = String(FR.banner.upgradeUrl||'').trim();
+  if (uu && !/^https?:\/\/|^\//i.test(uu)) errs.push('升级按钮链接需以 http(s):// 开头（或留空）');
+  return errs;
+}
+async function saveFreeRes(){
+  const errs = frValidate();
+  if (errs.length){
+    if (!confirm('检测到 '+errs.length+' 处问题：\n\n'+errs.slice(0,10).join('\n')+(errs.length>10?'\n…':'')+'\n\n仍要强行发布吗？（不推荐）')) return;
+  }
+  setMsg('frMsg','发布中…','sub');
+  const payload = { ver:1, banner:FR.banner, tiers:FR.tiers, items:FR.items };
+  try {
+    const r = await proxy('mxAdmin', { action:'freeRes', action2:'set', adminKey: ADMIN_KEY, freeRes: payload });
+    if (r && r.ok){
+      const on = FR.items.filter(function(x){ return x.on !== false; }).length;
+      setMsg('frMsg','✅ 已发布（档位 '+FR.tiers.length+' 个 / 资源 '+FR.items.length+' 个，其中上架 '+on+' 个），全端刷新后生效','ok');
+    } else setMsg('frMsg','❌ '+((r&&r.msg)||'发布失败'),'bad');
+  } catch(e){ setMsg('frMsg','❌ '+String(e.message||e),'bad'); }
+}
+async function loadFreeRes(){
+  setMsg('frMsg','读取中…','sub');
+  try {
+    const r = await proxy('mxAdmin', { action:'freeRes', adminKey: ADMIN_KEY });
+    if (r && r.ok){
+      if (r.freeRes && typeof r.freeRes === 'object'){
+        FR.banner = (r.freeRes.banner && typeof r.freeRes.banner==='object') ? r.freeRes.banner : JSON.parse(JSON.stringify(FR_DEFAULT.banner));
+        FR.tiers  = Array.isArray(r.freeRes.tiers) && r.freeRes.tiers.length ? r.freeRes.tiers : JSON.parse(JSON.stringify(FR_DEFAULT.tiers));
+        FR.items  = Array.isArray(r.freeRes.items) && r.freeRes.items.length ? r.freeRes.items : JSON.parse(JSON.stringify(FR_DEFAULT.items));
+        setMsg('frMsg','已读取云端配置','sub');
+      } else {
+        FR.banner = JSON.parse(JSON.stringify(FR_DEFAULT.banner));
+        FR.tiers  = JSON.parse(JSON.stringify(FR_DEFAULT.tiers));
+        FR.items  = JSON.parse(JSON.stringify(FR_DEFAULT.items));
+        setMsg('frMsg','⚠️ 云端暂无可配置：以下是代码默认模板，点「发布」后才对孩子端生效','warn');
+      }
+    } else {
+      setMsg('frMsg','❌ 读取失败：'+((r&&r.msg)||'未知原因'),'bad');
+      if (!FR.tiers.length) frResetSilent();
+    }
+  } catch(e){
+    setMsg('frMsg','❌ 读取失败：'+String(e.message||e),'bad');
+    if (!FR.tiers.length) frResetSilent();
+  }
+  frRender('tiers'); frRender('items'); frFillBanner(); frJsonOut();
+}
+function frResetSilent(){
+  FR.banner = JSON.parse(JSON.stringify(FR_DEFAULT.banner));
+  FR.tiers  = JSON.parse(JSON.stringify(FR_DEFAULT.tiers));
+  FR.items  = JSON.parse(JSON.stringify(FR_DEFAULT.items));
+}
+
 /* ===== #433 商品配置：表格化编辑器 =====
    表格是唯一编辑入口；底部 JSON textarea 与表格双向同步（高级/批量用）。 */
 const GOODS = { shop: [], mall: [] };
