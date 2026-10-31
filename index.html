@@ -3316,8 +3316,8 @@ html, body {
 
 /* 多周期统览（今日/本周/本月） */
 .ov-block { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--card-shadow); padding: 16px 16px 18px; margin-bottom: 18px; }
-.ov-head { font-size: 16px; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; }
-.ov-head .sub { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.ov-head { font-size: 16px; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.ov-head .sub { font-size: 12px; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
 .ov-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .ov-tab { flex: 0 0 auto; min-width: 64px; height: 34px; border: 1px solid var(--border-color); background: var(--bg-elevated, #f4f6f4); border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--text-secondary); cursor: pointer; padding: 0 16px; transition: all .15s ease; }
 .ov-tab.active { background: var(--accent-primary, #7ec850); color: #fff; border-color: var(--accent-primary, #7ec850); }
@@ -18835,7 +18835,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   /* 测试模式：仅由 window.__MX_DEBUG 控制是否显示「前进一天」等测试按钮与调试面板。
      测试部署版(index.html / CloudStudio 沙箱)默认 __MX_DEBUG=true → 测试控件 + 调试面板默认可见；
      用户版(_public_deploy / Netlify)由构建脚本改为 false 并堵万能码，正式上线彻底关闭（?debug=1 入口已移除）。
-     注意：仅显示测试控件，不自动激活 VIP，VIP 仍需真实注册或手动输 MENGXINGTEST0001。 */
+     注意：仅显示测试控件，不自动激活 VIP，VIP 仍需真实注册或云端核销。 */
   function isDebug() { try { return window.__MX_DEBUG === true; } catch (e) { return false; } }
   window.__MX_DEBUG = false; /* 正式版关闭测试态（GitHub Pages / 生产环境） */
 
