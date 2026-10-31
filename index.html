@@ -28030,14 +28030,11 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
 
   /* —— 本地演示核销(不入云)：示例码表（仅本地/未连云时生效） —— */
   var DEMO_CODES = {
-    'DEMO2026MX01234A': { vip: 0 },    // 普通码
-    'MXVIP2026000000A': { vip: 1 }     // VIP码
+    'DEMO2026MX01234A': { vip: 0 },    // 普通码    /* [1024投稿安全修复] 示例 VIP 码已移除 */
   };
   /* —— 永久测试码（开发者反复测试用，云端模式也可本地放行）——
      不绑定设备上限、可反复激活，专供测试。正式发布请走云端核销。 */
-  var TEST_CODES = {
-    'MENGXINGTEST0001': { vip: 1 }     // 永久测试码（VIP全功能）
-  };
+  var TEST_CODES = {};  /* [1024投稿安全修复] 永久测试码已移除，正式卡密一律走云端核销 */
   function localRedeem(code, devId) {
     var c = (code || '').trim();
     if (!/^[!-~]{16,}$/.test(c)) return Promise.resolve({ ok: false, msg: '请输入有效的卡密' });
@@ -30608,7 +30605,7 @@ function downloadResourceFromCloud(resId) {
 /* ===== 萌星宝宝 v2.4.0 增强（测试码登录记录面板） ===== */
 (function () {
   'use strict';
-  var TEST_CODE = 'MENGXINGTEST0001';  /* 测试码激活时显示测试面板 */
+  var TEST_CODE = '__REMOVED_1024__';  /* 测试码激活时显示测试面板 */
   var KEY_ALLOWED = 'mx_test_allowed';
   var KEY_LOG = 'mx_test_log';
   var KEY_CODE = 'mengxing_activated_code';
