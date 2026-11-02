@@ -12635,15 +12635,21 @@ window.MX_SEED = data;
      ============================================= */
 
   const AUDIO_BASE = './assets/audio/';
-  /* [TTSVIVO604] 音频双源：腾讯云 CDN（国内）优先，原站相对路径兜底。
-     动机（2026-11-02 实测）：github.io 单个 4KB 音频 TTFB=1.05s，移动网络 2~5s，
+  /* [TTSVIVO604] 音频双源：原站相对路径为主，腾讯云 CDN 兜底（顺序见 MX_CDN_FIRST）。
+     动机（2026-11-02 实测）：github.io 单个 4KB 音频 TTFB=1.05~1.27s，移动网络 2~5s，
      而 playAudio 原来每个候选只等 2.5s → 必判失败 → 回退 TTS → vivo/微信 X5 无 Web Speech
      → 弹「当前设备不支持语音」，把网络问题误报成设备问题（真实用户投诉）。
-     CDN 只放已确认上传的目录，poem（192MB）仍走原站，避免吃 CDN 流量额度。 */
+     CDN 只放已确认上传的目录，poem（200MB）仍走原站。 */
   const AUDIO_BASE_CDN = 'https://my-kb-d9grepb0u2ac94dc7-1253756551.tcloudbaseapp.com/assets/audio/';
   const MX_CDN_DIRS = { pinyin: 1, english: 1, sprunki: 1 };
   var MX_CDN_STATE = 0; /* 0=未知 1=可用 -1=已判不可用（连续失败后降级） */
   var MX_CDN_FAIL = 0;
+  /* [STRATEGY605] 开关：是否让 CDN 抢在原站前面。
+     false（默认）＝原站优先、CDN 只做兜底 —— 用户 2026-11-02 明确要求「千万别用腾讯云那个，
+     因为按流量计算」，腾讯云免费额度仅 3000 资源点/月（约 10~14GB 流量），不该拿来扛日常播放。
+     true ＝ CDN 优先（2026-11-02 早前的临时选择，已按用户要求关闭）。
+     注意：本开关只改「谁先试」，不影响兜底——原站 9 秒拿不到仍会自动落到 CDN，不会没声。 */
+  var MX_CDN_FIRST = false;
 
   const speechSupported = !!(window.SpeechSynthesisUtterance && window.speechSynthesis);
 
@@ -12711,7 +12717,7 @@ window.MX_SEED = data;
        仅对已上传 CDN 的目录生效，poem 等未上传目录不会多打一次 404。 */
     if (MX_CDN_DIRS[folder] && MX_CDN_STATE !== -2) {
       const dual = [];
-      const cdnFirst = MX_CDN_STATE !== -1;
+      const cdnFirst = MX_CDN_FIRST && MX_CDN_STATE !== -1;
       for (let di = 0; di < paths.length; di++) {
         const rel = paths[di];
         const pf = './assets/audio/';
