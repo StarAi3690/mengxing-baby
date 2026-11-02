@@ -12635,6 +12635,15 @@ window.MX_SEED = data;
      ============================================= */
 
   const AUDIO_BASE = './assets/audio/';
+  /* [TTSVIVO604] 音频双源：腾讯云 CDN（国内）优先，原站相对路径兜底。
+     动机（2026-11-02 实测）：github.io 单个 4KB 音频 TTFB=1.05s，移动网络 2~5s，
+     而 playAudio 原来每个候选只等 2.5s → 必判失败 → 回退 TTS → vivo/微信 X5 无 Web Speech
+     → 弹「当前设备不支持语音」，把网络问题误报成设备问题（真实用户投诉）。
+     CDN 只放已确认上传的目录，poem（192MB）仍走原站，避免吃 CDN 流量额度。 */
+  const AUDIO_BASE_CDN = 'https://my-kb-d9grepb0u2ac94dc7-1253756551.tcloudbaseapp.com/assets/audio/';
+  const MX_CDN_DIRS = { pinyin: 1, english: 1, sprunki: 1 };
+  var MX_CDN_STATE = 0; /* 0=未知 1=可用 -1=已判不可用（连续失败后降级） */
+  var MX_CDN_FAIL = 0;
 
   const speechSupported = !!(window.SpeechSynthesisUtterance && window.speechSynthesis);
 
@@ -12697,8 +12706,22 @@ window.MX_SEED = data;
 
     try { paths.push(`${AUDIO_BASE}${folder}/${encodeURIComponent(name)}.mp3`); } catch (e) {}
 
+    /* [TTSVIVO604] 双源展开：每个候选同时给出 CDN 版与原站版。
+       顺序由 MX_CDN_STATE 决定；未知时 CDN 优先（国内绝大多数场景更快）。
+       仅对已上传 CDN 的目录生效，poem 等未上传目录不会多打一次 404。 */
+    if (MX_CDN_DIRS[folder] && MX_CDN_STATE !== -2) {
+      const dual = [];
+      const cdnFirst = MX_CDN_STATE !== -1;
+      for (let di = 0; di < paths.length; di++) {
+        const rel = paths[di];
+        const pf = './assets/audio/';
+        if (rel.indexOf(pf) !== 0) { dual.push(rel); continue; }
+        const cdn = AUDIO_BASE_CDN + rel.slice(pf.length);
+        if (cdnFirst) { dual.push(cdn, rel); } else { dual.push(rel, cdn); }
+      }
+      return dual;
+    }
     return paths;
-
   }
 
 
@@ -12744,7 +12767,10 @@ window.MX_SEED = data;
 
     if (!window.SpeechSynthesisUtterance || !window.speechSynthesis) {
 
-      if (window.showToast) window.showToast('🔇 当前设备不支持语音');
+      /* [TTSVIVO604] 原提示「当前设备不支持语音」把网络问题说成了硬件问题。
+         vivo / 微信 X5 内核确实没有 Web Speech，但真人录音走国内 CDN 后根本不需要 TTS。
+         这里只在「录音也没拿到」时才走到，所以照实说原因并给重试指引。 */
+      if (window.showToast) window.showToast('🔈 发音没加载出来，请检查网络后再点一次');
 
       _done();
 
@@ -12800,9 +12826,25 @@ window.MX_SEED = data;
 
       let timer = null;
 
-      const onFail = () => { if (timer) { clearTimeout(timer); timer = null; } audio.onerror = audio.onplaying = audio.onended = null; tryPlay(i + 1); };
+      /* [TTSVIVO604] 当前候选是否走 CDN：用于分级超时与健康度统计 */
+      const isCdn = src.indexOf('http') === 0;
 
-      const onOk = () => { if (timer) { clearTimeout(timer); timer = null; } audioPlayed = true; audio.onerror = audio.onplaying = null; };
+      const onFail = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        audio.onerror = audio.onplaying = audio.onended = null;
+        /* [TTSVIVO604] CDN 连续失败 3 次才整体降级到原站，避免单次抖动就把全站拖慢 */
+        if (isCdn) { MX_CDN_FAIL += 1; if (MX_CDN_FAIL >= 3) MX_CDN_STATE = -1; }
+        try { window.__mxCdnState = MX_CDN_STATE; } catch (e5) {}
+        tryPlay(i + 1);
+      };
+
+      const onOk = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        audioPlayed = true;
+        audio.onerror = audio.onplaying = null;
+        if (isCdn) { MX_CDN_FAIL = 0; MX_CDN_STATE = 1; }
+        try { window.__mxCdnState = MX_CDN_STATE; } catch (e6) {}
+      };
 
       audio.onerror = onFail;
 
@@ -12817,13 +12859,18 @@ window.MX_SEED = data;
 
       audio.src = src;
 
-      timer = setTimeout(onFail, 2500); // 唱完兜底：若 2.5s 未开始播放视为失败
+      /* [TTSVIVO604] 分级超时：CDN 6s、原站 9s。
+         原值 2.5s 在移动网络下必然误判（实测 github.io 单文件 TTFB 就 1.05s，3 个候选叠加 3s+）。 */
+      timer = setTimeout(onFail, isCdn ? 6000 : 9000);
 
       try {
 
         const p = audio.play();
 
-        if (p && p.catch) p.catch(onFail);
+        /* [TTSVIVO604] play() 的 promise resolve 比 onplaying 更早更稳，先当作成功信号。
+           原来只挂 catch，部分内核 onplaying 不触发时会白白走到下一个候选。 */
+        if (p && p.then) { p.then(onOk).catch(onFail); }
+        else if (p && p.catch) { p.catch(onFail); }
 
       } catch (e) { onFail(); }
 
@@ -12836,6 +12883,31 @@ window.MX_SEED = data;
   }
 
 
+
+  /* [TTSVIVO604] 启动即探测 CDN 可用性：避免用户第一次点击时排在错误的源上白等 6 秒。
+     实现要点：必须用 Audio 而不是 fetch —— 实测 CloudBase 静态托管响应头**不含**
+     Access-Control-Allow-Origin（github.io 有 *），fetch 跨域探测会被浏览器直接拦掉，
+     把可用的 CDN 误判成不可用，修复等于没做。Audio 播放跨域媒体不要求 CORS。
+     只预加载 metadata，不调用 play()，因此不会突然出声；3.5 秒无结果按不可用处理。 */
+  (function _mxProbeCdn() {
+    try {
+      if (typeof Audio !== 'function') return; /* 保持 0=未知，仍按 CDN 优先走 */
+      var probe = new Audio();
+      var done = false;
+      var fin = function (ok) {
+        if (done) return; done = true;
+        try { probe.oncanplay = probe.onloadedmetadata = probe.onerror = null; probe.src = ''; } catch (e1) {}
+        if (ok) { MX_CDN_STATE = 1; MX_CDN_FAIL = 0; } else { MX_CDN_STATE = -1; }
+        try { window.__mxCdnState = MX_CDN_STATE; } catch (e2) {}
+      };
+      var ptid = setTimeout(function () { fin(false); }, 3500);
+      probe.onloadedmetadata = function () { clearTimeout(ptid); fin(true); };
+      probe.oncanplay = function () { clearTimeout(ptid); fin(true); };
+      probe.onerror = function () { clearTimeout(ptid); fin(false); };
+      probe.preload = 'auto';
+      probe.src = AUDIO_BASE_CDN + 'pinyin/yi1.mp3';
+    } catch (e) {}
+  })();
 
   /** 兼容旧接口 */
 
@@ -22292,7 +22364,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   function speak(text) {
     if (window.speakTTS) window.speakTTS(text, 'zh-CN');
     else if (window.speechSynthesis) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = 'zh-CN'; u.rate = 0.85; window.speechSynthesis.speak(u); }
-    else toast('🔇 当前设备不支持语音');
+    else toast('🔈 发音没加载出来，请检查网络后再点一次');
   }
 
   /* ---------- 动作要领库（儿童体能） ---------- */
@@ -27391,7 +27463,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       } else if (window.speakTTS) {
         window.speakTTS(w.word + '，' + (w.group || ''), 'zh-CN');
       } else if (window.showToast) {
-        window.showToast('🔇 当前设备不支持语音');
+        window.showToast('🔈 发音没加载出来，请检查网络后再点一次');
       }
     };
     var m = document.getElementById('mx22-wmaster');
@@ -27607,7 +27679,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
           if (window.showToast) window.showToast('朗读失败：' + (e.message || e));
         }
       } else {
-        if (window.showToast) window.showToast('当前设备不支持语音朗读');
+        if (window.showToast) window.showToast('发音没加载出来，请检查网络后再点一次');
       }
       /* 视觉反馈：按钮动效提示用户已触发 */
       sp.style.transform = 'scale(0.95)';
