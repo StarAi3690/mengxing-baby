@@ -7660,6 +7660,13 @@ html, body {
 
 
 
+      <div id="mx-data-notice" style="font-size:10px;line-height:1.75;color:#b0bec5;text-align:center;
+      padding:14px 16px 22px;max-width:760px;margin:0 auto;letter-spacing:.2px">
+        首次使用各模块时，资源需从网络加载，可能出现短暂卡顿或等待；
+        系统会自动把常用资源预存到本机（首次约几十 MB，建议连 Wi-Fi 完成），
+        预存后再次访问不再额外消耗流量，打开速度也会明显提升。
+      </div>
+
     </main>
 
   </div>
@@ -12713,7 +12720,7 @@ window.MX_SEED = data;
     try { paths.push(`${AUDIO_BASE}${folder}/${encodeURIComponent(name)}.mp3`); } catch (e) {}
 
     /* [TTSVIVO604] 双源展开：每个候选同时给出 CDN 版与原站版。
-       顺序由 MX_CDN_STATE 决定；未知时 CDN 优先（国内绝大多数场景更快）。
+       顺序由 MX_CDN_FIRST 决定（默认 false = 原站优先，不吃腾讯云额度）。
        仅对已上传 CDN 的目录生效，poem 等未上传目录不会多打一次 404。 */
     if (MX_CDN_DIRS[folder] && MX_CDN_STATE !== -2) {
       const dual = [];
@@ -12806,7 +12813,191 @@ window.MX_SEED = data;
 
   /** 核心播放入口：优先本地 MP3，失败回退 TTS */
 
+  /* MX_PREFETCH_610 —— 资源本地缓存 + 首次预取（用户 2026-11-02 批准）
+     需求：① 拼音/英语/节奏盒子/图标/诗画 等小资源进页面后自动全量预取；
+           ② 图片一并预取（移动流量也下）；
+           ③ 累计 ≤100MB 自动下载，超过 100MB 弹窗询问，用户不同意就停在 100MB 内；
+           ④ 页脚提示首次加载会慢、已缓存的不再耗流量。
+     实现：用 Cache Storage（caches）而非 Service Worker —— 无需 SW 即可读写，
+           不影响 HTML/JS/CSS 的更新时效（红线 10：绝不缓存 HTML/js/css/接口）。
+           只缓存同源 ./assets/** 静态资源；跨域一律不碰（红线 26：跨域探测禁用 fetch）。 */
+  (function () {
+    if (typeof caches === "undefined" || !caches.open) return;
+    var CACHE = "mx-assets-v1";
+    var BUDGET = 100 * 1024 * 1024;   /* 自动下载上限 100MB */
+    var MANIFEST = "./assets/prefetch-manifest.json";
+    var MODE_KEY = "mx_prefetch_mode";  /* "" | "full" | "declined" */
+    var _has = Object.create(null);
+    var _blob = Object.create(null);
+    var _idxReady = false, _running = false;
+
+    function pn(u) { try { return new URL(u, location.href).pathname; } catch (e) { return String(u); } }
+    function fmt(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(b / 1024)) + "KB"; }
+    function open() { return caches.open(CACHE); }
+
+    function loadIndex() {
+      return open().then(function (c) { return c.keys(); }).then(function (ks) {
+        for (var i = 0; i < ks.length; i++) { _has[pn(ks[i].url || String(ks[i]))] = 1; }
+        _idxReady = true;
+        try { window.__mxCachedCount = Object.keys(_has).length; } catch (e) {}
+      }).catch(function () { _idxReady = true; });
+    }
+
+    function hasCached(u) { return !!_has[pn(u)]; }
+
+    /* 命中缓存 → 给 audio.src 用的 blob URL；未命中返回 null */
+    function playableUrl(u) {
+      var k = pn(u);
+      if (!_has[k]) return Promise.resolve(null);
+      if (_blob[k]) return Promise.resolve(_blob[k]);
+      return open().then(function (c) { return c.match(k); })
+        .then(function (r) { return r ? r.blob() : null; })
+        .then(function (b) {
+          if (!b) return null;
+          var o = URL.createObjectURL(b); _blob[k] = o; return o;
+        }).catch(function () { return null; });
+    }
+
+    /* 取一条并写入缓存；已存在则直接算成功（不重复耗流量） */
+    function putOne(rel) {
+      var u = "./assets/" + rel;
+      var k = pn(u);
+      if (_has[k]) return Promise.resolve(true);
+      return open().then(function (c) {
+        return c.match(k).then(function (r) {
+          if (r) { _has[k] = 1; return true; }
+          return fetch(u, { cache: "no-store" }).then(function (resp) {
+            if (!resp || !resp.ok) return false;
+            return c.put(k, resp.clone()).then(function () { _has[k] = 1; return true; });
+          });
+        });
+      }).catch(function () { return false; });
+    }
+
+    function askMore(remain, sent, onYes, onNo) {
+      var old = document.getElementById("mx-pf-ask");
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+      var w = document.createElement("div");
+      w.id = "mx-pf-ask";
+      w.style.cssText = "position:fixed;left:12px;right:12px;bottom:14px;z-index:100002;max-width:520px;margin:0 auto;" +
+        "background:#fff;border:1px solid #e3e8f0;border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.2);" +
+        "padding:14px 16px;font-size:14px;line-height:1.6;color:#37474f";
+      w.innerHTML = '<div style="font-weight:800;margin-bottom:6px">📦 还有 ' + fmt(remain) + ' 学习资源，要不要一起下载？</div>' +
+        '<div style="font-size:12.5px;color:#78909c;line-height:1.7;margin-bottom:10px">已预存 ' + fmt(sent) +
+        '。继续下载会占用手机流量（建议连 Wi-Fi）。下载一次就长期存在本机，以后不再耗流量，打开也更快。</div>' +
+        '<div style="display:flex;gap:10px">' +
+        '<button id="mx-pf-yes" style="flex:1;border:none;border-radius:10px;padding:11px;background:linear-gradient(90deg,#42a5f5,#1e88e5);color:#fff;font-weight:800;font-size:14px;cursor:pointer">继续下载</button>' +
+        '<button id="mx-pf-no" style="flex:1;border:2px solid #e3e8f0;border-radius:10px;padding:11px;background:#fff;color:#78909c;font-weight:700;font-size:14px;cursor:pointer">先不下了</button></div>';
+      document.body.appendChild(w);
+      var y = document.getElementById("mx-pf-yes"), nn = document.getElementById("mx-pf-no");
+      if (y) y.onclick = function () { if (w.parentNode) w.parentNode.removeChild(w); onYes(); };
+      if (nn) nn.onclick = function () { if (w.parentNode) w.parentNode.removeChild(w); onNo(); };
+    }
+
+    function runPrefetch() {
+      if (_running) return; _running = true;
+      var mode = "";
+      try { mode = localStorage.getItem(MODE_KEY) || ""; } catch (e) {}
+      var full = (mode === "full");
+      var declined = (mode === "declined");
+      var queue = [], bytes = 0, done = 0, asked = false, stopped = false;
+
+      function finish() {
+        try { window.__mxPrefetchState = { done: done, bytes: bytes, total: queue.length, stopped: stopped }; } catch (e) {}
+      }
+
+      function step() {
+        if (stopped) { finish(); return; }
+        var batch = [];
+        while (queue.length && batch.length < 6) {
+          var rel = queue.shift()[0];
+          if (_has[pn("./assets/" + rel)]) { done++; continue; }
+          batch.push(rel);
+        }
+        if (!batch.length) { finish(); return; }
+        Promise.all(batch.map(function (r) { return putOne(r).then(function (ok) { if (ok) done++; }); }))
+          .then(function () { if (queue.length) setTimeout(step, 30); else finish(); });
+      }
+
+      fetch(MANIFEST, { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (m) {
+        var all = [];
+        (m.groups || []).forEach(function (g) { (g.items || []).forEach(function (it) { all.push(it); }); });
+        /* 按清单顺序（core → img → poem）累计字节，超过 100MB 就先停下来问 */
+        var pending = [], cum = 0, needAsk = false;
+        for (var i = 0; i < all.length; i++) {
+          if (_has[pn("./assets/" + all[i][0])]) { done++; continue; }
+          if (!full && cum + all[i][1] > BUDGET) { needAsk = true; }
+          if (needAsk && !full) { pending.push(all[i]); continue; }
+          cum += all[i][1]; queue.push(all[i]);
+        }
+        bytes = cum;
+        try { window.__mxPrefetchTotal = all.length; } catch (e) {}
+        if (needAsk && !declined && !asked) {
+          asked = true;
+          var remain = pending.reduce(function (a, x) { return a + x[1]; }, 0);
+          askMore(remain, bytes, function () {   /* 用户同意继续 */
+            try { localStorage.setItem(MODE_KEY, "full"); } catch (e) {}
+            for (var j = 0; j < pending.length; j++) { queue.push(pending[j]); bytes += pending[j][1]; }
+            step();
+          }, function () {                        /* 用户先不下 */
+            try { localStorage.setItem(MODE_KEY, "declined"); } catch (e) {}
+            stopped = true; finish();
+          });
+        }
+        step();
+      }).catch(function () { _running = false; });
+    }
+
+    window.mxAssetCache = {
+      hasCached: hasCached,
+      playableUrl: playableUrl,
+      putOne: putOne,
+      prefetch: runPrefetch,
+      count: function () { return Object.keys(_has).length; },
+      clear: function () { _has = Object.create(null); _blob = Object.create(null); return caches.delete(CACHE); }
+    };
+
+    loadIndex().then(function () {
+      /* 只在已解锁（不在激活门内）时预取，避免卡密页用户白耗流量 */
+      var tries = 0;
+      (function wait() {
+        if (document.body && !document.body.classList.contains("mx-gated")) {
+          setTimeout(runPrefetch, 2500);
+          return;
+        }
+        if (++tries > 120) return;   /* 最多等 6 分钟 */
+        setTimeout(wait, 3000);
+      })();
+    });
+  })();
+
+  /* [PREFETCH611] playAudio 缓存快路径。原网络逻辑原封不动改名为 mxPlayAudioNet，
+     只有「命中本地缓存」时才走这里，未命中立刻回落原逻辑，行为与改动前完全一致。 */
   function playAudio(text, lang, dir, onEnd) {
+    var AC = window.mxAssetCache;
+    if (!AC || !AC.hasCached) { return mxPlayAudioNet(text, lang, dir, onEnd); }
+    var paths = [];
+    try { paths = resolveAudioPaths(text, lang, dir) || []; } catch (e) { paths = []; }
+    var hit = null;
+    for (var k = 0; k < paths.length; k++) { if (AC.hasCached(paths[k])) { hit = paths[k]; break; } }
+    if (!hit) { return mxPlayAudioNet(text, lang, dir, onEnd); }
+    var gone = false;
+    AC.playableUrl(hit).then(function (u) {
+      if (!u) { if (!gone) { gone = true; mxPlayAudioNet(text, lang, dir, onEnd); } return; }
+      gone = true;
+      var a = new Audio();
+      try { if (window.__mxCurAudio && window.__mxCurAudio !== a && !window.__mxCurAudio.paused) window.__mxCurAudio.pause(); } catch (e1) {}
+      window.__mxCurAudio = a;
+      a.onended = function () { if (onEnd) { try { onEnd(); } catch (e2) {} } };
+      a.src = u;
+      try {
+        var pr = a.play();
+        if (pr && pr.catch) { pr.catch(function () { mxPlayAudioNet(text, lang, dir, onEnd); }); }
+      } catch (e3) { mxPlayAudioNet(text, lang, dir, onEnd); }
+    }, function () { if (!gone) { gone = true; mxPlayAudioNet(text, lang, dir, onEnd); } });
+  }
+
+  function mxPlayAudioNet(text, lang, dir, onEnd) {
 
     const paths = resolveAudioPaths(text, lang, dir);
 
@@ -38055,4 +38246,5 @@ var LIB_MAN={"g":[["poem","📜 古诗·范读","lchinese",45],["english","🔤 
 })();
 
 </script>
+
 </body>
