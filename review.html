@@ -3,41 +3,80 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
 <title>萌星宝宝 · 评审体验通道</title>
 <style>
   html,body{margin:0;height:100%}
   body{display:flex;align-items:center;justify-content:center;
        font-family:-apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif;
        background:#f6f8f7;color:#24583c}
-  .box{text-align:center;padding:24px}
+  .box{text-align:center;padding:24px;max-width:520px}
   .dot{width:46px;height:46px;margin:0 auto 18px;border-radius:50%;
        border:3px solid #d8e8de;border-top-color:#3c8f5e;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
   .t{font-size:19px;font-weight:600;letter-spacing:.5px}
-  .s{margin-top:10px;font-size:14px;color:#7d8c83;line-height:1.7}
+  .s{margin-top:10px;font-size:14px;color:#7d8c83;line-height:1.8}
   .s a{color:#3c8f5e;text-decoration:none;font-weight:600}
+  .bad .dot{border-color:#f0d9d9;border-top-color:#c0504d}
+  .bad .t{color:#a33}
 </style>
 </head>
 <body>
-<div class="box">
+<div class="box" id="box">
   <div class="dot"></div>
-  <div class="t">正在进入萌星宝宝…</div>
-  <div class="s">评审体验通道 · 免卡密直接进入<br>若 3 秒内未跳转，请点 <a href="./index.html">这里</a></div>
+  <div class="t" id="txt">正在进入萌星宝宝…</div>
+  <div class="s" id="sub">评审体验通道 · 免卡密直接进入<br>若 3 秒内未跳转，请点 <a href="./index.html">这里</a></div>
 </div>
 <script>
 (function () {
   'use strict';
-  /* 评审直通：仅在本页写入本机体验标记，不改动主程序任何逻辑。
-     主程序拦截条件为 localStorage.mengxing_device_activated === '1'，
-     此处写入后跳转主程序即可直达完整功能，无需输入卡密。 */
+
+  /* ── 评审体验通道 · 访问控制 ─────────────────────────────
+     1) 必须携带正确的访问令牌（?k=...），令牌只出现在主办方邮件中
+     2) 链接在 2026-11-30 23:59 后自动失效
+     3) 校验通过后，仅在本机写入「已激活」标记，主程序逻辑零改动
+     4) 未授权访问：不写入任何标记，引导回常规入口（卡密页）
+     ─────────────────────────────────────────────────── */
+
+  var TOKEN_HASH = '77694fe8';          // 令牌校验值（明文不落代码）
+  var EXPIRE_AT  = Date.parse('2026-11-30T23:59:59+08:00');
+
+  function fail() {
+    var box = document.getElementById('box');
+    var t = document.getElementById('txt');
+    var s = document.getElementById('sub');
+    if (box) box.className = 'box bad';
+    if (t) t.textContent = '该体验链接无效或已过期';
+    if (s) {
+      s.innerHTML = '如需体验萌星宝宝，请访问常规入口<br>' +
+        '<a href="./index.html">进入萌星宝宝</a>';
+    }
+  }
+
+  // FNV-1a 32bit，与生成端一致
+  function hash(str) {
+    var x = 2166136261 >>> 0;
+    for (var i = 0; i < str.length; i++) {
+      x ^= str.charCodeAt(i);
+      x = Math.imul(x, 16777619) >>> 0;
+    }
+    return ('0000000' + x.toString(16)).slice(-8);
+  }
+
   try {
+    if (Date.now() > EXPIRE_AT) { fail(); return; }
+    var q = new URLSearchParams(location.search);
+    var token = q.get('k') || '';
+    if (!token || hash(token) !== TOKEN_HASH) { fail(); return; }
+
     localStorage.setItem('mengxing_device_activated', '1');
-    localStorage.setItem('mengxing_activated_code', 'MX-REVIEW-2026');
+    localStorage.setItem('mengxing_activated_code', 'MX-1024-REVIEW');
     localStorage.setItem('mengxing_activated_vip', '0');
-  } catch (e) {}
-  setTimeout(function () {
-    location.replace('./index.html');
-  }, 120);
+
+    setTimeout(function () { location.replace('./index.html'); }, 120);
+  } catch (e) {
+    fail();
+  }
 })();
 </script>
 </body>
