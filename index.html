@@ -12874,26 +12874,6 @@ window.MX_SEED = data;
       }).catch(function () { return false; });
     }
 
-    function askMore(remain, sent, onYes, onNo) {
-      var old = document.getElementById("mx-pf-ask");
-      if (old && old.parentNode) old.parentNode.removeChild(old);
-      var w = document.createElement("div");
-      w.id = "mx-pf-ask";
-      w.style.cssText = "position:fixed;left:12px;right:12px;bottom:14px;z-index:100002;max-width:520px;margin:0 auto;" +
-        "background:#fff;border:1px solid #e3e8f0;border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.2);" +
-        "padding:14px 16px;font-size:14px;line-height:1.6;color:#37474f";
-      w.innerHTML = '<div style="font-weight:800;margin-bottom:6px">📦 还有 ' + fmt(remain) + ' 学习资源，要不要一起下载？</div>' +
-        '<div style="font-size:12.5px;color:#78909c;line-height:1.7;margin-bottom:10px">已预存 ' + fmt(sent) +
-        '。继续下载会占用手机流量（建议连 Wi-Fi）。下载一次就长期存在本机，以后不再耗流量，打开也更快。</div>' +
-        '<div style="display:flex;gap:10px">' +
-        '<button id="mx-pf-yes" style="flex:1;border:none;border-radius:10px;padding:11px;background:linear-gradient(90deg,#42a5f5,#1e88e5);color:#fff;font-weight:800;font-size:14px;cursor:pointer">继续下载</button>' +
-        '<button id="mx-pf-no" style="flex:1;border:2px solid #e3e8f0;border-radius:10px;padding:11px;background:#fff;color:#78909c;font-weight:700;font-size:14px;cursor:pointer">先不下了</button></div>';
-      document.body.appendChild(w);
-      var y = document.getElementById("mx-pf-yes"), nn = document.getElementById("mx-pf-no");
-      if (y) y.onclick = function () { if (w.parentNode) w.parentNode.removeChild(w); onYes(); };
-      if (nn) nn.onclick = function () { if (w.parentNode) w.parentNode.removeChild(w); onNo(); };
-    }
-
     function runPrefetch() {
       if (_running) return; _running = true;
       var mode = "";
@@ -12922,7 +12902,7 @@ window.MX_SEED = data;
       fetch(MANIFEST, { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (m) {
         var all = [];
         (m.groups || []).forEach(function (g) { (g.items || []).forEach(function (it) { all.push(it); }); });
-        /* 按清单顺序（core → img → poem）累计字节，超过 100MB 就先停下来问 */
+        /* 按清单顺序（core → img → poem）累计字节，超过 100MB 即停止预取（2026-11-03 起不再弹窗询问） */
         var pending = [], cum = 0, needAsk = false;
         for (var i = 0; i < all.length; i++) {
           if (_has[pn("./assets/" + all[i][0])]) { done++; continue; }
@@ -12932,19 +12912,7 @@ window.MX_SEED = data;
         }
         bytes = cum;
         try { window.__mxPrefetchTotal = all.length; } catch (e) {}
-        if (needAsk && !declined && !asked) {
-          asked = true;
-          var remain = pending.reduce(function (a, x) { return a + x[1]; }, 0);
-          askMore(remain, bytes, function () {   /* 用户同意继续 */
-            try { localStorage.setItem(MODE_KEY, "full"); } catch (e) {}
-            for (var j = 0; j < pending.length; j++) { queue.push(pending[j]); bytes += pending[j][1]; }
-            step();
-          }, function () {                        /* 用户先不下 */
-            try { localStorage.setItem(MODE_KEY, "declined"); } catch (e) {}
-            stopped = true; finish();
-          });
-        }
-        step();
+                step();
       }).catch(function () { _running = false; });
     }
 
