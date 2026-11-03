@@ -71,7 +71,15 @@
 
     localStorage.setItem('mengxing_device_activated', '1');
     localStorage.setItem('mengxing_activated_code', 'MX-1024-REVIEW');
-    localStorage.setItem('mengxing_activated_vip', '0');
+    /* [REVIEW-VIP] 评审通道按 VIP 全功能开放（主办方明确要求）：
+       - mengxing_vip 是 isVip() 唯一判定键，必须写 '1'
+       - mengxing_activated_vip 是云同步/闸门依赖键，同步写 '1'
+       - 不写 mengxing_expire_at，避免过期撤销分支把评审踢回普通用户
+       - valid_days 按 31 天档（与发放的评审月卡一致），供免费资源库算配额 */
+    localStorage.setItem('mengxing_vip', '1');
+    localStorage.setItem('mengxing_activated_vip', '1');
+    localStorage.setItem('mengxing_vip_level', '1');
+    localStorage.setItem('mengxing_valid_days', '31');
 
     setTimeout(function () { location.replace('./index.html'); }, 120);
   } catch (e) {

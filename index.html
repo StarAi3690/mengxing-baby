@@ -10707,6 +10707,7 @@ window.DB = {
 
     'page-estory':   { title: '英语绘本', desc: '英文原版绘本，逐句点读，双语对照模式。', icon: '📚', tag: '阶段四实现' },
     'page-wchallenge': { title: '单词闯关', desc: '选角色赛跑答题：每轮10题混合题型，答对加速答错摔倒，完成得5积分。', icon: '🏃', tag: '已实装' },
+    'page-tool-phonics': { title: '自然拼读单词导入', desc: '家长传一份 CSV（单词,图标,释义）即可生成带 emoji 图标与发音的自然拼读词卡，图标无版权风险。', icon: '🗣️', tag: '家长专属' },
     'page-tool-wlib':  { title: '英语词库管理', desc: '家长自定义词库套组：可命名多套（初级/2026年等），支持 Excel/CSV 导入与手动录入（单词+释义+音标+例句），作为闯关难度题库。', icon: '📚', tag: '家长专属' },
 
     'page-maththink':{ title: '数学思维', desc: '数感培养、逻辑推理、图形空间等思维训练。', icon: '🧠', tag: '阶段四实现' },
@@ -11391,9 +11392,9 @@ window.DB = {
 
     // 家长工作台进入需手势/密码验证（儿童/家长模式分区）
     /* [LISTENALBUM] page-feedback 也归家长区（与英语词库管理同口径），避免来回切时反复验密码 */
-    if ((pageId === 'page-parent' || pageId === 'page-tool-wlib' || pageId === 'page-feedback') && !window.__parentUnlocked) {
+    if ((pageId === 'page-parent' || pageId === 'page-tool-wlib' || pageId === 'page-tool-phonics' || pageId === 'page-feedback') && !window.__parentUnlocked) {
       if (window.mxParentUnlock) { window.mxParentUnlock(function () { navigateTo(pageId, navId); }); return; }
-    } else if (pageId !== 'page-parent' && pageId !== 'page-tool-wlib' && pageId !== 'page-feedback') {
+    } else if (pageId !== 'page-parent' && pageId !== 'page-tool-wlib' && pageId !== 'page-tool-phonics' && pageId !== 'page-feedback') {
       window.__parentUnlocked = false;
       var mb = document.getElementById('mode-badge'); if (mb) mb.textContent = '🧒 儿童模式';
       try { if (window.mxSyncModeBox) window.mxSyncModeBox(); } catch (eM) {}
@@ -14195,44 +14196,45 @@ window.MX_SEED = data;
 
 
   async function renderPhonics() {
-
     const { cvc } = await getAbc();
-
-    if (!cvc.length) {
-
-      setSectionContent('page-phonics', `<div class="content-section-title">🗣️ 自然拼读</div><div class="empty-tip">未获取到 CVC 单词数据</div>`);
-
+    /* [PHIMP641] 并入家长导入的自定义单词（CSV：单词,emoji图标,释义） */
+    let mine = [];
+    try { mine = (window.mxPhonicsGetWords ? await window.mxPhonicsGetWords() : []) || []; } catch (e) { mine = []; }
+    if (!cvc.length && !mine.length) {
+      setSectionContent('page-phonics', `<div class="content-section-title">🗣️ 自然拼读</div><div class="empty-tip">还没有单词。点右上角「✏️ 单词导入」传一份 CSV 就能生成词卡。</div>`);
       return;
-
     }
-
+    const _esc = window.mxPhEsc || (x => String(x == null ? '' : x));
     const cards = cvc.map(c => `
-
       <div class="study-card">
-
         <div class="card-art">${c.art}</div>
-
         <div class="card-main" style="font-size:28px;">${c.word}</div>
-
         <div class="card-pinyin">${c.letters}</div>
-
         <div class="card-ext">自然拼读</div>
-
         <button class="speak-btn" data-say="${c.word}" data-lang="en-US" data-dir="english">🔊</button>
         <button class="mx-wrong-add" data-wrong-add data-wrong-subject="自然拼读" data-wrong-q="${c.word}">📕错题</button>
-
       </div>`).join('');
-
+    const myCards = mine.map(m => `
+      <div class="study-card">
+        <div class="card-art">${(m.e || (window.mxPhonicsEmojiFor ? window.mxPhonicsEmojiFor(m.w) : '')) ? `<span class="ph-emo">${_esc(m.e || window.mxPhonicsEmojiFor(m.w))}</span>` : (window.mxPhonicsBadge ? window.mxPhonicsBadge(m.w) : '🔤')}</div>
+        <div class="card-main" style="font-size:26px;">${_esc(m.w)}</div>
+        <div class="card-pinyin">${_esc(m.zh || '我的词')}</div>
+        <div class="card-ext">我的单词</div>
+        <button class="speak-btn" data-say="${_esc(m.w)}" data-lang="en-US" data-dir="english">🔊</button>
+        <button class="mx-wrong-add" data-wrong-add data-wrong-subject="自然拼读" data-wrong-q="${_esc(m.w)}">📕错题</button>
+      </div>`).join('');
+    const total = cvc.length + mine.length;
     setSectionContent('page-phonics', `
-
-      <div class="content-section-title">🗣️ 自然拼读 <span class="sub">${cvc.length} 个 CVC 单词 · 点击喇叭听发音</span></div>
-
-      <div class="study-cards" id="phonics-grid">${cards}</div>
-
-      <div class="empty-tip">CVC 元音+辅音+辅音结构 · 点击逐字母拼读 → assets/audio/english/</div>`);
-
+      <style>.ph-emo{font-size:44px;line-height:1}</style>
+      <div class="content-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <span style="min-width:0">🗣️ 自然拼读 <span class="sub">${total} 词${mine.length ? ' · 我的 ' + mine.length : ''}</span></span>
+        <button id="ph-import-entry" style="margin-left:auto;border:none;border-radius:999px;background:linear-gradient(90deg,#7c5cff,#5a3fe0);color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;cursor:pointer;white-space:nowrap;box-shadow:0 3px 10px rgba(124,92,255,.28)">✏️ 单词导入</button>
+      </div>
+      <div class="study-cards" id="phonics-grid">${myCards}${cards}</div>
+      <div class="empty-tip">内置 CVC 词卡 + 家长导入的自定义词 · 音频 assets/audio/english/，没有本地音频自动用英语 TTS 朗读</div>`);
+    const ib = document.getElementById('ph-import-entry');
+    if (ib) ib.onclick = function () { if (window.navigateTo) window.navigateTo('page-tool-phonics'); };
     bindSpeak('#phonics-grid');
-
   }
 
 
@@ -15735,6 +15737,8 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     }
     var wchLibBtn = document.getElementById('wch-libbtn');
     if (wchLibBtn) wchLibBtn.onclick = function () { if (window.mxOpenWLib) { window.mxOpenWLib(); return; } if (window.navigateTo) window.navigateTo('page-tool-wlib'); };
+    var phLibBtn = s.querySelector('#pt-ph-lib');
+    if (phLibBtn) phLibBtn.onclick = function () { if (window.navigateTo) window.navigateTo('page-tool-phonics'); };
     if (!blocked) {
       var selId = null;
       sec.querySelectorAll('.wch-role').forEach(function (el) {
@@ -15894,6 +15898,297 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     sec.innerHTML = html;
     var ab = document.getElementById('wch-again');
     if (ab && plays2 < limit2) ab.onclick = function () { renderWChallenge(); };
+  }
+
+  /* ================= 自然拼读·单词导入 [PHIMP641] ================= */
+  /* 家长工作台「自然拼读单词管理」：CSV / 粘贴导入 → 单词 + emoji 图标 + 发音（本地音频→TTS）。
+     图标优先用内置常用词 emoji 映射（字体字形，无版权风险），未命中用首字母彩色徽章。
+     TODO(后续)：接入本机生图软件批量生成矢量彩图替换 emoji。 */
+  var PH_MAX = 500;
+  var PH_EMOJI = {
+    cat:'🐱',dog:'🐶',pig:'🐷',hen:'🐔',chick:'🐤',cow:'🐄',fox:'🦊',bat:'🦇',rat:'🐀',bee:'🐝',
+    ant:'🐜',owl:'🦉',bug:'🐛',ram:'🐏',yak:'🐂',zoo:'🦓',lion:'🦁',bear:'🐻',bird:'🐦',duck:'🦆',
+    frog:'🐸',fish:'🐟',mouse:'🐭',horse:'🐴',sheep:'🐑',tiger:'🐯',rabbit:'🐰',monkey:'🐵',panda:'🐼',
+    snake:'🐍',whale:'🐋',dolphin:'🐬',butterfly:'🦋',penguin:'🐧',chicken:'🐔',pet:'🐾',
+    sun:'🌞',moon:'🌙',star:'⭐',sky:'🌌',rain:'🌧️',snow:'❄️',cloud:'☁️',wind:'🌬️',tree:'🌳',
+    leaf:'🍃',flower:'🌸',grass:'🌿',seed:'🌱',hill:'⛰️',sea:'🌊',fire:'🔥',ice:'🧊',hot:'🔥',
+    cold:'🧊',light:'💡',night:'🌙',day:'☀️',rainbow:'🌈',
+    apple:'🍎',banana:'🍌',cake:'🍰',bread:'🍞',milk:'🥛',egg:'🥚',meat:'🍖',rice:'🍚',juice:'🧃',
+    water:'💧',jam:'🍯',nut:'🥜',candy:'🍬',cookie:'🍪',carrot:'🥕',corn:'🌽',grape:'🍇',lemon:'🍋',
+    pear:'🍐',peach:'🍑',orange:'🍊',tomato:'🍅',food:'🍽️',
+    bus:'🚌',car:'🚗',bike:'🚲',train:'🚆',boat:'⛵',plane:'✈️',jet:'✈️',ship:'🚢',truck:'🚚',
+    van:'🚐',rocket:'🚀',taxi:'🚕',road:'🛣️',
+    ball:'⚽',book:'📖',pen:'🖊️',bag:'🎒',cup:'🥤',box:'📦',hat:'🎩',cap:'🧢',sock:'🧦',shoe:'👟',
+    shirt:'👕',bed:'🛏️',chair:'🪑',door:'🚪',jug:'🏺',pan:'🍳',pot:'🍲',tub:'🛁',map:'🗺️',net:'🕸️',
+    gift:'🎁',clock:'🕐',phone:'📱',key:'🔑',balloon:'🎈',drum:'🥁',kite:'🪁',puzzle:'🧩',toy:'🧸',
+    hand:'✋',foot:'🦶',eye:'👁️',ear:'👂',nose:'👃',mouth:'👄',tooth:'🦷',leg:'🦵',hair:'💇',
+    mom:'👩',dad:'👨',baby:'👶',boy:'👦',girl:'👧',king:'🤴',queen:'👸',friend:'🧑‍🤝‍🧑',family:'👨‍👩‍👧',
+    run:'🏃',jump:'🤸',walk:'🚶',sit:'🧘',sleep:'😴',eat:'🍽️',drink:'🥤',play:'🎮',read:'📚',
+    sing:'🎤',dance:'💃',swim:'🏊',climb:'🧗',smile:'😊',happy:'😊',sad:'😢',cry:'😭',laugh:'😄',
+    angry:'😠',love:'❤️',hug:'🤗',
+    red:'🔴',blue:'🔵',green:'🟢',yellow:'🟡',black:'⚫',white:'⚪',pink:'🩷',brown:'🟤',color:'🎨',
+    one:'1️⃣',two:'2️⃣',three:'3️⃣',four:'4️⃣',five:'5️⃣',six:'6️⃣',seven:'7️⃣',eight:'8️⃣',nine:'9️⃣',ten:'🔟',
+    home:'🏠',house:'🏠',school:'🏫',park:'🏞️',shop:'🏪',hospital:'🏥',city:'🏙️',garden:'🌷',farm:'🚜'
+  };
+  var PH_BADGE_BG = ['#ffd9dd', '#ffe6cc', '#fff5cc', '#d6f5d6', '#d6e8ff', '#e6d9ff', '#ffd9ec', '#d6f7f4'];
+  var PH_EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/u;
+
+  function phEsc(x) { return wchEsc(x); }
+  window.mxPhEsc = phEsc;
+
+  function phIsEmoji(v) {
+    var t = String(v || '').trim();
+    if (!t || t.length > 8) return false;
+    return PH_EMOJI_RE.test(t) && !/[a-zA-Z\u4e00-\u9fa5]/.test(t);
+  }
+
+  function phEmojiFor(w) {
+    var k = String(w || '').toLowerCase().trim();
+    if (PH_EMOJI[k]) return PH_EMOJI[k];
+    if (k.length > 3 && /s$/.test(k) && PH_EMOJI[k.slice(0, -1)]) return PH_EMOJI[k.slice(0, -1)];
+    if (/ing$/.test(k) && PH_EMOJI[k.replace(/ing$/, '')]) return PH_EMOJI[k.replace(/ing$/, '')];
+    if (/ed$/.test(k) && PH_EMOJI[k.replace(/ed$/, '')]) return PH_EMOJI[k.replace(/ed$/, '')];
+    return '';
+  }
+
+  function phBadgeHtml(w) {
+    var ch = String(w || '?').charAt(0).toUpperCase();
+    var code = ch.charCodeAt(0) || 65;
+    return '<span class="ph-badge" style="background:' + PH_BADGE_BG[code % PH_BADGE_BG.length] + '">' + wchEsc(ch) + '</span>';
+  }
+  window.mxPhonicsBadge = phBadgeHtml;
+  window.mxPhonicsEmojiFor = phEmojiFor;
+
+  function phKeyOf() { return 'phonics:custom'; }
+
+  async function phGetWords() {
+    try {
+      var cid = await wchCid();
+      var raw = await wchGet(phKeyOf() + ':' + cid, '');
+      if (!raw) return [];
+      var a = JSON.parse(raw);
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  async function phSetWords(arr) {
+    var cid = await wchCid();
+    await wchSet(phKeyOf() + ':' + cid, JSON.stringify((arr || []).slice(0, PH_MAX)));
+  }
+  window.mxPhonicsGetWords = phGetWords;
+
+  /* 单行拆列：兼容 Excel 导出的带引号 CSV（字段内可含逗号） */
+  function phSplitLine(ln) {
+    if (ln.indexOf('"') < 0) return ln.split(/\t|,|，|;|；/).map(function (s) { return s.trim(); });
+    var out = [], cell = '', q = false;
+    for (var i = 0; i < ln.length; i++) {
+      var c = ln.charAt(i);
+      if (q) {
+        if (c === '"') { if (ln.charAt(i + 1) === '"') { cell += '"'; i++; } else { q = false; } }
+        else { cell += c; }
+      } else if (c === '"') { q = true; }
+      else if (/[\t,，;；]/.test(c)) { out.push(cell.trim()); cell = ''; }
+      else { cell += c; }
+    }
+    out.push(cell.trim());
+    return out;
+  }
+
+  /* 解析 CSV/粘贴文本 → [{w,e,zh}]；第1列单词必填，其余列自动识别 emoji 与释义 */
+  function phParseCsv(text) {
+    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    var out = [], skip = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].trim();
+      if (!ln) continue;
+      var cols = phSplitLine(ln);
+      var w = String(cols[0] == null ? '' : cols[0]).replace(/^["']+|["']+$/g, '').trim();
+      if (!w) { skip++; continue; }
+      if (i === 0 && /^(单词|word|words|拼读|phonics|vocab|序号|no\.?)$/i.test(w)) continue;
+      if (!/[a-zA-Z]/.test(w)) { skip++; continue; }
+      var e = '', zh = '';
+      for (var j = 1; j < cols.length; j++) {
+        var v = String(cols[j] == null ? '' : cols[j]).trim();
+        if (!v) continue;
+        if (!e && phIsEmoji(v)) { e = v; continue; }
+        if (!zh) zh = v;
+      }
+      out.push({ w: w.slice(0, 40), e: e || phEmojiFor(w), zh: zh.slice(0, 30) });
+      if (out.length >= PH_MAX) break;
+    }
+    return { words: out, skip: skip };
+  }
+
+  function phReadFile(file) {
+    function rd(enc) {
+      return new Promise(function (res, rej) {
+        var fr = new FileReader();
+        fr.onload = function () { res(String(fr.result || '')); };
+        fr.onerror = function () { rej(new Error('读取失败')); };
+        try { fr.readAsText(file, enc); } catch (e) { rej(e); }
+      });
+    }
+    return rd('UTF-8').then(function (t) {
+      if (t.indexOf('\uFFFD') < 0) return t;
+      return rd('GBK').catch(function () { return t; });
+    });
+  }
+
+  function phToast(m) { try { if (window.showToast) window.showToast(m); else alert(m); } catch (e) {} }
+
+  async function renderWPhonics() {
+    var sec = document.getElementById('page-tool-phonics');
+    if (!sec) return;
+    var list = await phGetWords();
+
+    var css = '<style>' +
+      '.ph-tb{width:100%;border-collapse:collapse;font-size:14px}' +
+      '.ph-tb th,.ph-tb td{border-bottom:1px solid #eef1f6;padding:8px 6px;text-align:left;vertical-align:middle}' +
+      '.ph-tb th{font-size:12.5px;color:#8a93a6;font-weight:700}' +
+      '.ph-in{border:2px solid #e3e8f0;border-radius:10px;padding:8px 10px;font-size:15px;outline:none}' +
+      '.ph-in:focus{border-color:#7c5cff}' +
+      '.ph-badge{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;font-size:22px;font-weight:900;color:#455a64}' +
+      '.ph-del{border:none;background:#ffebee;color:#c62828;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12.5px}' +
+      '.ph-say{border:none;background:#e3f2fd;color:#1565c0;border-radius:8px;padding:4px 9px;cursor:pointer;font-size:12.5px;margin-right:6px}' +
+      '.ph-emo{font-size:26px;line-height:1}' +
+      '</style>';
+
+    var h = '<div style="max-width:760px;margin:0 auto">' + css;
+    h += '<div style="text-align:center;padding:4px 0 10px">' +
+      '<div style="font-size:34px">🗣️</div>' +
+      '<div style="font-size:20px;font-weight:800;color:#37474f">自然拼读 · 单词导入</div>' +
+      '<div style="font-size:13px;color:#8a93a6">传一份 CSV，就有单词、图标和发音。已导入 <b>' + list.length + '</b> 个词</div></div>';
+
+    h += '<div style="background:#f3f0ff;border:1px solid #d8ccff;border-radius:12px;padding:12px;margin-bottom:12px;font-size:13px;color:#455a64;line-height:1.75">' +
+      '<b>CSV 格式（三列，用 Excel / WPS / 记事本都能做）</b><br>' +
+      '<code style="background:#fff;border-radius:5px;padding:1px 6px">单词,图标,释义</code><br>' +
+      '<code style="background:#fff;border-radius:5px;padding:1px 6px">cat,🐱,猫</code><br>' +
+      '· 第 1 列必填；第 2 列 emoji 可留空，留空会自动配图标（配不到就用首字母彩色徽章）<br>' +
+      '· emoji 是字体字形，<b>无版权风险</b>；发音优先用站点本地音频，没有就用系统英语 TTS 朗读' +
+      '</div>';
+
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
+      '<button id="ph-tpl" style="border:none;border-radius:10px;background:#eceff1;color:#455a64;font-weight:800;padding:9px 16px;cursor:pointer">⬇️ 下载 CSV 模板</button>' +
+      '<button id="ph-back" style="border:none;border-radius:10px;background:#e8f5e9;color:#2e7d32;font-weight:800;padding:9px 16px;cursor:pointer">🗣️ 去自然拼读页看效果</button>' +
+      '</div>';
+
+    h += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05);margin-bottom:12px">' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:8px">📥 导入单词</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+      '<label id="ph-filelbl" style="border:none;border-radius:10px;background:linear-gradient(90deg,#7c5cff,#5a3fe0);color:#fff;font-weight:800;padding:9px 18px;cursor:pointer;display:inline-block">📂 选择 CSV 文件' +
+      '<input type="file" id="ph-file" accept=".csv,.txt,text/csv,text/plain" hidden></label>' +
+      '<span id="ph-fileinfo" style="font-size:12.5px;color:#8a93a6">未选择文件</span>' +
+      '</div>' +
+      '<textarea id="ph-txt" class="ph-in" style="width:100%;min-height:96px;font-size:13.5px;box-sizing:border-box" placeholder="也可以直接粘贴，每行一个：&#10;cat,🐱,猫&#10;dog,🐶,狗&#10;elephant,,大象"></textarea>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+      '<button id="ph-imp" style="border:none;border-radius:10px;background:linear-gradient(90deg,#42a5f5,#1e88e5);color:#fff;font-weight:800;padding:9px 18px;cursor:pointer">✅ 开始导入</button>' +
+      '<button id="ph-clr" style="border:none;border-radius:10px;background:#ffebee;color:#c62828;font-weight:800;padding:9px 16px;cursor:pointer">🗑 清空我的单词</button>' +
+      '</div>' +
+      '<div id="ph-msg" style="font-size:13px;color:#2e7d32;margin-top:8px;line-height:1.7"></div></div>';
+
+    h += '<div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.05)">' +
+      '<div style="font-weight:800;font-size:15px;color:#455a64;margin-bottom:6px">📚 我导入的单词（' + list.length + '）</div>';
+    if (!list.length) {
+      h += '<div style="font-size:13.5px;color:#b0bec5;padding:16px 0;text-align:center">还没有导入，先下载模板试试～</div>';
+    } else {
+      h += '<div style="max-height:420px;overflow:auto"><table class="ph-tb"><tr><th style="width:52px">图标</th><th>单词</th><th>释义</th><th style="width:120px">操作</th></tr>' +
+        list.map(function (x, i) {
+          var _ie = x.e || phEmojiFor(x.w);
+          var icon = _ie ? '<span class="ph-emo">' + wchEsc(_ie) + '</span>' : phBadgeHtml(x.w);
+          return '<tr><td>' + icon + '</td><td style="font-weight:700">' + wchEsc(x.w) + '</td><td style="color:#607d8b">' + wchEsc(x.zh || '—') + '</td>' +
+            '<td><button class="ph-say" data-i="' + i + '">🔊</button><button class="ph-del" data-i="' + i + '">删除</button></td></tr>';
+        }).join('') + '</table></div>';
+    }
+    h += '</div></div>';
+    sec.innerHTML = h;
+
+    var tpl = sec.querySelector('#ph-tpl');
+    if (tpl) tpl.onclick = function () {
+      var csv = '\uFEFF单词,图标,释义\r\ncat,🐱,猫\r\ndog,🐶,狗\r\nsun,☀️,太阳\r\nbook,📖,书\r\n';
+      try {
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = '自然拼读单词模板.csv';
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1200);
+        phToast('模板已下载，用 Excel/WPS 打开填写');
+      } catch (e) { phToast('下载失败：' + (e && e.message || e)); }
+    };
+
+    var back = sec.querySelector('#ph-back');
+    if (back) back.onclick = function () { if (window.navigateTo) window.navigateTo('page-phonics'); };
+
+    var fEl = sec.querySelector('#ph-file');
+    var fInfo = sec.querySelector('#ph-fileinfo');
+    if (fEl) fEl.onchange = async function () {
+      var f = fEl.files && fEl.files[0];
+      if (!f) { if (fInfo) fInfo.textContent = '未选择文件'; return; }
+      try {
+        var txt = await phReadFile(f);
+        var ta = sec.querySelector('#ph-txt');
+        if (ta) ta.value = txt.replace(/\r\n?/g, '\n').trim();
+        var pv = phParseCsv(txt);
+        if (fInfo) fInfo.textContent = '已读取 ' + f.name + '（' + pv.words.length + ' 个词待导入）';
+      } catch (e) {
+        if (fInfo) fInfo.textContent = '读取失败：' + (e && e.message || e);
+      }
+    };
+
+    sec.querySelectorAll('.ph-say').forEach(function (b) {
+      b.onclick = function () {
+        var x = list[Number(b.getAttribute('data-i'))];
+        if (x && window.speak) window.speak(x.w, 'en-US', 'english');
+      };
+    });
+    sec.querySelectorAll('.ph-del').forEach(function (b) {
+      b.onclick = async function () {
+        var i = Number(b.getAttribute('data-i'));
+        list.splice(i, 1);
+        await phSetWords(list);
+        renderWPhonics();
+      };
+    });
+
+    var imp = sec.querySelector('#ph-imp');
+    if (imp) imp.onclick = async function () {
+      var ta = sec.querySelector('#ph-txt');
+      var txt = ta ? ta.value : '';
+      var msg = sec.querySelector('#ph-msg');
+      if (!String(txt).trim()) { if (msg) { msg.style.color = '#ef6c00'; msg.textContent = '⚠️ 先选文件或粘贴几行内容'; } return; }
+      var pv = phParseCsv(txt);
+      if (!pv.words.length) {
+        if (msg) { msg.style.color = '#c62828'; msg.textContent = '❌ 没解析到单词。请确认每行第 1 列是英文单词，如 cat,🐱,猫'; }
+        return;
+      }
+      var cur = await phGetWords();
+      var idx = {}, merged = cur.slice();
+      merged.forEach(function (x, i) { idx[String(x.w).toLowerCase()] = i; });
+      var add = 0, upd = 0;
+      pv.words.forEach(function (n) {
+        var k = String(n.w).toLowerCase();
+        if (idx[k] != null) { merged[idx[k]] = n; upd++; }
+        else { idx[k] = merged.length; merged.push(n); add++; }
+      });
+      if (merged.length > PH_MAX) merged = merged.slice(0, PH_MAX);
+      await phSetWords(merged);
+      renderWPhonics();
+      var m2 = sec.querySelector('#ph-msg');
+      if (m2) {
+        m2.style.color = '#2e7d32';
+        m2.innerHTML = '✅ 导入完成：新增 <b>' + add + '</b> 个，覆盖更新 <b>' + upd + '</b> 个' +
+          (pv.skip ? '，跳过 <b>' + pv.skip + '</b> 行无法识别的内容' : '') +
+          '<br>现在去「自然拼读」页就能看到这些词卡，点 🔊 试听。';
+      }
+    };
+
+    var clr = sec.querySelector('#ph-clr');
+    if (clr) clr.onclick = async function () {
+      if (!list.length) { phToast('还没有导入的单词'); return; }
+      if (!window.confirm('确定清空全部 ' + list.length + ' 个导入的单词？内置 CVC 单词不受影响。')) return;
+      await phSetWords([]);
+      renderWPhonics();
+      phToast('已清空');
+    };
   }
 
   /* ================= 智能工具·英语单词库 [WCH481-TOOL] ================= */
@@ -16223,6 +16518,7 @@ var WCH_LV3='elephant,giraffe,squirrel,hedgehog,koala,kangaroo,ladybug,caterpill
     'page-phonics':   renderPhonics,
     'page-wchallenge': renderWChallenge,
     'page-tool-wlib':   renderWLib,
+    'page-tool-phonics': renderWPhonics,
 
     'page-algo':      renderQuiz,
 
@@ -23347,6 +23643,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
     h += '<span class="mx-note-inline">次/天（默认5）。今日已闯关 <b>' + (await sget('wch:plays:' + c + ':' + __wchToday, '0')) + '</b> 次。</span></div>';
     h += '<button class="mx-btn mx-btn-main" id="pt-wch-save" style="margin-top:8px">💾 保存单词闯关设置</button>';
     h += '<button class="mx-btn" id="pt-wch-lib" style="margin-top:8px;margin-left:8px">📚 英语词库管理 / 批量导入</button>';
+    h += '<button class="mx-btn" id="pt-ph-lib" style="margin-top:8px;margin-left:8px">🗣️ 自然拼读单词导入</button>';
     h += '</div>';
 
     /* ---- 🛠️ 家长工具箱：日历 / 套组 / 异常任务处理 / 自主导入 ---- */
@@ -23357,6 +23654,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="listen">🎧 熏听工坊</button>' +
       '<button type="button" class="mx-btn mx-btn-main" data-ptab="resources">📥 资源中心</button>' +
       '<button type="button" class="mx-btn mx-btn-main" data-go="page-tool-wlib">📚 英语词库管理</button>' +
+      '<button type="button" class="mx-btn mx-btn-main" data-go="page-tool-phonics">🗣️ 自然拼读单词导入</button>' +
       '<button type="button" class="mx-btn mx-btn-main" data-go="page-feedback">💌 建议与反馈</button>' +
     '</div>';
     h += '<div class="mx-sub-t" style="font-size:13px;font-weight:700;margin:6px 0 6px">🆘 异常任务处理（今日）</div>';
