@@ -19531,7 +19531,7 @@ window.getDailySchedule = window.getDailySchedule || function (cid, key) {
   }
   function mxUpsellGame(id) {
     var m = GAME_META[id] || { name: '该模块' };
-    var PUR = (window.__MX_CLOUD_CFG__ && window.__MX_CLOUD_CFG__.purchaseUrl) || 'https://your-purchase-link.example.com';
+    var PUR = (window.__MX_CLOUD_CFG__ && window.__MX_CLOUD_CFG__.purchaseUrl) || 'https://m.tb.cn/h.jSK53rX?tk=W4Bd6bG6VEo';
     var box = mxModal(
       '<div style="font-size:44px">🔒</div>' +
       '<div style="font-size:18px;font-weight:800;color:#1f3a5f;margin:6px 0 8px">「' + esc(m.name) + '」需会员解锁</div>' +
@@ -29761,7 +29761,7 @@ function downloadResourceFromCloud(resId) {
     } catch (e3) {}
     return mask;
   }
-  var PURCHASE_URL = (cloudConf() && cloudConf().purchaseUrl) || 'https://your-purchase-link.example.com';
+  var PURCHASE_URL = (cloudConf() && cloudConf().purchaseUrl) || 'https://m.tb.cn/h.jSK53rX?tk=W4Bd6bG6VEo';
 
   /* 场景A：本地模式弹窗 */
   /* [ACTREDLINE539] 激活红线埋点：激活链路每个关键节点上报云端，
@@ -31125,7 +31125,7 @@ function downloadResourceFromCloud(resId) {
      可直接内置；仍保留 /api/config 运行时回填作为可选覆盖。
      v2.4.1 修复：此前 envId 留空、静态托管无 /api/config 服务端 → tcbApp() 永远返回 null
      → 邮箱注册/登录一律报「云端未连接」。现直接内置真实 envId 修复该问题。 */
-  window.__MX_CLOUD_CFG__ = { envId: 'my-kb-d9grepb0u2ac94dc7', appId: 'my-kb-d9grepb0u2ac94dc7', purchaseUrl: 'https://your-purchase-link.example.com' };
+  window.__MX_CLOUD_CFG__ = { envId: 'my-kb-d9grepb0u2ac94dc7', appId: 'my-kb-d9grepb0u2ac94dc7', purchaseUrl: 'https://m.tb.cn/h.jSK53rX?tk=W4Bd6bG6VEo' };
   (function () {
     try {
       fetch('/api/config', { method: 'GET' })

@@ -62,6 +62,7 @@
   .gt .ico.del{color:var(--bad)}
   .gt tbody tr:hover{background:#f8fafd}
 </style>
+<script src="./assets/lame.min.js?v=1"></script>
 </head>
 <body data-page-node-id="smQgver1I8NjEG3k9089fM">
 
@@ -503,6 +504,18 @@
         <input id="roTitle" placeholder="资源名（可选）" style="width:170px">
         <input id="roModule" placeholder="归属模块（可选，如 poem）" style="width:190px">
         <button class="btn" onclick="officialUpload()">⬆ 直传为官方资源</button>
+      </div>
+      <div class="row" id="roCompressBar" style="margin-top:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:13px;display:flex;align-items:center;gap:5px;white-space:nowrap;margin:0">
+          <input type="checkbox" id="roCompressOn" style="width:auto"> 🗜️ 上传前压缩音频
+        </label>
+        <select id="roCompressPreset" style="max-width:250px">
+          <option value="48m">48 kbps 单声道 · 朗读/古诗（最小）</option>
+          <option value="64m" selected>64 kbps 单声道 · 朗读推荐</option>
+          <option value="96s">96 kbps 立体声 · 儿歌/音乐</option>
+          <option value="128s">128 kbps 立体声 · 高保真</option>
+        </select>
+        <span class="hint" style="margin:0">只对 mp3/wav/m4a/ogg 等音频生效；在浏览器本地压缩，不上传原始大文件、不额外花云端额度。不勾选或非音频一律原样上传。大文件可能要等几十秒。</span>
       </div>
       <div class="row" id="roBatchBar" style="margin-top:8px;display:none;align-items:center">
         <select id="roBatchSel" style="max-width:200px"></select>
@@ -2145,10 +2158,89 @@ async function adminMpuUpload(f, fp, ext, title, module){
   }
 }
 
+/* [AC651] 浏览器端音频压缩（纯本地，零外部服务）
+   依赖：./assets/lame.min.js（lamejs 1.2.1，156KB，同源静态资源）
+   流程：File → ArrayBuffer → AudioContext.decodeAudioData → 重采样 44100
+        → 单/双声道混流 → Int16 → lamejs.Mp3Encoder → File(*.mp3)
+   任何一步不支持都返回 {error}，调用方按原文件上传（绝不阻塞）。 */
+async function mxCompressAudio(file, preset){
+  const P = { '48m':[1,48], '64m':[1,64], '96s':[2,96], '128s':[2,128] }[preset] || [1,64];
+  const channels = P[0], kbps = P[1], SR = 44100;
+  if (typeof lamejs === 'undefined' || !lamejs.Mp3Encoder) return { error:'压缩库未加载，请刷新页面' };
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return { error:'当前浏览器不支持音频解码' };
+  let ctx = null;
+  try {
+    const ab = file.arrayBuffer ? await file.arrayBuffer() : await new Promise(function(res, rej){
+      const fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = rej; fr.readAsArrayBuffer(file);
+    });
+    ctx = new AC();
+    const buf = await new Promise(function(res, rej){
+      try { ctx.decodeAudioData(ab, res, rej); } catch(e){ rej(e); }
+    });
+    if (!buf || !buf.length) return { error:'音频为空或解码失败' };
+    const n = Math.max(1, Math.round(buf.duration * SR));
+    const ratio = buf.sampleRate / SR;
+    function resample(src, len){
+      const out = new Int16Array(len);
+      for (let i=0;i<len;i++){
+        const pos = i*ratio, j = Math.floor(pos), t = pos-j;
+        const a = src[j] || 0, b = src[j+1] || a;
+        let v = a + (b-a)*t;
+        v = v < -1 ? -1 : (v > 1 ? 1 : v);
+        out[i] = v < 0 ? v*0x8000 : v*0x7FFF;
+      }
+      return out;
+    }
+    function chan(k){
+      if (channels === 1 && buf.numberOfChannels > 1) {
+        const l = buf.getChannelData(0), r = buf.getChannelData(1);
+        const m = new Float32Array(l.length);
+        for (let i=0;i<l.length;i++) m[i] = (l[i] + r[i]) * 0.5;
+        return resample(m, n);
+      }
+      return resample(buf.getChannelData(Math.min(k, buf.numberOfChannels - 1)), n);
+    }
+    const L = chan(0), R = channels === 2 ? chan(1) : null;
+    const enc = new lamejs.Mp3Encoder(channels, SR, kbps);
+    const BLOCK = 1152, parts = [];
+    for (let i=0;i<L.length;i+=BLOCK){
+      const l = L.subarray(i, Math.min(i+BLOCK, L.length));
+      let d;
+      if (channels === 2) d = enc.encodeBuffer(l, R.subarray(i, Math.min(i+BLOCK, R.length)));
+      else d = enc.encodeBuffer(l);
+      if (d && d.length) parts.push(new Int8Array(d));
+    }
+    const tail = enc.flush();
+    if (tail && tail.length) parts.push(new Int8Array(tail));
+    const blob = new Blob(parts, { type:'audio/mpeg' });
+    if (!blob.size) return { error:'编码结果为空' };
+    const base = String(file.name).replace(/\.[^.]+$/, '');
+    return { file: new File([blob], base + '.mp3', { type:'audio/mpeg' }), original:file.size, compressed:blob.size };
+  } catch(e) {
+    return { error: String(e && e.message || e) };
+  } finally { try { if (ctx && ctx.close) ctx.close(); } catch(_){} }
+}
+
 async function officialUpload(){
   const inp = $('roFile');
-  const f = inp && inp.files && inp.files[0];
+  let f = inp && inp.files && inp.files[0];
   if (!f){ setMsg('roMsg','请先选择文件','bad'); return; }
+  /* [AC651] 上传前本地压缩：勾选与档位由管理员自己选；不勾选 / 非音频 / 压缩失败一律原样上传 */
+  const _cpOn = $('roCompressOn'), _cpSel = $('roCompressPreset');
+  if (_cpOn && _cpOn.checked && /\.(mp3|wav|m4a|aac|ogg|flac|webm)$/i.test(f.name)) {
+    setMsg('roMsg','🗜️ 正在本地压缩音频…（'+roBytes(f.size)+'）','sub');
+    try {
+      const cr = await mxCompressAudio(f, (_cpSel && _cpSel.value) || '64m');
+      if (cr && cr.file) {
+        const savedPct = Math.max(0, Math.round((f.size - cr.file.size) * 100 / f.size));
+        setMsg('roMsg','✅ 压缩完成：'+roBytes(f.size)+' → '+roBytes(cr.file.size)+'（省 '+savedPct+'%）','sub');
+        f = cr.file;
+      } else {
+        setMsg('roMsg','⚠️ 压缩未成功（'+((cr && cr.error) || '未知原因')+'），按原文件上传','warn');
+      }
+    } catch(e) { setMsg('roMsg','⚠️ 压缩异常，按原文件上传：'+String(e.message || e),'warn'); }
+  }
   const ext = (String(f.name).split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
   try{
     setMsg('roMsg','计算指纹…','sub');
