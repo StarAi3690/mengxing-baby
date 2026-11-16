@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<script>
+/* [REVIEW1107] 评审通道防扒取：拦截右键 / F12 / 开发者工具快捷键，降低令牌逻辑与入口被公开窃取的风险 */
+(function(){
+  function shield(e){
+    var k=e.key||'';
+    if(e.type==='contextmenu'){ e.preventDefault(); return; }
+    if(k==='F12'||(e.ctrlKey&&e.shiftKey&&(k==='I'||k==='J'||k==='C'))||(e.ctrlKey&&k==='U')){
+      e.preventDefault();
+    }
+  }
+  document.addEventListener('contextmenu', shield, false);
+  document.addEventListener('keydown', shield, false);
+})();
+</script>
 <title>萌星宝宝 · 评审体验通道</title>
 <style>
   html,body{margin:0;height:100%}
