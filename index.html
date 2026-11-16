@@ -13119,7 +13119,8 @@ window.MX_SEED = data;
   /* MX_PREFETCH_610 —— 资源本地缓存 + 首次预取（用户 2026-11-02 批准）
      需求：① 拼音/英语/节奏盒子/图标/诗画 等小资源进页面后自动全量预取；
            ② 图片一并预取（移动流量也下）；
-           ③ 累计 ≤150MB 自动下载，超过 150MB 弹窗询问，用户不同意就停在 150MB 内；
+           ③ **[PREFETCH1116] 分批下载：每次进站最多下 50MB，剩余留到下次进站自动续传**
+              （原策略是「总量 ≤150MB 就一次下满」，实测清单 92.32MB 从未触顶＝首次进站一次性下 92MB）；
            ④ 页脚提示首次加载会慢、已缓存的不再耗流量。
      实现：用 Cache Storage（caches）而非 Service Worker —— 无需 SW 即可读写，
            不影响 HTML/JS/CSS 的更新时效（红线 10：绝不缓存 HTML/js/css/接口）。
@@ -13127,7 +13128,8 @@ window.MX_SEED = data;
   (function () {
     if (typeof caches === "undefined" || !caches.open) return;
     var CACHE = "mx-assets-v1";
-    var BUDGET = 150 * 1024 * 1024;   /* [PREFETCH1103] 自动下载上限 150MB（超限直接停止，11-03 起不再弹窗询问） */
+    var BUDGET = 150 * 1024 * 1024;   /* [PREFETCH1103] 总量安全上限 150MB（超过即整批停下，防异常清单打爆流量） */
+    var SESSION_BUDGET = 50 * 1024 * 1024;   /* [PREFETCH1116] 单次进站下载额度 50MB，下不完下次续传 */
     var MANIFEST = "./assets/prefetch-manifest.json";
     var MODE_KEY = "mx_prefetch_mode";  /* "" | "full" | "declined" */
     var _has = Object.create(null);
@@ -13205,16 +13207,24 @@ window.MX_SEED = data;
       fetch(MANIFEST, { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (m) {
         var all = [];
         (m.groups || []).forEach(function (g) { (g.items || []).forEach(function (it) { all.push(it); }); });
-        /* [PREFETCH1103] 按清单顺序（core → img → poem）累计字节，超过 150MB 即停止预取（2026-11-03 起不再弹窗询问） */
-        var pending = [], cum = 0, needAsk = false;
+        /* [PREFETCH1116] 分批预取：按清单顺序（core → img → poem）累计，单次进站最多下 SESSION_BUDGET，
+           额度用完后的条目一律进 pending 留到下次进站（缓存命中即跳过，天然断点续传）。
+           原 [PREFETCH1103] 逻辑为「总量 ≤150MB 就一次下满」，实测清单 92.32MB 从未触顶。 */
+        var pending = [], cum = 0, needAsk = false, cachedBytes = 0;
         for (var i = 0; i < all.length; i++) {
-          if (_has[pn("./assets/" + all[i][0])]) { done++; continue; }
+          if (_has[pn("./assets/" + all[i][0])]) { done++; cachedBytes += all[i][1]; continue; }
           if (!full && cum + all[i][1] > BUDGET) { needAsk = true; }
           if (needAsk && !full) { pending.push(all[i]); continue; }
+          if (!full && cum + all[i][1] > SESSION_BUDGET) { pending.push(all[i]); continue; }
           cum += all[i][1]; queue.push(all[i]);
         }
         bytes = cum;
-        try { window.__mxPrefetchTotal = all.length; } catch (e) {}
+        try {
+          window.__mxPrefetchTotal = all.length;
+          window.__mxPrefetchCachedBytes = cachedBytes;
+          window.__mxPrefetchPendingCount = pending.length;
+          window.__mxPrefetchPendingBytes = pending.reduce(function (s, x) { return s + (x[1] || 0); }, 0);
+        } catch (e) {}
                 step();
       }).catch(function () { _running = false; });
     }
