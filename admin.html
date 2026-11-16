@@ -85,6 +85,7 @@
     <div class="tab" id="tab-mon" onclick="switchTab('mon')" data-page-node-id="8PsEbHuq3S0cokXMSYXS8V">📊 运营监控</div>
     <div class="tab" id="tab-fb" onclick="switchTab('fb')" data-page-node-id="S3uIFWJVAZsNKTfKq6Is10">💌 用户反馈</div>
     <div class="tab" id="tab-data" onclick="switchTab('data')" data-page-node-id="2Vt2j8HyzhM0J9P7PUhA8H">📋 数据明细</div>
+    <div class="tab" id="tab-cards" onclick="switchTab('cards')">🎟️ 卡密管理</div>
     <div class="tab" id="tab-sec" onclick="switchTab('sec')" data-page-node-id="J0dqbNKoDJq6GcIyTyOGFb">⚙️ 账号安全</div>
     <div class="tab" id="tab-goods" onclick="switchTab('goods')">🛍️ 商品配置</div>
     <div class="tab" id="tab-freeres" onclick="switchTab('freeres')">📦 免费资源库</div>
@@ -186,6 +187,101 @@
       </div>
       <div class="sub" data-page-node-id="VOuz6vxIQKjU6I7ya6SPhk">用户在「建议与反馈」模块提交的内容会同步到云端 <code data-page-node-id="iX5n67d9n7LlfVRx0cTQdm">Feedback</code> 集合，并直接出现在这里。可在腾讯云控制台查看与导出。</div>
       <div class="scroll" data-page-node-id="FPFH7WbRABWtfTCChgTLBr"><table id="fbTable" data-page-node-id="ZRsoLbfrEzGS9HTJrK838Z"><thead data-page-node-id="BQOQncseyU2IkPDDqvKFMz"><tr data-page-node-id="kVr4lqjnjwADQKQE9FdFL2"><th data-page-node-id="gAdEAk4vgHpXh0GYrOPXGB">时间</th><th data-page-node-id="l94acfnVRAX6oEoqJ5RITO">称呼</th><th data-page-node-id="9zJHqHpIDjgfk3oZduLG75">联系方式</th><th data-page-node-id="7MAUrfn9sBBlLgpfJXCMYE">账号</th><th data-page-node-id="0DhVbGS3exAvC52NPqB7xK">原激活卡密</th><th data-page-node-id="67WDWW58HSYt7U2g7Dquy7">来源页</th><th data-page-node-id="6KA2fVgrUzYRymnZn5IwL0">反馈内容</th></tr></thead><tbody data-page-node-id="1DoPgBHg0ozdStxlBgCJSF"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- 🎟️ 卡密管理（#560） -->
+  <div id="pane-cards" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">🎟️ 卡密库存总览</h3>
+        <span style="display:flex;gap:8px;align-items:center">
+          <button class="btn ghost sm" onclick="loadCards()">↺ 刷新</button>
+        </span>
+      </div>
+      <div class="sub" style="margin-bottom:10px">直连云端 <code>card_activation</code>。<b>「可用」= 未激活、未冻结、没人用过</b>，可以直接发给客户；生成/导入后立即入库，不用再跑本地同步脚本。</div>
+      <div class="grid" id="cardStats"></div>
+      <span id="cardsMsg" class="msg"></span>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 4px">✨ 生成新卡密 <span class="pill">生成即同步云端</span></h3>
+      <div class="sub">卡种、开头、长度、有效期全部由你定。生成后自动出现在下方列表，可直接复制/导出 CSV。</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-top:6px">
+        <div>
+          <label style="margin-top:0">卡种类型</label>
+          <select id="genType" onchange="genTypeChange()" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;background:#fff">
+            <option value="normal">普通卡 · 普通码（单设备）</option>
+            <option value="vip">VIP 卡（账号级 · 多设备）</option>
+            <option value="trial">体验卡（VIP 1 天 · 每设备限 1 次）</option>
+          </select>
+        </div>
+        <div><label style="margin-top:0">卡密开头（前缀）</label><input id="genPrefix" type="text" value="MX" maxlength="12" placeholder="如 MX / PT / VIP"></div>
+        <div><label style="margin-top:0">随机段长度</label><input id="genLen" type="text" value="14" placeholder="14"></div>
+        <div><label style="margin-top:0">生成数量</label><input id="genCount" type="text" value="10" placeholder="最多 500"></div>
+        <div><label style="margin-top:0">有效期天数</label><input id="genDays" type="text" value="31" placeholder="0 = 永久有效"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0;display:flex;align-items:center;gap:6px;color:var(--txt)"><input type="checkbox" id="genSym" checked> 含特殊符号（!@#$%&amp;*，更安全）</label>
+        <input id="genNote" type="text" placeholder="卡种备注（可选，如：2026双11 VIP月卡）" style="flex:1;min-width:200px">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="doGenCards()">✅ 生成并同步到云端</button>
+        <button class="btn ghost" onclick="genSample()">🎲 看一个示例</button>
+        <span id="genSampleBox" class="hint" style="margin:0"></span>
+      </div>
+      <span id="genMsg" class="msg"></span>
+
+      <div id="genResultBox" hidden style="margin-top:12px;border-top:1px dashed var(--line);padding-top:12px">
+        <div class="row" style="justify-content:space-between;margin-top:0">
+          <b id="genResultTitle" style="font-size:14px"></b>
+          <span style="display:flex;gap:8px">
+            <button class="btn ghost sm" onclick="copyText(document.getElementById('genResult').value, this)">📋 复制全部</button>
+            <button class="btn ghost sm" onclick="exportGenCSV()">⬇ 导出 CSV</button>
+            <button class="btn ghost sm" onclick="document.getElementById('genResultBox').hidden=true">收起</button>
+          </span>
+        </div>
+        <textarea id="genResult" rows="6" readonly style="margin-top:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
+        <div class="hint">🔒 关闭后这些卡号不会再次显示明文；请现在复制或导出保存。</div>
+      </div>
+
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--pri);font-weight:600">📥 已有卡密批量导入（从 Excel / 旧表粘贴，每行一个）</summary>
+        <div class="sub" style="margin:8px 0 0">按上面选的<b>卡种类型 / 有效期 / 备注</b>写入。已存在的卡号自动跳过，不会覆盖已激活信息。</div>
+        <textarea id="impCodes" rows="5" placeholder="MXabcd1234!xyz567&#10;MXefgh5678@uvw901（每行一个，也可用逗号分隔）" style="margin-top:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
+        <div class="row"><button class="btn ghost sm" onclick="doImportCards()">📥 导入并同步</button><span id="impMsg" class="msg"></span></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0">
+        <h3 style="margin:0">📋 卡密列表</h3>
+        <span style="display:flex;gap:8px">
+          <button class="btn ghost sm" onclick="exportCardCSV()">⬇ 导出当前列表 CSV</button>
+          <button class="btn ghost sm" onclick="loadCards()">↺ 刷新</button>
+        </span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="cardFilter" onchange="loadCards()" style="padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">
+          <option value="avail">✅ 可用（未激活）</option>
+          <option value="used">已激活</option>
+          <option value="frozen">已冻结</option>
+          <option value="all">全部</option>
+          <option value="vip">仅 VIP 卡</option>
+          <option value="normal">仅普通卡</option>
+        </select>
+        <input id="cardSearch" type="text" placeholder="搜索卡号 / 备注" style="flex:1;min-width:160px;padding:9px 12px" oninput="renderCardTable()">
+        <span id="cardCount" class="hint" style="margin:0"></span>
+      </div>
+      <div class="scroll" style="margin-top:10px">
+        <table id="cardListTable" style="min-width:860px">
+          <thead><tr>
+            <th style="min-width:190px">卡密</th><th>卡种</th><th>状态</th><th>有效期</th><th>备注</th><th>绑定/时间</th><th style="min-width:150px">操作</th>
+          </tr></thead>
+          <tbody id="cardListBody"><tr><td colspan="7" class="sub">点「刷新」加载…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="hint">「删除」只对<b>未激活</b>卡开放；已激活/已冻结卡一律拒绝删除，避免误删已售卡。需要停用请用「冻结」。</div>
     </div>
   </div>
 
@@ -623,12 +719,13 @@ function logout(){
   ADMIN_KEY=''; localStorage.removeItem('mx_admin_key'); location.reload();
 }
 function switchTab(t){
-  ['ann','nav','mon','fb','data','sec','goods','freeres','wish','intent','pub','resops'].forEach(function(x){
+  ['ann','nav','mon','fb','data','sec','goods','freeres','wish','intent','pub','resops','cards'].forEach(function(x){
     $('tab-'+x).classList.toggle('on', x===t);
     $('pane-'+x).hidden = (x!==t);
   });
   if (t==='fb') loadFeedback();
   if (t==='data') loadData();
+  if (t==='cards') loadCards();
   if (t==='sec') loadSecQ();
   if (t==='nav') loadNavOrder();
   if (t==='goods') loadGoods();
@@ -2388,6 +2485,230 @@ async function officialDel(fp, ext){
     else setMsg('roMsg','❌ '+((r&&r.msg)||'删除失败'),'bad');
     await loadResOps();
   }catch(e){ setMsg('roMsg','❌ '+String(e.message||e),'bad'); }
+}
+
+/* ============ 🎟️ 卡密管理（#560）============
+   数据源：mxAdmin action=cards（op: list / gen / import / del）
+   口径与 checkCard、sync_cards.js 一致：vip 布尔、未激活卡不带 devices、valid_days=0 永久。
+   生成即写库，所以「生成 = 一键同步」，不需要再跑本地脚本。 */
+let CARD_CACHE = { cards: [], stats: {}, matched: 0 };
+let CARD_VIEW = [];                       /* 当前表格实际渲染的行（过滤后），按钮按索引取用，避免卡号拼进 HTML 属性 */
+let GEN_LAST = { codes: [], type: 'normal', vip: false, days: 0, note: '' };
+
+function cardTs(v){
+  const n = Number(v) || 0;
+  if (!n) return '—';
+  const d = new Date(n);
+  const p = function(x){ return (x<10?'0':'')+x; };
+  return (d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function copyText(t, btn){
+  t = String(t || '');
+  if (!t) return;
+  const done = function(){
+    if (!btn) return;
+    const o = btn.textContent;
+    btn.textContent = '✅ 已复制';
+    setTimeout(function(){ btn.textContent = o; }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(done).catch(function(){ copyFallback(t, done); });
+  } else copyFallback(t, done);
+}
+function copyFallback(t, done){
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done && done(); }
+  catch(e){ alert('浏览器不允许自动复制，请手动全选复制：\n\n' + t); }
+  document.body.removeChild(ta);
+}
+
+async function loadCards(){
+  setMsg('cardsMsg','读取中…','sub');
+  try{
+    const r = await proxy('mxAdmin', { action:'cards', op:'list', adminKey: ADMIN_KEY, filter: $('cardFilter').value });
+    if (!r || !r.ok) { setMsg('cardsMsg','读取失败：'+((r && r.msg) || '未知错误'),'bad'); return; }
+    CARD_CACHE.cards = r.cards || [];
+    CARD_CACHE.stats = r.stats || {};
+    CARD_CACHE.matched = r.matched || 0;
+    renderCardStats();
+    renderCardTable();
+    setMsg('cardsMsg','✅ 已读取 '+ (r.matched||0) +' 条' + ((r.returned||0) < (r.matched||0) ? '（列表仅显示前 '+r.returned+' 条）' : ''), 'ok');
+  }catch(e){ setMsg('cardsMsg','读取失败：'+String(e.message||e),'bad'); }
+}
+
+function renderCardStats(){
+  const s = CARD_CACHE.stats || {};
+  $('cardStats').innerHTML =
+    '<div class="metric pri"><b>'+(s.total||0)+'</b><span>卡密总数</span></div>'+
+    '<div class="metric ok"><b>'+(s.avail||0)+'</b><span>✅ 可用（未激活）</span></div>'+
+    '<div class="metric"><b>'+(s.used||0)+'</b><span>已激活</span></div>'+
+    '<div class="metric warn"><b>'+(s.frozen||0)+'</b><span>已冻结</span></div>'+
+    '<div class="metric"><b>'+(s.vip||0)+'</b><span>其中 VIP 卡</span></div>'+
+    '<div class="metric"><b>'+(s.trial||0)+'</b><span>其中体验卡</span></div>';
+}
+
+function renderCardTable(){
+  const kw = String($('cardSearch').value || '').trim().toLowerCase();
+  let list = CARD_CACHE.cards || [];
+  if (kw) list = list.filter(function(c){
+    return String(c.code||'').toLowerCase().indexOf(kw) >= 0 || String(c.note||'').toLowerCase().indexOf(kw) >= 0;
+  });
+  CARD_VIEW = list;
+  $('cardCount').textContent = kw ? ('匹配 '+list.length+' / '+CARD_CACHE.matched+' 条') : ('共 '+CARD_CACHE.matched+' 条');
+  const tb = $('cardListBody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="sub">没有符合条件的卡密</td></tr>'; return; }
+
+  tb.innerHTML = list.map(function(c, i){
+    const typeTxt = c.vip ? (c.days === 1 ? 'VIP 体验' : 'VIP') : '普通';
+    const stTxt = c.frozen ? '已冻结' : (c.isUsed ? '已激活' : '可用');
+    const stColor = c.frozen ? '#e8a33d' : (c.isUsed ? '#6b7a93' : '#1faa6b');
+    const meta = c.isUsed
+      ? ('激活 ' + cardTs(c.usedAt) + (c.deviceCount ? ' · ' + c.deviceCount + ' 台设备' : ''))
+      : ('生成 ' + cardTs(c.createdAt));
+    let ops = '<button class="btn ghost sm" onclick="copyCardAt('+i+',this)">📋 复制</button>';
+    if (c.isUsed || c.frozen) {
+      ops += ' <button class="btn ghost sm" onclick="freezeCardAt('+i+',false)">🔥 解冻</button>';
+    } else {
+      ops += ' <button class="btn ghost sm" onclick="freezeCardAt('+i+',true)">❄️ 冻结</button>';
+    }
+    if (!c.isUsed) ops += ' <button class="btn ghost sm" onclick="delCardAt('+i+')" style="color:#e25563">🗑 删除</button>';
+    return '<tr>'+
+      '<td style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">'+esc(c.code)+'</td>'+
+      '<td>'+(c.vip ? '<span class="pill">'+typeTxt+'</span>' : typeTxt)+'</td>'+
+      '<td style="color:'+stColor+';font-weight:'+(c.isUsed||c.frozen?'400':'700')+'">'+stTxt+'</td>'+
+      '<td>'+(c.days > 0 ? c.days+' 天' : '永久')+'</td>'+
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c.note ? esc(c.note) : '<span style="color:#aab">—</span>')+'</td>'+
+      '<td class="sub" style="font-size:12px">'+meta+'</td>'+
+      '<td>'+ops+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function copyCardAt(i, btn){
+  const c = CARD_VIEW[i];
+  if (c) copyText(c.code, btn);
+}
+
+async function freezeCardAt(i, freeze){
+  const c = CARD_VIEW[i];
+  if (!c) return;
+  if (!confirm((freeze ? '确认冻结该卡密？\n该卡在所有设备上会立即失效：' : '确认解冻该卡密？\n设备端下次复查即恢复：') + '\n' + c.code)) return;
+  try{
+    const r = await proxy('mxAdmin', { action:'cardFreeze', adminKey: ADMIN_KEY, code: c.code, freeze: !!freeze });
+    if (r && r.ok) { setMsg('cardsMsg','✅ ' + (r.msg || '操作成功'), 'ok'); loadCards(); }
+    else setMsg('cardsMsg','❌ ' + ((r && r.msg) || '操作失败'), 'bad');
+  }catch(e){ setMsg('cardsMsg','❌ '+String(e.message||e),'bad'); }
+}
+
+async function delCardAt(i){
+  const c = CARD_VIEW[i];
+  if (!c) return;
+  if (!confirm('确认删除这张未激活卡密？删除后无法恢复：\n' + c.code)) return;
+  try{
+    const r = await proxy('mxAdmin', { action:'cards', op:'del', adminKey: ADMIN_KEY, codes: [c.code] });
+    if (r && r.ok && r.removed > 0) { setMsg('cardsMsg','✅ 已删除 1 张', 'ok'); loadCards(); }
+    else setMsg('cardsMsg','❌ ' + ((r && (r.skipped||[])[0]) || (r && r.msg) || '删除失败'), 'bad');
+  }catch(e){ setMsg('cardsMsg','❌ '+String(e.message||e),'bad'); }
+}
+
+function genTypeChange(){
+  const t = $('genType').value;
+  const dEl = $('genDays');
+  if (t === 'trial') { dEl.value = '1'; dEl.disabled = true; }
+  else { dEl.disabled = false; if (!String(dEl.value||'').trim() || dEl.value === '1') dEl.value = (t === 'vip' ? '31' : '0'); }
+  genSample();
+}
+
+function genSample(){
+  const prefix = String($('genPrefix').value || 'MX').replace(/[^A-Za-z0-9]/g,'').slice(0,12);
+  const len = parseInt($('genLen').value, 10) || 14;
+  const sym = $('genSym').checked;
+  const pool = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789' + (sym ? '!@#$%&*' : '');
+  let s = '';
+  for (let i = 0; i < len; i++) s += pool.charAt(Math.floor(Math.random() * pool.length));
+  $('genSampleBox').innerHTML = '示例：<code>' + esc(prefix + s) + '</code>（' + (prefix.length + len) + ' 位）';
+}
+
+async function doGenCards(){
+  const type = $('genType').value;
+  const vip = (type === 'vip' || type === 'trial');
+  let days = parseInt($('genDays').value, 10);
+  if (isNaN(days) || days < 0) days = 0;
+  if (type === 'trial') days = 1;
+  const prefix = String($('genPrefix').value || '').trim();
+  const randLen = parseInt($('genLen').value, 10) || 0;
+  const count = parseInt($('genCount').value, 10) || 0;
+  const note = String($('genNote').value || '').trim();
+  const useSym = !!$('genSym').checked;
+
+  if (!/^[A-Za-z0-9]*$/.test(prefix)) { setMsg('genMsg','❌ 前缀只能用字母和数字','bad'); return; }
+  if (prefix.length + randLen < 16) { setMsg('genMsg','❌ 前缀 + 随机段必须 ≥ 16 位（激活校验硬要求）','bad'); return; }
+  if (randLen < 4 || randLen > 30) { setMsg('genMsg','❌ 随机段长度需在 4~30 之间','bad'); return; }
+  if (count < 1 || count > 500) { setMsg('genMsg','❌ 数量需在 1~500 之间','bad'); return; }
+
+  const typeTxt = type === 'trial' ? 'VIP 体验卡（1 天）' : (vip ? 'VIP 卡' : '普通卡');
+  if (!confirm('确认生成 ' + count + ' 张「' + typeTxt + '」？\n\n前缀：' + prefix + '\n有效期：' + (days > 0 ? days + ' 天' : '永久有效') + (note ? '\n备注：' + note : '') + '\n\n生成后立即写入云端，可直接发给客户。')) return;
+
+  setMsg('genMsg','生成中，请稍候…','sub');
+  try{
+    const r = await proxy('mxAdmin', { action:'cards', op:'gen', adminKey: ADMIN_KEY,
+      count: count, prefix: prefix, randLen: randLen, vip: vip, days: days, note: note, useSym: useSym });
+    if (!r || !r.ok) { setMsg('genMsg','❌ ' + ((r && r.msg) || '生成失败'), 'bad'); return; }
+    GEN_LAST = { codes: r.codes || [], type: type, vip: vip, days: days, note: note };
+    $('genResult').value = GEN_LAST.codes.join('\n');
+    $('genResultTitle').textContent = '✅ 已生成 ' + GEN_LAST.codes.length + ' 张 · ' + typeTxt + ' · ' + (days > 0 ? days + ' 天' : '永久');
+    $('genResultBox').hidden = false;
+    setMsg('genMsg','✅ 已同步到云端' + (r.fail ? '（失败 ' + r.fail + ' 张）' : ''), 'ok');
+    loadCards();
+  }catch(e){ setMsg('genMsg','❌ 生成失败：' + String(e.message||e), 'bad'); }
+}
+
+async function doImportCards(){
+  const raw = String($('impCodes').value || '').trim();
+  if (!raw) { setMsg('impMsg','请先粘贴卡号','bad'); return; }
+  const type = $('genType').value;
+  const vip = (type === 'vip' || type === 'trial');
+  let days = parseInt($('genDays').value, 10); if (isNaN(days) || days < 0) days = 0;
+  if (type === 'trial') days = 1;
+  const note = String($('genNote').value || '').trim();
+  if (!confirm('确认导入这些卡号并按「' + (type === 'trial' ? 'VIP 体验卡' : (vip ? 'VIP 卡' : '普通卡')) + ' / ' + (days > 0 ? days + ' 天' : '永久') + '」写入云端？\n已存在的卡号会自动跳过。')) return;
+  setMsg('impMsg','导入中…','sub');
+  try{
+    const r = await proxy('mxAdmin', { action:'cards', op:'import', adminKey: ADMIN_KEY,
+      codes: raw, vip: vip, days: days, note: note });
+    if (!r || !r.ok) { setMsg('impMsg','❌ ' + ((r && r.msg) || '导入失败'), 'bad'); return; }
+    setMsg('impMsg','✅ 成功 ' + (r.imported||0) + ' 张，跳过已存在 ' + (r.dup||0) + ' 张' + ((r.badCount||0) ? '，格式非法 ' + r.badCount + ' 张' : ''), 'ok');
+    if (r.imported) { $('impCodes').value = ''; loadCards(); }
+  }catch(e){ setMsg('impMsg','❌ 导入失败：' + String(e.message||e), 'bad'); }
+}
+
+function exportGenCSV(){
+  if (!GEN_LAST.codes.length) { alert('还没有生成结果'); return; }
+  const typeTxt = GEN_LAST.type === 'trial' ? 'VIP体验卡' : (GEN_LAST.vip ? 'VIP卡' : '普通卡');
+  const L = ['卡密,卡种,有效期天数,备注'];
+  const q = function(s){ return '"' + String(s||'').replace(/"/g,'""') + '"'; };
+  GEN_LAST.codes.forEach(function(c){ L.push(q(c) + ',' + typeTxt + ',' + GEN_LAST.days + ',' + q(GEN_LAST.note)); });
+  downloadCSV(L, 'mx_cards_new_' + new Date().toISOString().slice(0,10) + '.csv');
+}
+
+function exportCardCSV(){
+  if (!CARD_VIEW.length) { alert('当前列表为空'); return; }
+  const q = function(s){ return '"' + String(s||'').replace(/"/g,'""') + '"'; };
+  const L = ['卡密,卡种,状态,有效期天数,备注,激活/生成时间,设备数'];
+  CARD_VIEW.forEach(function(c){
+    L.push(q(c.code) + ',' + (c.vip ? (c.days===1?'VIP体验':'VIP') : '普通') + ',' + q(c.status) + ',' + (c.days||0) + ',' + q(c.note) + ',' + q(cardTs(c.isUsed ? c.usedAt : c.createdAt)) + ',' + (c.deviceCount||0));
+  });
+  downloadCSV(L, 'mx_cards_' + $('cardFilter').value + '_' + new Date().toISOString().slice(0,10) + '.csv');
+}
+
+function downloadCSV(lines, filename){
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 </script>
 </body>
